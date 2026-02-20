@@ -1,0 +1,36 @@
+# Build artifacts
+target/
+node_modules/
+dist/
+output/
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Project management
+.project-management/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Documentation
+*.md
+LICENSE
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore

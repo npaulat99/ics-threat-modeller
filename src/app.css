@@ -1,0 +1,129 @@
+/* ICS Threat Modeller — Global Styles */
+
+:root {
+  /* Primary palette */
+  --color-primary: #1a365d;
+  --color-primary-light: #2c5282;
+  --color-primary-dark: #1a202c;
+
+  /* Backgrounds */
+  --color-bg: #ffffff;
+  --color-sidebar-bg: #f7fafc;
+  --color-card-bg: #f7fafc;
+  --color-footer-bg: #edf2f7;
+
+  /* Text */
+  --color-text: #2d3748;
+  --color-text-muted: #718096;
+
+  /* Borders */
+  --color-border: #e2e8f0;
+
+  /* Interactive */
+  --color-hover: #edf2f7;
+  --color-active: #e2e8f0;
+  --color-badge-bg: #e2e8f0;
+
+  /* Secondary */
+  --color-secondary: #edf2f7;
+
+  /* Severity */
+  --color-severity-critical: #e53e3e;
+  --color-severity-high: #dd6b20;
+  --color-severity-medium: #d69e2e;
+  --color-severity-low: #38a169;
+
+  /* Typography */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color: var(--color-text);
+  background-color: var(--color-bg);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+#app {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Link styles */
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Selection */
+::selection {
+  background: var(--color-primary);
+  color: white;
+}
+
+/* Utility classes */
+.severity-critical {
+  background: #fed7d7;
+  color: #c53030;
+}
+
+.severity-high {
+  background: #feebc8;
+  color: #c05621;
+}
+
+.severity-medium {
+  background: #fefcbf;
+  color: #975a16;
+}
+
+.severity-low {
+  background: #c6f6d5;
+  color: #276749;
+}

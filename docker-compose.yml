@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  ics-threat-modeller:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ics-threat-modeller
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}
+    volumes:
+      # Mount X11 socket for GUI display (Linux).
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Persist database across container restarts.
+      - ics-data:/app/data
+    network_mode: host
+    # For GUI rendering on Linux.
+    privileged: false
+    security_opt:
+      - seccomp:unconfined
+
+  # Development build service (does not run the app).
+  build-only:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: ics-build
+    volumes:
+      - ./output:/output
+    command: >
+      sh -c "
+        mkdir -p /output &&
+        cp /app/src-tauri/target/release/ics-threat-modeller /output/ 2>/dev/null || true &&
+        cp -r /app/src-tauri/target/release/bundle/ /output/bundle/ 2>/dev/null || true &&
+        echo 'Build artifacts copied to ./output/'
+      "
+
+volumes:
+  ics-data:
+    driver: local
