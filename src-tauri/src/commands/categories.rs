@@ -158,6 +158,12 @@ pub fn delete_category_cascade(conn: &rusqlite::Connection, cat_id: &str) -> Res
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_category(db: State<'_, Database>, id: String) -> Result<Category, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    get_category_by_id(&conn, &id)
+}
+
 fn get_category_by_id(conn: &rusqlite::Connection, id: &str) -> Result<Category, String> {
     conn.query_row(
         "SELECT id, parent_id, parent_type, name, description, sort_order, created_at, updated_at

@@ -166,6 +166,12 @@ fn delete_goal_cascade(conn: &rusqlite::Connection, goal_id: &str) -> Result<(),
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_goal(db: State<'_, Database>, id: String) -> Result<Goal, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    get_goal_by_id(&conn, &id)
+}
+
 fn get_goal_by_id(conn: &rusqlite::Connection, id: &str) -> Result<Goal, String> {
     conn.query_row(
         "SELECT id, project_id, name, description, impact_category, catalog_source_id, sort_order, created_at, updated_at

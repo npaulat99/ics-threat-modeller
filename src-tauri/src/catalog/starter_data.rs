@@ -71,13 +71,15 @@ fn firmware_compromise() -> CatalogEntry {
 
     CatalogEntry {
         id: Uuid::new_v4().to_string(),
+        entry_type: "attack_tree".to_string(),
         name: "Firmware Compromise".to_string(),
         description: "Attack tree template for firmware compromise scenarios on embedded ICS devices.".to_string(),
-        category: "Firmware".to_string(),
-        severity: "critical".to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
-        source: "ICS-CERT / MITRE ATT&CK for ICS".to_string(),
+        source_framework: "ICS-CERT / MITRE ATT&CK for ICS".to_string(),
+        version: "1.0".to_string(),
+        tags: "[]".to_string(),
         created_at: String::new(),
+        updated_at: String::new(),
     }
 }
 
@@ -132,13 +134,15 @@ fn process_manipulation() -> CatalogEntry {
 
     CatalogEntry {
         id: Uuid::new_v4().to_string(),
+        entry_type: "attack_tree".to_string(),
         name: "Process Manipulation".to_string(),
         description: "Attack tree template for industrial process manipulation scenarios.".to_string(),
-        category: "Process Control".to_string(),
-        severity: "critical".to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
-        source: "ICS-CERT / MITRE ATT&CK for ICS".to_string(),
+        source_framework: "ICS-CERT / MITRE ATT&CK for ICS".to_string(),
+        version: "1.0".to_string(),
+        tags: "[]".to_string(),
         created_at: String::new(),
+        updated_at: String::new(),
     }
 }
 
@@ -193,13 +197,15 @@ fn persistent_access() -> CatalogEntry {
 
     CatalogEntry {
         id: Uuid::new_v4().to_string(),
+        entry_type: "attack_tree".to_string(),
         name: "Persistent Access".to_string(),
         description: "Attack tree template for establishing persistent access to ICS environments.".to_string(),
-        category: "Access".to_string(),
-        severity: "high".to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
-        source: "ICS-CERT / MITRE ATT&CK for ICS".to_string(),
+        source_framework: "ICS-CERT / MITRE ATT&CK for ICS".to_string(),
+        version: "1.0".to_string(),
+        tags: "[]".to_string(),
         created_at: String::new(),
+        updated_at: String::new(),
     }
 }
 
@@ -254,13 +260,15 @@ fn information_leakage() -> CatalogEntry {
 
     CatalogEntry {
         id: Uuid::new_v4().to_string(),
+        entry_type: "attack_tree".to_string(),
         name: "Information Leakage".to_string(),
         description: "Attack tree template for exfiltration of sensitive process data from ICS.".to_string(),
-        category: "Data Exfiltration".to_string(),
-        severity: "high".to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
-        source: "ICS-CERT / MITRE ATT&CK for ICS".to_string(),
+        source_framework: "ICS-CERT / MITRE ATT&CK for ICS".to_string(),
+        version: "1.0".to_string(),
+        tags: "[]".to_string(),
         created_at: String::new(),
+        updated_at: String::new(),
     }
 }
 
@@ -296,13 +304,15 @@ fn supply_chain_attack() -> CatalogEntry {
 
     CatalogEntry {
         id: Uuid::new_v4().to_string(),
+        entry_type: "attack_tree".to_string(),
         name: "Supply Chain Attack".to_string(),
         description: "Attack tree template for supply chain compromise of ICS components.".to_string(),
-        category: "Supply Chain".to_string(),
-        severity: "critical".to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
-        source: "MITRE ATT&CK for ICS".to_string(),
+        source_framework: "MITRE ATT&CK for ICS".to_string(),
+        version: "1.0".to_string(),
+        tags: "[]".to_string(),
         created_at: String::new(),
+        updated_at: String::new(),
     }
 }
 
@@ -357,13 +367,15 @@ fn credential_theft() -> CatalogEntry {
 
     CatalogEntry {
         id: Uuid::new_v4().to_string(),
+        entry_type: "attack_tree".to_string(),
         name: "Credential Theft".to_string(),
         description: "Attack tree template for credential theft targeting ICS systems.".to_string(),
-        category: "Access".to_string(),
-        severity: "high".to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
-        source: "MITRE ATT&CK for ICS".to_string(),
+        source_framework: "MITRE ATT&CK for ICS".to_string(),
+        version: "1.0".to_string(),
+        tags: "[]".to_string(),
         created_at: String::new(),
+        updated_at: String::new(),
     }
 }
 
@@ -418,13 +430,15 @@ fn denial_of_service() -> CatalogEntry {
 
     CatalogEntry {
         id: Uuid::new_v4().to_string(),
+        entry_type: "attack_tree".to_string(),
         name: "Denial of Service".to_string(),
         description: "Attack tree template for denial of service attacks against ICS.".to_string(),
-        category: "Availability".to_string(),
-        severity: "high".to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
-        source: "MITRE ATT&CK for ICS".to_string(),
+        source_framework: "MITRE ATT&CK for ICS".to_string(),
+        version: "1.0".to_string(),
+        tags: "[]".to_string(),
         created_at: String::new(),
+        updated_at: String::new(),
     }
 }
 
@@ -460,12 +474,14 @@ fn sensor_spoofing() -> CatalogEntry {
 
     CatalogEntry {
         id: Uuid::new_v4().to_string(),
+        entry_type: "attack_tree".to_string(),
         name: "Sensor Spoofing".to_string(),
         description: "Attack tree template for sensor data manipulation in ICS.".to_string(),
-        category: "Process Control".to_string(),
-        severity: "high".to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
-        source: "MITRE ATT&CK for ICS".to_string(),
+        source_framework: "MITRE ATT&CK for ICS".to_string(),
+        version: "1.0".to_string(),
+        tags: "[]".to_string(),
         created_at: String::new(),
+        updated_at: String::new(),
     }
 }

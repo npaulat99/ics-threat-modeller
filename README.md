@@ -93,7 +93,6 @@ sudo apt-get install -y nodejs
 # System dependencies for Tauri
 sudo apt-get install -y \
   libwebkit2gtk-4.1-dev \
-  libappindicator3-dev \
   librsvg2-dev \
   patchelf \
   libssl-dev \

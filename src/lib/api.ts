@@ -151,11 +151,11 @@ export const deleteWeakness = (id: string) =>
 export const createAssessment = (data: CreateAssessment) =>
   invoke<Assessment>('create_assessment', { data });
 
-export const listAssessments = (stepId: string) =>
-  invoke<Assessment[]>('list_assessments', { stepId });
+export const getAssessments = (entityId: string, entityType: string) =>
+  invoke<Assessment[]>('get_assessments', { entityId, entityType });
 
-export const getAssessment = (id: string) =>
-  invoke<Assessment>('get_assessment', { id });
+export const listAssessments = (stepId: string) =>
+  invoke<Assessment[]>('get_assessments', { entityId: stepId, entityType: 'step' });
 
 export const updateAssessment = (data: UpdateAssessment) =>
   invoke<Assessment>('update_assessment', { data });
@@ -219,7 +219,7 @@ export const importCatalogEntry = (catalogId: string, projectId: string) =>
   invoke<string>('import_catalog_entry', { catalogId, projectId });
 
 export const seedCatalog = () =>
-  invoke<number>('seed_catalog');
+  invoke<number>('seed_catalog_command');
 
 // ─── Export / Import ────────────────────────────────────────────
 export const exportProjectJson = (projectId: string) =>

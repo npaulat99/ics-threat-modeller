@@ -126,6 +126,12 @@ pub fn delete_attacker_profile(db: State<'_, Database>, id: String) -> Result<()
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_attacker_profile(db: State<'_, Database>, id: String) -> Result<AttackerProfile, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    get_profile_by_id(&conn, &id)
+}
+
 fn get_profile_by_id(conn: &rusqlite::Connection, id: &str) -> Result<AttackerProfile, String> {
     conn.query_row(
         "SELECT id, project_id, name, skill_level, access_level, description, created_at, updated_at

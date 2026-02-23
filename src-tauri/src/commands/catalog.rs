@@ -88,6 +88,33 @@ pub fn delete_catalog_entry(db: State<'_, Database>, id: String) -> Result<(), S
     Ok(())
 }
 
+#[tauri::command]
+pub fn update_catalog_entry(
+    db: State<'_, Database>,
+    id: String,
+    data: CreateCatalogEntry,
+) -> Result<CatalogEntry, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    conn.execute(
+        "UPDATE catalog_entries SET name = ?1, description = ?2, tree_data = ?3, source_framework = ?4, version = ?5, tags = ?6, updated_at = ?7 WHERE id = ?8",
+        params![
+            data.name,
+            data.description.unwrap_or_default(),
+            data.tree_data,
+            data.source_framework.unwrap_or_default(),
+            data.version.unwrap_or_else(|| "1.0".to_string()),
+            data.tags.unwrap_or_else(|| "[]".to_string()),
+            now,
+            id,
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+
+    get_entry_by_id(&conn, &id)
+}
+
 /// Import a catalog entry's tree into a project.
 /// Creates goals, steps, substeps, countermeasures, weaknesses, and assessments
 /// from the catalog entry's tree_data JSON.
@@ -287,6 +314,13 @@ pub fn seed_catalog(conn: &rusqlite::Connection) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// Tauri command wrapper for seed_catalog.
+#[tauri::command]
+pub fn seed_catalog_command(db: State<'_, Database>) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    seed_catalog(&conn)
 }
 
 fn get_entry_by_id(conn: &rusqlite::Connection, id: &str) -> Result<CatalogEntry, String> {

@@ -123,6 +123,12 @@ pub fn delete_weakness(db: State<'_, Database>, id: String) -> Result<(), String
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_weakness(db: State<'_, Database>, id: String) -> Result<Weakness, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    get_weakness_by_id(&conn, &id)
+}
+
 fn get_weakness_by_id(conn: &rusqlite::Connection, id: &str) -> Result<Weakness, String> {
     conn.query_row(
         "SELECT id, parent_id, parent_type, name, description, severity, cve_id, sort_order, created_at, updated_at

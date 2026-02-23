@@ -10,10 +10,8 @@ use uuid::Uuid;
 #[tauri::command]
 pub fn create_snapshot(db: State<'_, Database>, data: CreateSnapshot) -> Result<Snapshot, String> {
     // Build the full project export as JSON for the snapshot.
-    let json = super::export_import::export_project_json(
-        State::from(&*db),
-        data.project_id.clone(),
-    )?;
+    let export = super::export_import::build_project_export(&db, &data.project_id)?;
+    let json = serde_json::to_string_pretty(&export).map_err(|e| e.to_string())?;
 
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let id = Uuid::new_v4().to_string();
@@ -106,10 +104,9 @@ pub fn restore_snapshot(db: State<'_, Database>, snapshot_id: String) -> Result<
     }
 
     // Re-import the snapshot data.
-    super::export_import::import_project_json(
-        State::from(&*db),
-        snapshot.snapshot_data,
-    )
+    let export: crate::db::models::ProjectExport = serde_json::from_str(&snapshot.snapshot_data)
+        .map_err(|e| format!("Invalid snapshot data: {}", e))?;
+    super::export_import::import_project_data(&db, export)
 }
 
 /// Delete a snapshot.

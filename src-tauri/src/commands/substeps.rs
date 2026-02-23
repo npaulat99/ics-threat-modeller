@@ -143,6 +143,12 @@ pub fn delete_substep(db: State<'_, Database>, id: String) -> Result<(), String>
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_substep(db: State<'_, Database>, id: String) -> Result<Substep, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    get_substep_by_id(&conn, &id)
+}
+
 fn get_substep_by_id(conn: &rusqlite::Connection, id: &str) -> Result<Substep, String> {
     conn.query_row(
         "SELECT id, parent_step_id, conjunction, name, description, access_level, skill_level, sort_order, created_at, updated_at

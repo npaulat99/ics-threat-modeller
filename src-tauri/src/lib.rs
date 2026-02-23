@@ -5,27 +5,17 @@ pub mod commands;
 pub mod db;
 
 use db::Database;
+use std::path::Path;
 
 /// Build and configure the Tauri application.
 pub fn run() {
-    let database = Database::open("ics_threat_modeller.db").expect("Failed to open database");
+    let database =
+        Database::open(Path::new("ics_threat_modeller.db")).expect("Failed to open database");
 
     // Seed catalog on first run.
     {
         let conn = database.conn.lock().unwrap();
-        let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM catalog_entries", [], |r| r.get(0))
-            .unwrap_or(0);
-        if count == 0 {
-            let entries = catalog::starter_data::get_starter_entries();
-            let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-            for entry in entries {
-                conn.execute(
-                    "INSERT OR IGNORE INTO catalog_entries (id, name, description, category, severity, tree_data, source, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                    rusqlite::params![entry.id, entry.name, entry.description, entry.category, entry.severity, entry.tree_data, entry.source, now],
-                ).ok();
-            }
-        }
+        commands::catalog::seed_catalog(&conn).ok();
     }
 
     tauri::Builder::default()
@@ -84,8 +74,7 @@ pub fn run() {
             commands::weaknesses::delete_weakness,
             // Assessments
             commands::assessments::create_assessment,
-            commands::assessments::list_assessments,
-            commands::assessments::get_assessment,
+            commands::assessments::get_assessments,
             commands::assessments::update_assessment,
             commands::assessments::delete_assessment,
             commands::assessments::upsert_assessment,
@@ -108,7 +97,7 @@ pub fn run() {
             commands::catalog::delete_catalog_entry,
             commands::catalog::search_catalog,
             commands::catalog::import_catalog_entry,
-            commands::catalog::seed_catalog,
+            commands::catalog::seed_catalog_command,
             // Export / Import
             commands::export_import::export_project_json,
             commands::export_import::export_project_yaml,

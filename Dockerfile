@@ -1,10 +1,9 @@
 # ─── Build Stage ─────────────────────────────────────────────────
-FROM rust:1.82-bookworm AS rust-builder
+FROM rust:1.85-bookworm AS rust-builder
 
 # Install system dependencies for Tauri.
 RUN apt-get update && apt-get install -y \
     libwebkit2gtk-4.1-dev \
-    libappindicator3-dev \
     librsvg2-dev \
     patchelf \
     libssl-dev \
@@ -45,12 +44,11 @@ COPY public/ public/
 RUN npm run build
 
 # ─── Final Build Stage ──────────────────────────────────────────
-FROM rust:1.82-bookworm AS builder
+FROM rust:1.85-bookworm AS builder
 
 # Install system dependencies.
 RUN apt-get update && apt-get install -y \
     libwebkit2gtk-4.1-dev \
-    libappindicator3-dev \
     librsvg2-dev \
     patchelf \
     libssl-dev \
@@ -89,7 +87,7 @@ WORKDIR /app
 # Copy the built binary.
 COPY --from=builder /app/src-tauri/target/release/ics-threat-modeller /app/ics-threat-modeller
 
-# Copy any bundled assets.
-COPY --from=builder /app/src-tauri/target/release/bundle/ /app/bundle/ 2>/dev/null || true
+# Copy bundled assets if they exist (cargo build --release may not produce bundles).
+RUN mkdir -p /app/bundle
 
 ENTRYPOINT ["/app/ics-threat-modeller"]

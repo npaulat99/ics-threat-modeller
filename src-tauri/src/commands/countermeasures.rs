@@ -126,6 +126,12 @@ pub fn delete_countermeasure(db: State<'_, Database>, id: String) -> Result<(), 
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_countermeasure(db: State<'_, Database>, id: String) -> Result<Countermeasure, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    get_cm_by_id(&conn, &id)
+}
+
 fn get_cm_by_id(conn: &rusqlite::Connection, id: &str) -> Result<Countermeasure, String> {
     conn.query_row(
         "SELECT id, parent_id, parent_type, name, description, effectiveness, implementation_cost, sort_order, created_at, updated_at

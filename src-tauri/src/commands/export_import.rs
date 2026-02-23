@@ -194,7 +194,7 @@ fn export_category_to_files(
 }
 
 /// Build the full ProjectExport structure from the database.
-fn build_project_export(db: &Database, project_id: &str) -> Result<ProjectExport, String> {
+pub fn build_project_export(db: &Database, project_id: &str) -> Result<ProjectExport, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
     // Project.
@@ -389,7 +389,7 @@ fn build_steps_export(
 }
 
 /// Import a full ProjectExport into the database, assigning new IDs to avoid conflicts.
-fn import_project_data(db: &Database, data: ProjectExport) -> Result<String, String> {
+pub fn import_project_data(db: &Database, data: ProjectExport) -> Result<String, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
