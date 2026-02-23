@@ -13,8 +13,8 @@ pub fn create_project(db: State<'_, Database>, data: CreateProject) -> Result<Pr
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
-        "INSERT INTO projects (id, name, description, device_type, architecture, interfaces, assets, deployment_context, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "INSERT INTO projects (id, name, description, device_type, architecture, interfaces, assets, deployment_context, factor_weights, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
             id,
             data.name,
@@ -24,6 +24,7 @@ pub fn create_project(db: State<'_, Database>, data: CreateProject) -> Result<Pr
             data.interfaces.unwrap_or_else(|| "[]".to_string()),
             data.assets.unwrap_or_else(|| "[]".to_string()),
             data.deployment_context.unwrap_or_else(|| "{}".to_string()),
+            data.factor_weights.unwrap_or_else(|| "{\"time_effort\":0.25,\"exploitability\":0.20,\"window_of_opportunity\":0.15,\"detection_probability\":0.15,\"prior_knowledge\":0.10,\"preparation_effort\":0.10,\"abort_risk\":0.05}".to_string()),
             now,
             now,
         ],

@@ -81,6 +81,10 @@
       </div>
     </div>
   {/if}
+
+  <div class="db-info">
+    <p>💾 Database: <code>ics_threat_modeller.db</code> in the application's working directory. Use any SQLite client (e.g. <code>sqlite3</code>, DB Browser) to access it directly.</p>
+  </div>
 </div>
 
 <style>
@@ -197,4 +201,26 @@
 
   .btn-primary { background: var(--color-primary, #1a365d); color: white; }
   .btn-lg { padding: 12px 32px; font-size: 1rem; }
+
+  .db-info {
+    margin-top: 40px;
+    padding: 12px 16px;
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    text-align: center;
+  }
+
+  .db-info p {
+    margin: 0;
+    font-size: 0.78rem;
+    color: #718096;
+  }
+
+  .db-info code {
+    background: #edf2f7;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.78rem;
+  }
 </style>

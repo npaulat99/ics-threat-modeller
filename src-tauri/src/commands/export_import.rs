@@ -419,11 +419,33 @@ pub fn import_project_data(db: &Database, data: ProjectExport) -> Result<String,
         ).map_err(|e| e.to_string())?;
     }
 
-    // Goals.
+    // Catalog sources — must be imported BEFORE goals which reference them via catalog_source_id.
+    for cs in &data.catalog_sources {
+        conn.execute(
+            "INSERT OR REPLACE INTO catalog_entries (id, entry_type, name, description, tree_data, source_framework, version, tags, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![cs.id, cs.entry_type, cs.name, cs.description, cs.tree_data, cs.source_framework, cs.version, cs.tags, cs.created_at, now],
+        ).map_err(|e| e.to_string())?;
+    }
+
+    // Goals — catalog_source_id may reference a catalog entry that wasn't exported.
+    // Set to NULL if the referenced catalog entry doesn't exist.
     for ge in &data.goals {
+        let catalog_source_id = if let Some(ref csid) = ge.goal.catalog_source_id {
+            let exists: bool = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM catalog_entries WHERE id = ?1",
+                    params![csid],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map(|c| c > 0)
+                .unwrap_or(false);
+            if exists { Some(csid.clone()) } else { None }
+        } else {
+            None
+        };
         conn.execute(
             "INSERT OR REPLACE INTO goals (id, project_id, name, description, impact_category, catalog_source_id, sort_order, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            params![ge.goal.id, ge.goal.project_id, ge.goal.name, ge.goal.description, ge.goal.impact_category, ge.goal.catalog_source_id, ge.goal.sort_order, ge.goal.created_at, now],
+            params![ge.goal.id, ge.goal.project_id, ge.goal.name, ge.goal.description, ge.goal.impact_category, catalog_source_id, ge.goal.sort_order, ge.goal.created_at, now],
         ).map_err(|e| e.to_string())?;
 
         import_categories_data(&conn, &ge.categories, &now)?;

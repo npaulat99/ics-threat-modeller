@@ -7,6 +7,7 @@
   export let onSelect: (node: TreeNodeData) => void = () => {};
   export let onAddChild: ((parentNode: TreeNodeData) => void) | null = null;
   export let onDelete: ((node: TreeNodeData) => void) | null = null;
+  export let onReorder: ((detail: { draggedId: string; draggedType: string; targetId: string; targetType: string; position: 'before' | 'after' }) => void) | null = null;
 
   function handleSelect(node: TreeNodeData) {
     selectedNodeId.set(node.id);
@@ -30,6 +31,7 @@
         on:select={(e) => handleSelect(e.detail)}
         on:addChild={(e) => onAddChild?.(e.detail)}
         on:delete={(e) => onDelete?.(e.detail)}
+        on:reorder={(e) => onReorder?.(e.detail)}
       />
     {/each}
   {/if}

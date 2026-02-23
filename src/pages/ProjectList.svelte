@@ -11,6 +11,9 @@
   let newName = '';
   let newDesc = '';
   let newDeviceType = '';
+  let newArchitecture = '';
+  let newInterfaces = '';
+  let newAssets = '';
   let deleteTarget: Project | null = null;
 
   onMount(loadProjects);
@@ -31,6 +34,9 @@
         name: newName,
         description: newDesc || undefined,
         device_type: newDeviceType || undefined,
+        architecture: newArchitecture || undefined,
+        interfaces: newInterfaces || undefined,
+        assets: newAssets || undefined,
         factor_weights: JSON.stringify(DEFAULT_FACTOR_WEIGHTS),
       };
       const project = await api.createProject(data);
@@ -38,6 +44,9 @@
       newName = '';
       newDesc = '';
       newDeviceType = '';
+      newArchitecture = '';
+      newInterfaces = '';
+      newAssets = '';
       showCreate = false;
       await loadProjects();
     } catch (e) {
@@ -85,6 +94,18 @@
       <div class="form-group">
         <label for="proj-dev">Device Type</label>
         <input id="proj-dev" type="text" bind:value={newDeviceType} class="input" placeholder="e.g., Siemens S7-1200" />
+      </div>
+      <div class="form-group">
+        <label for="proj-arch">Architecture</label>
+        <input id="proj-arch" type="text" bind:value={newArchitecture} class="input" placeholder="e.g., ARM Cortex-M4" />
+      </div>
+      <div class="form-group">
+        <label for="proj-intf">Interfaces (JSON)</label>
+        <textarea id="proj-intf" bind:value={newInterfaces} class="input" rows="2" placeholder='e.g., ["Ethernet", "RS-485", "USB"]' />
+      </div>
+      <div class="form-group">
+        <label for="proj-assets">Assets (JSON)</label>
+        <textarea id="proj-assets" bind:value={newAssets} class="input" rows="2" placeholder='e.g., ["Firmware", "Configuration", "Process Data"]' />
       </div>
       <button class="btn btn-primary" on:click={createProject} disabled={!newName.trim()}>Create</button>
     </div>

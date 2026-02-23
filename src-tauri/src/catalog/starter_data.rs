@@ -32,15 +32,15 @@ fn firmware_compromise() -> CatalogEntry {
                 "is_leaf": true,
                 "assessments": [
                     {"factor_name": "Elapsed Time", "factor_value": 4, "rationale": "Requires physical proximity and specialized tools."},
-                    {"factor_name": "Expertise", "factor_value": 6, "rationale": "Requires knowledge of embedded hardware debugging."},
-                    {"factor_name": "Knowledge of Target", "factor_value": 7, "rationale": "Needs device-specific debug port information."},
+                    {"factor_name": "Expertise", "factor_value": 5, "rationale": "Requires knowledge of embedded hardware debugging."},
+                    {"factor_name": "Knowledge of Target", "factor_value": 5, "rationale": "Needs device-specific debug port information."},
                     {"factor_name": "Window of Opportunity", "factor_value": 3, "rationale": "Requires physical access window."},
                     {"factor_name": "Equipment", "factor_value": 5, "rationale": "Specialized debug probes and adapters."}
                 ],
                 "countermeasures": [
-                    {"name": "Disable Debug Ports", "description": "Fuse-blow or disable JTAG/SWD in production.", "effectiveness": 8},
-                    {"name": "Firmware Encryption", "description": "Encrypt firmware at rest so extraction yields ciphertext.", "effectiveness": 7},
-                    {"name": "Physical Tamper Detection", "description": "Tamper-evident enclosures with alert mechanisms.", "effectiveness": 5}
+                    {"name": "Disable Debug Ports", "description": "Fuse-blow or disable JTAG/SWD in production.", "effectiveness": 4},
+                    {"name": "Firmware Encryption", "description": "Encrypt firmware at rest so extraction yields ciphertext.", "effectiveness": 4},
+                    {"name": "Physical Tamper Detection", "description": "Tamper-evident enclosures with alert mechanisms.", "effectiveness": 3}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0839", "technique_name": "Module Firmware", "source": "MITRE ATT&CK for ICS"}
@@ -51,16 +51,16 @@ fn firmware_compromise() -> CatalogEntry {
                 "description": "Intercept or forge firmware update to inject malicious code.",
                 "is_leaf": true,
                 "assessments": [
-                    {"factor_name": "Elapsed Time", "factor_value": 7, "rationale": "Requires time to reverse update protocol."},
-                    {"factor_name": "Expertise", "factor_value": 8, "rationale": "Advanced reverse engineering and crypto skills."},
-                    {"factor_name": "Knowledge of Target", "factor_value": 8, "rationale": "Update mechanism must be understood."},
-                    {"factor_name": "Window of Opportunity", "factor_value": 6, "rationale": "Must coincide with firmware update cycle."},
+                    {"factor_name": "Elapsed Time", "factor_value": 5, "rationale": "Requires time to reverse update protocol."},
+                    {"factor_name": "Expertise", "factor_value": 5, "rationale": "Advanced reverse engineering and crypto skills."},
+                    {"factor_name": "Knowledge of Target", "factor_value": 5, "rationale": "Update mechanism must be understood."},
+                    {"factor_name": "Window of Opportunity", "factor_value": 4, "rationale": "Must coincide with firmware update cycle."},
                     {"factor_name": "Equipment", "factor_value": 4, "rationale": "Network intercept tools and signing bypass."}
                 ],
                 "countermeasures": [
-                    {"name": "Signed Firmware Updates", "description": "Cryptographically sign all firmware images.", "effectiveness": 9},
-                    {"name": "Secure Boot Chain", "description": "Verify firmware signature before execution.", "effectiveness": 9},
-                    {"name": "Encrypted Update Channel", "description": "TLS/DTLS for firmware delivery.", "effectiveness": 6}
+                    {"name": "Signed Firmware Updates", "description": "Cryptographically sign all firmware images.", "effectiveness": 5},
+                    {"name": "Secure Boot Chain", "description": "Verify firmware signature before execution.", "effectiveness": 5},
+                    {"name": "Encrypted Update Channel", "description": "TLS/DTLS for firmware delivery.", "effectiveness": 3}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0857", "technique_name": "System Firmware", "source": "MITRE ATT&CK for ICS"}
@@ -103,8 +103,8 @@ fn process_manipulation() -> CatalogEntry {
                     {"factor_name": "Equipment", "factor_value": 2, "rationale": "Standard network tools."}
                 ],
                 "countermeasures": [
-                    {"name": "HMI Authentication", "description": "Require strong authentication for setpoint changes.", "effectiveness": 8},
-                    {"name": "Rate-of-Change Limits", "description": "PLC enforces maximum rate of change for critical parameters.", "effectiveness": 7}
+                    {"name": "HMI Authentication", "description": "Require strong authentication for setpoint changes.", "effectiveness": 4},
+                    {"name": "Rate-of-Change Limits", "description": "PLC enforces maximum rate of change for critical parameters.", "effectiveness": 4}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0836", "technique_name": "Modify Parameter", "source": "MITRE ATT&CK for ICS"}
@@ -115,15 +115,15 @@ fn process_manipulation() -> CatalogEntry {
                 "description": "Upload modified control logic to PLC.",
                 "is_leaf": true,
                 "assessments": [
-                    {"factor_name": "Elapsed Time", "factor_value": 6, "rationale": "Must analyze and modify ladder logic."},
-                    {"factor_name": "Expertise", "factor_value": 7, "rationale": "PLC programming expertise required."},
-                    {"factor_name": "Knowledge of Target", "factor_value": 8, "rationale": "Specific PLC model and program structure."},
+                    {"factor_name": "Elapsed Time", "factor_value": 5, "rationale": "Must analyze and modify ladder logic."},
+                    {"factor_name": "Expertise", "factor_value": 5, "rationale": "PLC programming expertise required."},
+                    {"factor_name": "Knowledge of Target", "factor_value": 5, "rationale": "Specific PLC model and program structure."},
                     {"factor_name": "Window of Opportunity", "factor_value": 4, "rationale": "Engineering workstation access needed."},
                     {"factor_name": "Equipment", "factor_value": 5, "rationale": "PLC programming software."}
                 ],
                 "countermeasures": [
-                    {"name": "PLC Key Switch", "description": "Physical key switch to prevent remote logic upload.", "effectiveness": 9},
-                    {"name": "Logic Change Detection", "description": "Monitor for unauthorized logic changes.", "effectiveness": 7}
+                    {"name": "PLC Key Switch", "description": "Physical key switch to prevent remote logic upload.", "effectiveness": 5},
+                    {"name": "Logic Change Detection", "description": "Monitor for unauthorized logic changes.", "effectiveness": 4}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0833", "technique_name": "Modify Control Logic", "source": "MITRE ATT&CK for ICS"}
@@ -160,14 +160,14 @@ fn persistent_access() -> CatalogEntry {
                 "is_leaf": true,
                 "assessments": [
                     {"factor_name": "Elapsed Time", "factor_value": 5, "rationale": "Social engineering plus malware deployment."},
-                    {"factor_name": "Expertise", "factor_value": 6, "rationale": "Malware development and evasion."},
+                    {"factor_name": "Expertise", "factor_value": 5, "rationale": "Malware development and evasion."},
                     {"factor_name": "Knowledge of Target", "factor_value": 4, "rationale": "OS and AV information."},
                     {"factor_name": "Window of Opportunity", "factor_value": 5, "rationale": "Phishing or USB drop opportunity."},
                     {"factor_name": "Equipment", "factor_value": 4, "rationale": "Custom malware and C2 infrastructure."}
                 ],
                 "countermeasures": [
-                    {"name": "Application Whitelisting", "description": "Only allow approved applications to execute.", "effectiveness": 8},
-                    {"name": "USB Port Lockdown", "description": "Disable or monitor USB ports.", "effectiveness": 6}
+                    {"name": "Application Whitelisting", "description": "Only allow approved applications to execute.", "effectiveness": 4},
+                    {"name": "USB Port Lockdown", "description": "Disable or monitor USB ports.", "effectiveness": 3}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0889", "technique_name": "Modify Program", "source": "MITRE ATT&CK for ICS"}
@@ -181,12 +181,12 @@ fn persistent_access() -> CatalogEntry {
                     {"factor_name": "Elapsed Time", "factor_value": 4, "rationale": "Default credentials or known vulnerabilities."},
                     {"factor_name": "Expertise", "factor_value": 5, "rationale": "Network administration skills."},
                     {"factor_name": "Knowledge of Target", "factor_value": 5, "rationale": "Network topology knowledge."},
-                    {"factor_name": "Window of Opportunity", "factor_value": 6, "rationale": "Remote access to management interfaces."},
+                    {"factor_name": "Window of Opportunity", "factor_value": 5, "rationale": "Remote access to management interfaces."},
                     {"factor_name": "Equipment", "factor_value": 3, "rationale": "Standard pentest tools."}
                 ],
                 "countermeasures": [
-                    {"name": "Network Segmentation", "description": "Isolate OT network from IT network.", "effectiveness": 8},
-                    {"name": "Change Default Credentials", "description": "Replace all default passwords.", "effectiveness": 7}
+                    {"name": "Network Segmentation", "description": "Isolate OT network from IT network.", "effectiveness": 4},
+                    {"name": "Change Default Credentials", "description": "Replace all default passwords.", "effectiveness": 4}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0883", "technique_name": "Internet Accessible Device", "source": "MITRE ATT&CK for ICS"}
@@ -229,8 +229,8 @@ fn information_leakage() -> CatalogEntry {
                     {"factor_name": "Equipment", "factor_value": 2, "rationale": "Standard packet capture tools."}
                 ],
                 "countermeasures": [
-                    {"name": "OT Protocol Encryption", "description": "Use encrypted variants of industrial protocols.", "effectiveness": 8},
-                    {"name": "Network Monitoring", "description": "IDS for anomalous traffic patterns.", "effectiveness": 6}
+                    {"name": "OT Protocol Encryption", "description": "Use encrypted variants of industrial protocols.", "effectiveness": 4},
+                    {"name": "Network Monitoring", "description": "IDS for anomalous traffic patterns.", "effectiveness": 3}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0801", "technique_name": "Monitor Process State", "source": "MITRE ATT&CK for ICS"}
@@ -248,8 +248,8 @@ fn information_leakage() -> CatalogEntry {
                     {"factor_name": "Equipment", "factor_value": 2, "rationale": "Database client tools."}
                 ],
                 "countermeasures": [
-                    {"name": "Historian Access Controls", "description": "Role-based access to historian data.", "effectiveness": 7},
-                    {"name": "Data Loss Prevention", "description": "Monitor for large data transfers.", "effectiveness": 6}
+                    {"name": "Historian Access Controls", "description": "Role-based access to historian data.", "effectiveness": 4},
+                    {"name": "Data Loss Prevention", "description": "Monitor for large data transfers.", "effectiveness": 3}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0802", "technique_name": "Automated Collection", "source": "MITRE ATT&CK for ICS"}
@@ -285,15 +285,15 @@ fn supply_chain_attack() -> CatalogEntry {
                 "description": "Replace legitimate hardware or software with trojanized version.",
                 "is_leaf": true,
                 "assessments": [
-                    {"factor_name": "Elapsed Time", "factor_value": 8, "rationale": "Long-term supply chain infiltration."},
-                    {"factor_name": "Expertise", "factor_value": 9, "rationale": "Hardware/software design expertise."},
-                    {"factor_name": "Knowledge of Target", "factor_value": 6, "rationale": "Target procurement processes."},
-                    {"factor_name": "Window of Opportunity", "factor_value": 7, "rationale": "Supply chain access point."},
-                    {"factor_name": "Equipment", "factor_value": 7, "rationale": "Manufacturing or development capability."}
+                    {"factor_name": "Elapsed Time", "factor_value": 5, "rationale": "Long-term supply chain infiltration."},
+                    {"factor_name": "Expertise", "factor_value": 5, "rationale": "Hardware/software design expertise."},
+                    {"factor_name": "Knowledge of Target", "factor_value": 5, "rationale": "Target procurement processes."},
+                    {"factor_name": "Window of Opportunity", "factor_value": 5, "rationale": "Supply chain access point."},
+                    {"factor_name": "Equipment", "factor_value": 5, "rationale": "Manufacturing or development capability."}
                 ],
                 "countermeasures": [
-                    {"name": "Vendor Verification", "description": "Verify component authenticity and provenance.", "effectiveness": 7},
-                    {"name": "Incoming Inspection", "description": "Test components before deployment.", "effectiveness": 6}
+                    {"name": "Vendor Verification", "description": "Verify component authenticity and provenance.", "effectiveness": 4},
+                    {"name": "Incoming Inspection", "description": "Test components before deployment.", "effectiveness": 3}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0862", "technique_name": "Supply Chain Compromise", "source": "MITRE ATT&CK for ICS"}
@@ -336,8 +336,8 @@ fn credential_theft() -> CatalogEntry {
                     {"factor_name": "Equipment", "factor_value": 1, "rationale": "Standard tools."}
                 ],
                 "countermeasures": [
-                    {"name": "Change Default Passwords", "description": "Replace all factory-default credentials.", "effectiveness": 9},
-                    {"name": "Password Policy", "description": "Enforce strong password policy for OT systems.", "effectiveness": 7}
+                    {"name": "Change Default Passwords", "description": "Replace all factory-default credentials.", "effectiveness": 5},
+                    {"name": "Password Policy", "description": "Enforce strong password policy for OT systems.", "effectiveness": 4}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0812", "technique_name": "Default Credentials", "source": "MITRE ATT&CK for ICS"}
@@ -355,8 +355,8 @@ fn credential_theft() -> CatalogEntry {
                     {"factor_name": "Equipment", "factor_value": 3, "rationale": "Credential dumping tools."}
                 ],
                 "countermeasures": [
-                    {"name": "Separate OT Authentication", "description": "Dedicated authentication for OT systems.", "effectiveness": 8},
-                    {"name": "Multi-Factor Authentication", "description": "MFA for critical ICS access.", "effectiveness": 8}
+                    {"name": "Separate OT Authentication", "description": "Dedicated authentication for OT systems.", "effectiveness": 4},
+                    {"name": "Multi-Factor Authentication", "description": "MFA for critical ICS access.", "effectiveness": 4}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0859", "technique_name": "Valid Accounts", "source": "MITRE ATT&CK for ICS"}
@@ -399,8 +399,8 @@ fn denial_of_service() -> CatalogEntry {
                     {"factor_name": "Equipment", "factor_value": 2, "rationale": "Traffic generation tools."}
                 ],
                 "countermeasures": [
-                    {"name": "Network Segmentation", "description": "Segment OT network from IT.", "effectiveness": 7},
-                    {"name": "Traffic Rate Limiting", "description": "Limit traffic rates on OT network segments.", "effectiveness": 6}
+                    {"name": "Network Segmentation", "description": "Segment OT network from IT.", "effectiveness": 4},
+                    {"name": "Traffic Rate Limiting", "description": "Limit traffic rates on OT network segments.", "effectiveness": 3}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0814", "technique_name": "Denial of Service", "source": "MITRE ATT&CK for ICS"}
@@ -413,13 +413,13 @@ fn denial_of_service() -> CatalogEntry {
                 "assessments": [
                     {"factor_name": "Elapsed Time", "factor_value": 3, "rationale": "Fuzzing and exploit development."},
                     {"factor_name": "Expertise", "factor_value": 5, "rationale": "Protocol and vulnerability knowledge."},
-                    {"factor_name": "Knowledge of Target", "factor_value": 6, "rationale": "Device firmware version."},
+                    {"factor_name": "Knowledge of Target", "factor_value": 5, "rationale": "Device firmware version."},
                     {"factor_name": "Window of Opportunity", "factor_value": 4, "rationale": "Network access to device."},
                     {"factor_name": "Equipment", "factor_value": 3, "rationale": "Protocol fuzzer."}
                 ],
                 "countermeasures": [
-                    {"name": "Deep Packet Inspection", "description": "Industrial firewalls with protocol validation.", "effectiveness": 7},
-                    {"name": "Firmware Patching", "description": "Apply vendor patches for known vulnerabilities.", "effectiveness": 8}
+                    {"name": "Deep Packet Inspection", "description": "Industrial firewalls with protocol validation.", "effectiveness": 4},
+                    {"name": "Firmware Patching", "description": "Apply vendor patches for known vulnerabilities.", "effectiveness": 4}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0880", "technique_name": "Loss of Safety", "source": "MITRE ATT&CK for ICS"}
@@ -456,14 +456,14 @@ fn sensor_spoofing() -> CatalogEntry {
                 "is_leaf": true,
                 "assessments": [
                     {"factor_name": "Elapsed Time", "factor_value": 5, "rationale": "Setup and calibration of MITM."},
-                    {"factor_name": "Expertise", "factor_value": 6, "rationale": "OT protocol analysis."},
-                    {"factor_name": "Knowledge of Target", "factor_value": 7, "rationale": "Sensor addresses and expected ranges."},
+                    {"factor_name": "Expertise", "factor_value": 5, "rationale": "OT protocol analysis."},
+                    {"factor_name": "Knowledge of Target", "factor_value": 5, "rationale": "Sensor addresses and expected ranges."},
                     {"factor_name": "Window of Opportunity", "factor_value": 4, "rationale": "Physical or network access."},
                     {"factor_name": "Equipment", "factor_value": 5, "rationale": "Protocol-aware proxy tools."}
                 ],
                 "countermeasures": [
-                    {"name": "Sensor Data Authentication", "description": "Authenticate sensor communications.", "effectiveness": 8},
-                    {"name": "Redundant Sensors", "description": "Cross-check with independent sensor measurements.", "effectiveness": 7}
+                    {"name": "Sensor Data Authentication", "description": "Authenticate sensor communications.", "effectiveness": 4},
+                    {"name": "Redundant Sensors", "description": "Cross-check with independent sensor measurements.", "effectiveness": 4}
                 ],
                 "technique_mappings": [
                     {"technique_id": "T0832", "technique_name": "Manipulation of View", "source": "MITRE ATT&CK for ICS"}

@@ -146,9 +146,24 @@ fn import_tree_node(
 
     // Import the goal.
     let goal_id = Uuid::new_v4().to_string();
-    let goal_name = tree["name"].as_str().unwrap_or("Imported Goal");
-    let goal_desc = tree["description"].as_str().unwrap_or("");
-    let impact_cat = tree["impact_category"].as_str().unwrap_or("");
+    // The catalog JSON has the goal under a "goal" key.
+    let goal_obj = &tree["goal"];
+    let goal_name = goal_obj["name"]
+        .as_str()
+        .or_else(|| tree["name"].as_str())
+        .unwrap_or("Imported Goal");
+    let goal_desc = goal_obj["description"]
+        .as_str()
+        .or_else(|| tree["description"].as_str())
+        .unwrap_or("");
+    let _goal_agg = goal_obj["aggregation_type"]
+        .as_str()
+        .or_else(|| tree["aggregation_type"].as_str())
+        .unwrap_or("");
+    let impact_cat = goal_obj["impact_category"]
+        .as_str()
+        .or_else(|| tree["impact_category"].as_str())
+        .unwrap_or("");
 
     conn.execute(
         "INSERT INTO goals (id, project_id, name, description, impact_category, catalog_source_id, sort_order, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8)",
@@ -215,6 +230,10 @@ fn import_step(
     if let Some(cms) = step_val["countermeasures"].as_array() {
         for (j, cm_val) in cms.iter().enumerate() {
             let cm_id = Uuid::new_v4().to_string();
+            let raw_eff = cm_val["effectiveness"].as_i64().unwrap_or(3) as i32;
+            let effectiveness = raw_eff.clamp(1, 5);
+            let raw_cost = cm_val["implementation_cost"].as_i64().unwrap_or(3) as i32;
+            let implementation_cost = raw_cost.clamp(1, 5);
             conn.execute(
                 "INSERT INTO countermeasures (id, parent_id, parent_type, name, description, effectiveness, implementation_cost, sort_order, created_at, updated_at) VALUES (?1, ?2, 'step', ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                 params![
@@ -222,8 +241,8 @@ fn import_step(
                     step_id,
                     cm_val["name"].as_str().unwrap_or("Countermeasure"),
                     cm_val["description"].as_str().unwrap_or(""),
-                    cm_val["effectiveness"].as_i64().unwrap_or(3) as i32,
-                    cm_val["implementation_cost"].as_i64().unwrap_or(3) as i32,
+                    effectiveness,
+                    implementation_cost,
                     j as i32,
                     now,
                     now,

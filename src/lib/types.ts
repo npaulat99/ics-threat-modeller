@@ -25,6 +25,7 @@ export interface CreateProject {
   interfaces?: string;
   assets?: string;
   deployment_context?: string;
+  factor_weights?: string;
 }
 
 export interface UpdateProject {

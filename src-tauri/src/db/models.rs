@@ -30,6 +30,7 @@ pub struct CreateProject {
     pub interfaces: Option<String>,
     pub assets: Option<String>,
     pub deployment_context: Option<String>,
+    pub factor_weights: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

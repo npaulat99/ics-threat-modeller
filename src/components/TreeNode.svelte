@@ -10,9 +10,11 @@
     select: TreeNodeData;
     addChild: TreeNodeData;
     delete: TreeNodeData;
+    reorder: { draggedId: string; draggedType: string; targetId: string; targetType: string; position: 'before' | 'after' };
   }>();
 
   let expanded = node.expanded ?? true;
+  let dragOver: 'before' | 'after' | null = null;
 
   function toggle() {
     expanded = !expanded;
@@ -31,6 +33,39 @@
     dispatch('delete', node);
   }
 
+  function handleDragStart(e: DragEvent) {
+    e.dataTransfer?.setData('text/plain', JSON.stringify({ id: node.id, type: node.type }));
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function handleDragOver(e: DragEvent) {
+    e.preventDefault();
+    if (!e.dataTransfer) return;
+    e.dataTransfer.dropEffect = 'move';
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    dragOver = e.clientY < midY ? 'before' : 'after';
+  }
+
+  function handleDragLeave() {
+    dragOver = null;
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    dragOver = null;
+    const raw = e.dataTransfer?.getData('text/plain');
+    if (!raw) return;
+    try {
+      const data = JSON.parse(raw);
+      if (data.id === node.id) return;
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const position = e.clientY < midY ? 'before' : 'after';
+      dispatch('reorder', { draggedId: data.id, draggedType: data.type, targetId: node.id, targetType: node.type, position });
+    } catch {}
+  }
+
   function forwardSelect(e: CustomEvent<TreeNodeData>) {
     dispatch('select', e.detail);
   }
@@ -41,6 +76,10 @@
 
   function forwardDelete(e: CustomEvent<TreeNodeData>) {
     dispatch('delete', e.detail);
+  }
+
+  function forwardReorder(e: CustomEvent) {
+    dispatch('reorder', e.detail);
   }
 
   const typeIcons: Record<string, string> = {
@@ -62,10 +101,17 @@
   <div
     class="node-row"
     class:selected={selectedId === node.id}
+    class:drag-before={dragOver === 'before'}
+    class:drag-after={dragOver === 'after'}
     on:click={select}
     on:keypress={select}
     role="treeitem"
     tabindex="0"
+    draggable="true"
+    on:dragstart={handleDragStart}
+    on:dragover={handleDragOver}
+    on:dragleave={handleDragLeave}
+    on:drop={handleDrop}
   >
     <button
       class="toggle-btn"
@@ -97,6 +143,7 @@
           on:select={forwardSelect}
           on:addChild={forwardAddChild}
           on:delete={forwardDelete}
+          on:reorder={forwardReorder}
         />
       {/each}
     </div>
@@ -199,4 +246,7 @@
     border-left: 1px dashed var(--color-border, #cbd5e0);
     margin-left: 9px;
   }
+
+  .node-row.drag-before { border-top: 2px solid #3182ce; }
+  .node-row.drag-after { border-bottom: 2px solid #3182ce; }
 </style>

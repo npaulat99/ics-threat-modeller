@@ -17,12 +17,26 @@
   $: localValue = value;
   $: localRationale = rationale;
 
+  // Factor-specific labels for each level 1-5
+  const factorLabels: Record<string, string[]> = {
+    time_effort:           ['≤ 1 day', '≤ 1 week', '≤ 1 month', '≤ 6 months', '> 6 months'],
+    prior_knowledge:       ['Public info', 'Basic training', 'Domain expert', 'Deep specialist', 'Rare expertise'],
+    exploitability:        ['Trivial', 'Easy', 'Moderate', 'Difficult', 'Near impossible'],
+    window_of_opportunity: ['Unlimited', 'Large window', 'Medium window', 'Small window', 'Tiny window'],
+    detection_probability: ['Undetectable', 'Low detection', 'Moderate', 'Likely detected', 'Certain detection'],
+    preparation_effort:    ['None needed', 'Minimal', 'Moderate', 'Significant', 'Extensive'],
+    abort_risk:            ['No risk', 'Low risk', 'Moderate', 'High risk', 'Critical risk'],
+  };
+
+  $: labels = factorLabels[name] || ['1', '2', '3', '4', '5'];
+
   function emitChange() {
     dispatch('change', { value: localValue, rationale: localRationale });
   }
 
-  function handleSlider(e: Event) {
-    localValue = parseInt((e.target as HTMLInputElement).value);
+  function selectValue(v: number) {
+    if (readonly) return;
+    localValue = v;
     emitChange();
   }
 
@@ -33,25 +47,30 @@
 
 <div class="cost-factor">
   <div class="factor-header">
-    <span class="factor-name">{name}</span>
+    <span class="factor-name">{name.replace(/_/g, ' ')}</span>
     <span class="factor-weight">w={weight.toFixed(2)}</span>
   </div>
 
-  <div class="slider-row">
-    <input
-      type="range"
-      min="1"
-      max="5"
-      step="1"
-      bind:value={localValue}
-      on:change={handleSlider}
-      disabled={readonly}
-      class="slider"
-    />
-    <span class="value-display" class:low={localValue <= 2} class:mid={localValue > 2 && localValue <= 3} class:high={localValue > 3}>
-      {localValue}
-    </span>
+  <div class="button-row">
+    {#each [1, 2, 3, 4, 5] as v}
+      <button
+        class="score-btn"
+        class:active={localValue === v}
+        class:low={v <= 2}
+        class:mid={v === 3}
+        class:high={v >= 4}
+        disabled={readonly}
+        on:click={() => selectValue(v)}
+        title={labels[v - 1]}
+      >
+        {v}
+      </button>
+    {/each}
   </div>
+
+  {#if localValue > 0}
+    <div class="level-label">{labels[localValue - 1]}</div>
+  {/if}
 
   <textarea
     class="rationale-input"
@@ -81,6 +100,7 @@
   .factor-name {
     font-weight: 600;
     font-size: 0.82rem;
+    text-transform: capitalize;
   }
 
   .factor-weight {
@@ -88,42 +108,63 @@
     color: var(--color-text-muted, #718096);
   }
 
-  .slider-row {
+  .button-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+
+  .score-btn {
+    width: 36px;
+    height: 36px;
+    border: 2px solid #cbd5e0;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #4a5568;
+    transition: all 0.12s;
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .score-btn:hover:not(:disabled) {
+    border-color: #a0aec0;
+    background: #edf2f7;
+  }
+
+  .score-btn.active.low {
+    background: #c6f6d5;
+    border-color: #38a169;
+    color: #22543d;
+  }
+
+  .score-btn.active.mid {
+    background: #fefcbf;
+    border-color: #d69e2e;
+    color: #744210;
+  }
+
+  .score-btn.active.high {
+    background: #fed7d7;
+    border-color: #e53e3e;
+    color: #742a2a;
+  }
+
+  .score-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .level-label {
+    font-size: 0.72rem;
+    color: var(--color-text-muted, #718096);
     margin-bottom: 8px;
+    font-style: italic;
   }
-
-  .slider {
-    flex: 1;
-    height: 6px;
-    -webkit-appearance: none;
-    appearance: none;
-    border-radius: 3px;
-    background: #cbd5e0;
-    outline: none;
-  }
-
-  .slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--color-primary, #1a365d);
-    cursor: pointer;
-  }
-
-  .value-display {
-    font-weight: 700;
-    font-size: 1.1rem;
-    width: 30px;
-    text-align: center;
-  }
-
-  .value-display.low { color: #38a169; }
-  .value-display.mid { color: #d69e2e; }
-  .value-display.high { color: #e53e3e; }
 
   .rationale-input {
     width: 100%;

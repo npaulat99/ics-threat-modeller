@@ -76,6 +76,7 @@
   }
 
   const skillLabels = ['Novice', 'Beginner', 'Competent', 'Professional', 'Expert'];
+  const accessLabels = ['Public', 'Limited', 'Moderate', 'Privileged', 'Unrestricted'];
 </script>
 
 <div class="profiles-page">
@@ -102,7 +103,7 @@
         <input type="range" min="1" max="5" bind:value={formSkillLevel} class="slider" />
       </div>
       <div class="form-group">
-        <label>Access Level: {formAccessLevel}</label>
+        <label>Access Level: {formAccessLevel} ({accessLabels[formAccessLevel - 1] ?? ''})</label>
         <input type="range" min="1" max="5" bind:value={formAccessLevel} class="slider" />
       </div>
       <div class="form-actions">
@@ -117,10 +118,10 @@
       <div class="profile-card">
         <div class="profile-header">
           <h4>{p.name}</h4>
-          <span class="cap-badge">Skill: {p.skill_level}/5</span>
+          <span class="cap-badge">Skill: {p.skill_level}/5 ({skillLabels[p.skill_level - 1] ?? ''})</span>
         </div>
         <p class="profile-desc">{p.description || '—'}</p>
-        <div class="profile-meta">Access Level: {p.access_level}/5</div>
+        <div class="profile-meta">Access Level: {p.access_level}/5 ({accessLabels[p.access_level - 1] ?? ''})</div>
         <div class="profile-actions">
           <button class="btn btn-sm btn-secondary" on:click={() => editProfile(p)}>Edit</button>
           <button class="btn btn-sm btn-danger" on:click={() => (deleteTarget = p)}>Delete</button>
