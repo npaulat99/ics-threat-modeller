@@ -1,0 +1,10 @@
+# .trivyignore — suppress known false-positives and accepted risks
+# Format: one CVE / GHSA / AVD identifier per line
+# See https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/#by-finding-ids
+
+# ── Dockerfile best-practice checks (informational) ──────────────
+# DS002: "RUN apt-get update && apt-get install" — accepted pattern for build stages
+AVD-DS-0002
+
+# DS026: "No HEALTHCHECK defined" — Tauri is a GUI desktop app, not a service
+AVD-DS-0026

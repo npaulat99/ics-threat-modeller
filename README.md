@@ -87,6 +87,9 @@ A desktop application for **attack-tree based threat modelling** of Industrial C
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Node.js 22
+# Remove old system Node packages first (they conflict with the NodeSource repo)
+sudo apt-get remove -y nodejs libnode-dev libnode72 2>/dev/null || true
+sudo apt-get autoremove -y
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
@@ -98,6 +101,31 @@ sudo apt-get install -y \
   libssl-dev \
   libgtk-3-dev \
   libayatana-appindicator3-dev
+```
+
+### Docker (for container builds)
+
+If you only want to build via Docker (no local Rust/Node toolchain needed):
+
+```bash
+# Install Docker Engine + Compose plugin (if not already installed)
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+  https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io \
+  docker-buildx-plugin docker-compose-plugin
+
+# Add your user to the docker group (log out/in after this)
+sudo usermod -aG docker $USER
 ```
 
 ---
@@ -153,13 +181,13 @@ The built application will be in `src-tauri/target/release/bundle/`.
 
 ### Docker Build
 
-Build the application inside a Docker container (no local Rust/Node toolchain needed):
+Build the application inside a Docker container (no local Rust/Node toolchain needed).
+
+> **Note:** Requires Docker Engine with the Compose plugin (`docker compose`). See [Docker prerequisites](#docker-for-container-builds) above.
 
 ```bash
-# Build using Docker Compose
+# Build and extract the binary to ./output/
 docker compose run --rm build-only
-
-# The binary and bundle will be in ./output/
 ls output/
 ```
 
@@ -174,6 +202,24 @@ To run the containerised application (Linux only, requires X11):
 ```bash
 xhost +local:docker
 docker compose up ics-threat-modeller
+```
+
+**Fallback (plain Docker without Compose):**
+
+```bash
+# Build the image
+docker build -t ics-threat-modeller .
+
+# Extract the binary
+docker build --target builder -t ics-build .
+docker run --rm -v "$(pwd)/output:/output" ics-build sh -c \
+  'mkdir -p /output && cp /app/src-tauri/target/release/ics-threat-modeller /output/'
+
+# Run the GUI (X11)
+xhost +local:docker
+docker run --rm -e DISPLAY=$DISPLAY \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+  --net=host ics-threat-modeller
 ```
 
 ---
