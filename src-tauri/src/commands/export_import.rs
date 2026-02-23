@@ -7,30 +7,21 @@ use tauri::State;
 
 /// Export a complete project to JSON.
 #[tauri::command]
-pub fn export_project_json(
-    db: State<'_, Database>,
-    project_id: String,
-) -> Result<String, String> {
+pub fn export_project_json(db: State<'_, Database>, project_id: String) -> Result<String, String> {
     let export = build_project_export(&db, &project_id)?;
     serde_json::to_string_pretty(&export).map_err(|e| e.to_string())
 }
 
 /// Export a complete project to YAML.
 #[tauri::command]
-pub fn export_project_yaml(
-    db: State<'_, Database>,
-    project_id: String,
-) -> Result<String, String> {
+pub fn export_project_yaml(db: State<'_, Database>, project_id: String) -> Result<String, String> {
     let export = build_project_export(&db, &project_id)?;
-    serde_yaml::to_string(&export).map_err(|e| e.to_string())
+    serde_yml::to_string(&export).map_err(|e| e.to_string())
 }
 
 /// Import a project from JSON string.
 #[tauri::command]
-pub fn import_project_json(
-    db: State<'_, Database>,
-    json_str: String,
-) -> Result<String, String> {
+pub fn import_project_json(db: State<'_, Database>, json_str: String) -> Result<String, String> {
     let export: ProjectExport =
         serde_json::from_str(&json_str).map_err(|e| format!("Invalid JSON: {}", e))?;
     import_project_data(&db, export)
@@ -38,12 +29,9 @@ pub fn import_project_json(
 
 /// Import a project from YAML string.
 #[tauri::command]
-pub fn import_project_yaml(
-    db: State<'_, Database>,
-    yaml_str: String,
-) -> Result<String, String> {
+pub fn import_project_yaml(db: State<'_, Database>, yaml_str: String) -> Result<String, String> {
     let export: ProjectExport =
-        serde_yaml::from_str(&yaml_str).map_err(|e| format!("Invalid YAML: {}", e))?;
+        serde_yml::from_str(&yaml_str).map_err(|e| format!("Invalid YAML: {}", e))?;
     import_project_data(&db, export)
 }
 
@@ -73,12 +61,15 @@ pub fn export_project_directory(
             "updated_at": export.project.updated_at,
         }
     });
-    let meta_yaml = serde_yaml::to_string(&meta).map_err(|e| e.to_string())?;
-    files.insert("meta.yaml".to_string(), serde_json::Value::String(meta_yaml));
+    let meta_yaml = serde_yml::to_string(&meta).map_err(|e| e.to_string())?;
+    files.insert(
+        "meta.yaml".to_string(),
+        serde_json::Value::String(meta_yaml),
+    );
 
     // Attacker profiles.
     for profile in &export.attacker_profiles {
-        let yaml = serde_yaml::to_string(profile).map_err(|e| e.to_string())?;
+        let yaml = serde_yml::to_string(profile).map_err(|e| e.to_string())?;
         let path = format!("attacker-profiles/profile-{}.yaml", profile.id);
         files.insert(path, serde_json::Value::String(yaml));
     }
@@ -86,7 +77,7 @@ pub fn export_project_directory(
     // Goals.
     for goal_export in &export.goals {
         let goal_dir = format!("goals/{}", goal_export.goal.id);
-        let goal_yaml = serde_yaml::to_string(&goal_export.goal).map_err(|e| e.to_string())?;
+        let goal_yaml = serde_yml::to_string(&goal_export.goal).map_err(|e| e.to_string())?;
         files.insert(
             format!("{}/goal.yaml", goal_dir),
             serde_json::Value::String(goal_yaml),
@@ -105,14 +96,20 @@ pub fn export_project_directory(
 
     // Catalog sources.
     if !export.catalog_sources.is_empty() {
-        let yaml = serde_yaml::to_string(&export.catalog_sources).map_err(|e| e.to_string())?;
-        files.insert("catalog-sources.yaml".to_string(), serde_json::Value::String(yaml));
+        let yaml = serde_yml::to_string(&export.catalog_sources).map_err(|e| e.to_string())?;
+        files.insert(
+            "catalog-sources.yaml".to_string(),
+            serde_json::Value::String(yaml),
+        );
     }
 
     // Change log.
     if !export.change_log.is_empty() {
-        let yaml = serde_yaml::to_string(&export.change_log).map_err(|e| e.to_string())?;
-        files.insert("changelog.yaml".to_string(), serde_json::Value::String(yaml));
+        let yaml = serde_yml::to_string(&export.change_log).map_err(|e| e.to_string())?;
+        files.insert(
+            "changelog.yaml".to_string(),
+            serde_json::Value::String(yaml),
+        );
     }
 
     serde_json::to_string_pretty(&files).map_err(|e| e.to_string())
@@ -132,7 +129,7 @@ fn export_step_to_files(
         "technique_mappings": step_export.technique_mappings,
         "tags": step_export.tags,
     });
-    let yaml = serde_yaml::to_string(&step_data).map_err(|e| e.to_string())?;
+    let yaml = serde_yml::to_string(&step_data).map_err(|e| e.to_string())?;
     files.insert(
         format!("{}/step.yaml", step_dir),
         serde_json::Value::String(yaml),
@@ -140,7 +137,7 @@ fn export_step_to_files(
 
     // Substeps.
     for ss in &step_export.substeps {
-        let yaml = serde_yaml::to_string(&ss).map_err(|e| e.to_string())?;
+        let yaml = serde_yml::to_string(&ss).map_err(|e| e.to_string())?;
         files.insert(
             format!("{}/substeps/{}.yaml", step_dir, ss.substep.id),
             serde_json::Value::String(yaml),
@@ -149,7 +146,7 @@ fn export_step_to_files(
 
     // Countermeasures.
     for cm in &step_export.countermeasures {
-        let yaml = serde_yaml::to_string(cm).map_err(|e| e.to_string())?;
+        let yaml = serde_yml::to_string(cm).map_err(|e| e.to_string())?;
         files.insert(
             format!("{}/countermeasures/{}.yaml", step_dir, cm.id),
             serde_json::Value::String(yaml),
@@ -158,7 +155,7 @@ fn export_step_to_files(
 
     // Weaknesses.
     for w in &step_export.weaknesses {
-        let yaml = serde_yaml::to_string(w).map_err(|e| e.to_string())?;
+        let yaml = serde_yml::to_string(w).map_err(|e| e.to_string())?;
         files.insert(
             format!("{}/weaknesses/{}.yaml", step_dir, w.id),
             serde_json::Value::String(yaml),
@@ -174,7 +171,7 @@ fn export_category_to_files(
     files: &mut serde_json::Map<String, serde_json::Value>,
 ) -> Result<(), String> {
     let cat_dir = format!("{}/categories", parent_dir);
-    let yaml = serde_yaml::to_string(&cat_export.category).map_err(|e| e.to_string())?;
+    let yaml = serde_yml::to_string(&cat_export.category).map_err(|e| e.to_string())?;
     files.insert(
         format!("{}/{}.yaml", cat_dir, cat_export.category.id),
         serde_json::Value::String(yaml),
@@ -314,9 +311,14 @@ fn build_categories_export(
     let cat_rows: Vec<Category> = stmt
         .query_map(params![parent_id, parent_type], |row| {
             Ok(Category {
-                id: row.get(0)?, parent_id: row.get(1)?, parent_type: row.get(2)?,
-                name: row.get(3)?, description: row.get(4)?, sort_order: row.get(5)?,
-                created_at: row.get(6)?, updated_at: row.get(7)?,
+                id: row.get(0)?,
+                parent_id: row.get(1)?,
+                parent_type: row.get(2)?,
+                name: row.get(3)?,
+                description: row.get(4)?,
+                sort_order: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -353,10 +355,13 @@ fn build_steps_export(
         let mut substeps = Vec::new();
         for ss in substep_rows {
             let ss_id = ss.id.clone();
-            let ss_cms = super::countermeasures::list_countermeasures_internal(conn, &ss_id, "substep")?;
+            let ss_cms =
+                super::countermeasures::list_countermeasures_internal(conn, &ss_id, "substep")?;
             let ss_ws = super::weaknesses::list_weaknesses_internal(conn, &ss_id, "substep")?;
-            let ss_assessments = super::assessments::get_assessments_internal(conn, &ss_id, "substep")?;
-            let ss_mappings = super::tags::list_technique_mappings_internal(conn, &ss_id, "substep")?;
+            let ss_assessments =
+                super::assessments::get_assessments_internal(conn, &ss_id, "substep")?;
+            let ss_mappings =
+                super::tags::list_technique_mappings_internal(conn, &ss_id, "substep")?;
             let ss_tags = super::tags::list_tags_internal(conn, &ss_id, "substep")?;
             substeps.push(SubstepExport {
                 substep: ss,

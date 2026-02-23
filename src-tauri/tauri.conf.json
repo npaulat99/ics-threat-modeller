@@ -10,7 +10,6 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "title": "ICS Threat Modeller",
     "windows": [
       {
         "title": "ICS Threat Modeller — Threat Modeling for Embedded Field Devices",
