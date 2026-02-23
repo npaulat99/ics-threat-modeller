@@ -1,31 +1,58 @@
 <script lang="ts">
-  import type { Assessment, UpsertAssessment } from '$lib/types';
+  import type { Assessment, CreateAssessment } from '$lib/types';
   import { DEFAULT_FACTORS } from '$lib/types';
   import { calculateCostValue, costToProbability, formatProbability, getSeverityColor } from '$lib/calculations';
   import CostFactorInput from './CostFactorInput.svelte';
 
-  export let stepId: string;
+  export let entityId: string;
+  export let entityType: string;
   export let assessments: Assessment[] = [];
   export let factorWeights: Record<string, number> = {};
-  export let onSave: (data: UpsertAssessment) => Promise<void> = async () => {};
+  export let onSave: (data: CreateAssessment) => Promise<void> = async () => {};
   export let readonly = false;
 
-  // Build a map of current values.
-  $: assessmentMap = Object.fromEntries(
-    assessments.map((a) => [a.factor_name, a])
-  );
+  // The new model stores one Assessment row per entity with 7 named factor columns.
+  $: currentAssessment = assessments.length > 0 ? assessments[0] : null;
 
-  $: result = calculateCostValue(assessments, factorWeights);
+  // Extract factor values from the assessment row into a map for the UI.
+  $: factorValues = {
+    time_effort: currentAssessment?.time_effort ?? null,
+    prior_knowledge: currentAssessment?.prior_knowledge ?? null,
+    exploitability: currentAssessment?.exploitability ?? null,
+    window_of_opportunity: currentAssessment?.window_of_opportunity ?? null,
+    detection_probability: currentAssessment?.detection_probability ?? null,
+    preparation_effort: currentAssessment?.preparation_effort ?? null,
+    abort_risk: currentAssessment?.abort_risk ?? null,
+  } as Record<string, number | null>;
+
+  $: rationaleMap = (() => {
+    try {
+      return currentAssessment?.rationale_json ? JSON.parse(currentAssessment.rationale_json) : {};
+    } catch { return {}; }
+  })();
+
+  $: result = calculateCostValue(factorValues, factorWeights);
   $: probability = costToProbability(result.costValue);
   $: severityClass = getSeverityColor(probability);
 
   async function handleFactorChange(factorName: string, value: number, rationale: string) {
-    await onSave({
-      step_id: stepId,
-      factor_name: factorName,
-      factor_value: value,
-      rationale,
-    });
+    // Build updated rationale JSON.
+    const newRationale = { ...rationaleMap, [factorName]: rationale };
+    // Build CreateAssessment with all current factor values + the changed one.
+    const data: CreateAssessment = {
+      entity_id: entityId,
+      entity_type: entityType,
+      time_effort: factorValues.time_effort ?? undefined,
+      prior_knowledge: factorValues.prior_knowledge ?? undefined,
+      exploitability: factorValues.exploitability ?? undefined,
+      window_of_opportunity: factorValues.window_of_opportunity ?? undefined,
+      detection_probability: factorValues.detection_probability ?? undefined,
+      preparation_effort: factorValues.preparation_effort ?? undefined,
+      abort_risk: factorValues.abort_risk ?? undefined,
+      rationale_json: JSON.stringify(newRationale),
+      [factorName]: value,
+    };
+    await onSave(data);
   }
 </script>
 
@@ -40,16 +67,16 @@
 
   <div class="cost-display">
     <span class="cost-label">Cost Value C(s):</span>
-    <span class="cost-value">{result.costValue.toFixed(2)} / 10</span>
+    <span class="cost-value">{result.costValue.toFixed(2)} / 5</span>
   </div>
 
   <div class="factors-grid">
     {#each DEFAULT_FACTORS as factor}
       <CostFactorInput
         name={factor}
-        value={assessmentMap[factor]?.factor_value ?? 0}
-        rationale={assessmentMap[factor]?.rationale ?? ''}
-        weight={factorWeights[factor] ?? 0.2}
+        value={factorValues[factor] ?? 0}
+        rationale={rationaleMap[factor] ?? ''}
+        weight={factorWeights[factor] ?? (1 / 7)}
         {readonly}
         on:change={(e) => handleFactorChange(factor, e.detail.value, e.detail.rationale)}
       />
@@ -63,18 +90,18 @@
         <thead>
           <tr>
             <th>Factor</th>
-            <th>Raw</th>
+            <th>Value</th>
             <th>Weight</th>
-            <th>Weighted</th>
+            <th>Contribution</th>
           </tr>
         </thead>
         <tbody>
           {#each result.contributions as c}
             <tr>
               <td>{c.factor_name}</td>
-              <td>{c.raw_value}</td>
+              <td>{c.value}</td>
               <td>{(c.weight * 100).toFixed(0)}%</td>
-              <td>{c.weighted_value.toFixed(2)}</td>
+              <td>{c.contribution.toFixed(2)}</td>
             </tr>
           {/each}
         </tbody>

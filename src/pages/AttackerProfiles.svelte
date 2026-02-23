@@ -11,9 +11,8 @@
 
   let formName = '';
   let formDesc = '';
-  let formMotivation = '';
-  let formCapability = 5;
-  let formResources = '';
+  let formSkillLevel = 3;
+  let formAccessLevel = 3;
 
   onMount(loadProfiles);
 
@@ -28,9 +27,8 @@
   function resetForm() {
     formName = '';
     formDesc = '';
-    formMotivation = '';
-    formCapability = 5;
-    formResources = '';
+    formSkillLevel = 3;
+    formAccessLevel = 3;
     editId = null;
     showCreate = false;
   }
@@ -39,9 +37,8 @@
     editId = p.id;
     formName = p.name;
     formDesc = p.description;
-    formMotivation = p.motivation;
-    formCapability = p.capability_level;
-    formResources = p.resources;
+    formSkillLevel = p.skill_level;
+    formAccessLevel = p.access_level;
     showCreate = true;
   }
 
@@ -51,14 +48,14 @@
       if (editId) {
         const data: UpdateAttackerProfile = {
           id: editId, name: formName, description: formDesc,
-          motivation: formMotivation, capability_level: formCapability, resources: formResources,
+          skill_level: formSkillLevel, access_level: formAccessLevel,
         };
         await api.updateAttackerProfile(data);
         setSuccess('Profile updated.');
       } else {
         const data: CreateAttackerProfile = {
           project_id: $currentProject.id, name: formName, description: formDesc,
-          motivation: formMotivation, capability_level: formCapability, resources: formResources,
+          skill_level: formSkillLevel, access_level: formAccessLevel,
         };
         await api.createAttackerProfile(data);
         setSuccess('Profile created.');
@@ -78,7 +75,7 @@
     } catch (e) { setError(`Delete failed: ${e}`); }
   }
 
-  const capLabels = ['Script Kiddie', 'Hobbyist', 'Competent', 'Professional', 'Expert', 'Expert', 'Nation State', 'Nation State', 'APT', 'APT', 'Elite APT'];
+  const skillLabels = ['Novice', 'Beginner', 'Competent', 'Professional', 'Expert'];
 </script>
 
 <div class="profiles-page">
@@ -101,16 +98,12 @@
         <textarea class="input" rows="2" bind:value={formDesc} />
       </div>
       <div class="form-group">
-        <label>Motivation</label>
-        <input class="input" bind:value={formMotivation} placeholder="e.g., Espionage, Sabotage" />
+        <label>Skill Level: {formSkillLevel} ({skillLabels[formSkillLevel - 1] ?? ''})</label>
+        <input type="range" min="1" max="5" bind:value={formSkillLevel} class="slider" />
       </div>
       <div class="form-group">
-        <label>Capability Level: {formCapability} ({capLabels[formCapability] ?? ''})</label>
-        <input type="range" min="0" max="10" bind:value={formCapability} class="slider" />
-      </div>
-      <div class="form-group">
-        <label>Resources</label>
-        <input class="input" bind:value={formResources} placeholder="e.g., Significant funding, zero-day exploits" />
+        <label>Access Level: {formAccessLevel}</label>
+        <input type="range" min="1" max="5" bind:value={formAccessLevel} class="slider" />
       </div>
       <div class="form-actions">
         <button class="btn btn-secondary" on:click={resetForm}>Cancel</button>
@@ -124,15 +117,10 @@
       <div class="profile-card">
         <div class="profile-header">
           <h4>{p.name}</h4>
-          <span class="cap-badge">Cap: {p.capability_level}/10</span>
+          <span class="cap-badge">Skill: {p.skill_level}/5</span>
         </div>
         <p class="profile-desc">{p.description || '—'}</p>
-        {#if p.motivation}
-          <div class="profile-meta">Motivation: {p.motivation}</div>
-        {/if}
-        {#if p.resources}
-          <div class="profile-meta">Resources: {p.resources}</div>
-        {/if}
+        <div class="profile-meta">Access Level: {p.access_level}/5</div>
         <div class="profile-actions">
           <button class="btn btn-sm btn-secondary" on:click={() => editProfile(p)}>Edit</button>
           <button class="btn btn-sm btn-danger" on:click={() => (deleteTarget = p)}>Delete</button>

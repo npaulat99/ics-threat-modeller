@@ -1,5 +1,5 @@
 # ─── Build Stage ─────────────────────────────────────────────────
-FROM rust:1.85-bookworm AS rust-builder
+FROM rust:1.88-bookworm AS rust-builder
 
 # Install system dependencies for Tauri.
 RUN apt-get update && apt-get install -y \
@@ -44,7 +44,7 @@ COPY public/ public/
 RUN npm run build
 
 # ─── Final Build Stage ──────────────────────────────────────────
-FROM rust:1.85-bookworm AS builder
+FROM rust:1.88-bookworm AS builder
 
 # Install system dependencies.
 RUN apt-get update && apt-get install -y \

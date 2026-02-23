@@ -1,4 +1,5 @@
 // TypeScript types matching Rust backend models.
+// Field names use snake_case to match Rust's serde serialization.
 
 // ─── Project ────────────────────────────────────────────────────
 export interface Project {
@@ -6,11 +7,12 @@ export interface Project {
   name: string;
   description: string;
   device_type: string;
-  network_connectivity: string;
-  firmware_update_mechanism: string;
-  access_probability: number;
-  entry_point_probability: number;
-  factor_weights: string; // JSON string
+  architecture: string;
+  interfaces: string;          // JSON array
+  assets: string;              // JSON array
+  deployment_context: string;  // JSON object
+  factor_weights: string;      // JSON object
+  access_probabilities: string; // JSON object
   created_at: string;
   updated_at: string;
 }
@@ -19,11 +21,10 @@ export interface CreateProject {
   name: string;
   description?: string;
   device_type?: string;
-  network_connectivity?: string;
-  firmware_update_mechanism?: string;
-  access_probability?: number;
-  entry_point_probability?: number;
-  factor_weights?: string;
+  architecture?: string;
+  interfaces?: string;
+  assets?: string;
+  deployment_context?: string;
 }
 
 export interface UpdateProject {
@@ -31,11 +32,12 @@ export interface UpdateProject {
   name?: string;
   description?: string;
   device_type?: string;
-  network_connectivity?: string;
-  firmware_update_mechanism?: string;
-  access_probability?: number;
-  entry_point_probability?: number;
+  architecture?: string;
+  interfaces?: string;
+  assets?: string;
+  deployment_context?: string;
   factor_weights?: string;
+  access_probabilities?: string;
 }
 
 // ─── Attacker Profile ───────────────────────────────────────────
@@ -43,29 +45,28 @@ export interface AttackerProfile {
   id: string;
   project_id: string;
   name: string;
+  skill_level: number;
+  access_level: number;
   description: string;
-  motivation: string;
-  capability_level: number;
-  resources: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface CreateAttackerProfile {
   project_id: string;
   name: string;
+  skill_level?: number;
+  access_level?: number;
   description?: string;
-  motivation?: string;
-  capability_level?: number;
-  resources?: string;
 }
 
+// UpdateAttackerProfile — Rust command takes individual params, not a struct.
 export interface UpdateAttackerProfile {
   id: string;
   name?: string;
+  skill_level?: number;
+  access_level?: number;
   description?: string;
-  motivation?: string;
-  capability_level?: number;
-  resources?: string;
 }
 
 // ─── Goal ───────────────────────────────────────────────────────
@@ -74,24 +75,27 @@ export interface Goal {
   project_id: string;
   name: string;
   description: string;
-  aggregation_type: string;
+  impact_category: string;
+  catalog_source_id: string | null;
   sort_order: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface CreateGoal {
   project_id: string;
   name: string;
   description?: string;
-  aggregation_type?: string;
-  sort_order?: number;
+  impact_category?: string;
+  catalog_source_id?: string;
 }
 
+// UpdateGoal — Rust command takes individual params.
 export interface UpdateGoal {
   id: string;
   name?: string;
   description?: string;
-  aggregation_type?: string;
+  impact_category?: string;
   sort_order?: number;
 }
 
@@ -104,21 +108,24 @@ export interface Category {
   description: string;
   sort_order: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface CreateCategory {
   parent_id: string;
-  parent_type: string;
+  parent_type: string;  // "goal" | "category"
   name: string;
   description?: string;
-  sort_order?: number;
 }
 
+// UpdateCategory — Rust command takes individual params.
 export interface UpdateCategory {
   id: string;
   name?: string;
   description?: string;
   sort_order?: number;
+  parent_id?: string;
+  parent_type?: string;
 }
 
 // ─── Step ───────────────────────────────────────────────────────
@@ -126,54 +133,71 @@ export interface Step {
   id: string;
   parent_id: string;
   parent_type: string;
+  conjunction: string;
   name: string;
   description: string;
-  is_leaf: boolean;
-  conjunction: string;
+  access_level: number;
+  skill_level: number;
+  catalog_source_id: string | null;
   sort_order: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface CreateStep {
   parent_id: string;
-  parent_type: string;
+  parent_type: string;  // "goal" | "category" | "step"
+  conjunction?: string;
   name: string;
   description?: string;
-  is_leaf?: boolean;
-  conjunction?: string;
-  sort_order?: number;
+  access_level?: number;
+  skill_level?: number;
+  catalog_source_id?: string;
 }
 
 export interface UpdateStep {
   id: string;
+  conjunction?: string;
   name?: string;
   description?: string;
-  is_leaf?: boolean;
-  conjunction?: string;
+  access_level?: number;
+  skill_level?: number;
+  parent_id?: string;
+  parent_type?: string;
   sort_order?: number;
 }
 
 // ─── Substep ────────────────────────────────────────────────────
 export interface Substep {
   id: string;
-  step_id: string;
+  parent_step_id: string;
+  conjunction: string;
   name: string;
   description: string;
+  access_level: number;
+  skill_level: number;
   sort_order: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface CreateSubstep {
-  step_id: string;
+  parent_step_id: string;
+  conjunction?: string;
   name: string;
   description?: string;
-  sort_order?: number;
+  access_level?: number;
+  skill_level?: number;
 }
 
+// UpdateSubstep — Rust command takes individual params.
 export interface UpdateSubstep {
   id: string;
+  conjunction?: string;
   name?: string;
   description?: string;
+  access_level?: number;
+  skill_level?: number;
   sort_order?: number;
 }
 
@@ -185,22 +209,28 @@ export interface Countermeasure {
   name: string;
   description: string;
   effectiveness: number;
+  implementation_cost: number;
+  sort_order: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface CreateCountermeasure {
   parent_id: string;
-  parent_type: string;
+  parent_type: string;  // "step" | "substep"
   name: string;
   description?: string;
   effectiveness?: number;
+  implementation_cost?: number;
 }
 
+// UpdateCountermeasure — Rust command takes individual params.
 export interface UpdateCountermeasure {
   id: string;
   name?: string;
   description?: string;
   effectiveness?: number;
+  implementation_cost?: number;
 }
 
 // ─── Weakness ───────────────────────────────────────────────────
@@ -211,7 +241,10 @@ export interface Weakness {
   name: string;
   description: string;
   severity: number;
+  cve_id: string | null;
+  sort_order: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface CreateWeakness {
@@ -220,66 +253,79 @@ export interface CreateWeakness {
   name: string;
   description?: string;
   severity?: number;
+  cve_id?: string;
 }
 
+// UpdateWeakness — Rust command takes individual params.
 export interface UpdateWeakness {
   id: string;
   name?: string;
   description?: string;
   severity?: number;
+  cve_id?: string;
 }
 
 // ─── Assessment ─────────────────────────────────────────────────
 export interface Assessment {
   id: string;
-  step_id: string;
-  factor_name: string;
-  factor_value: number;
-  rationale: string;
+  entity_id: string;
+  entity_type: string;
   is_reference: boolean;
-  reference_step_id: string;
+  time_effort: number | null;
+  prior_knowledge: number | null;
+  exploitability: number | null;
+  window_of_opportunity: number | null;
+  detection_probability: number | null;
+  preparation_effort: number | null;
+  abort_risk: number | null;
+  rationale_json: string;
+  override_rationale: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface CreateAssessment {
-  step_id: string;
-  factor_name: string;
-  factor_value: number;
-  rationale?: string;
+  entity_id: string;
+  entity_type: string;
   is_reference?: boolean;
-  reference_step_id?: string;
+  time_effort?: number;
+  prior_knowledge?: number;
+  exploitability?: number;
+  window_of_opportunity?: number;
+  detection_probability?: number;
+  preparation_effort?: number;
+  abort_risk?: number;
+  rationale_json?: string;
+  override_rationale?: string;
 }
 
 export interface UpdateAssessment {
   id: string;
-  factor_name?: string;
-  factor_value?: number;
-  rationale?: string;
-  is_reference?: boolean;
-  reference_step_id?: string;
-}
-
-export interface UpsertAssessment {
-  step_id: string;
-  factor_name: string;
-  factor_value: number;
-  rationale?: string;
+  time_effort?: number;
+  prior_knowledge?: number;
+  exploitability?: number;
+  window_of_opportunity?: number;
+  detection_probability?: number;
+  preparation_effort?: number;
+  abort_risk?: number;
+  rationale_json?: string;
+  override_rationale?: string;
 }
 
 // ─── Calculation Results ────────────────────────────────────────
 export interface StepCalculation {
-  step_id: string;
-  step_name: string;
-  cost_value: number;
-  probability: number;
+  entity_id: string;
+  entity_type: string;
+  weighted_cost: number;       // C(s_i) ∈ [1, 5]
+  cost_probability: number;    // P_cost(s_i) ∈ [0.2, 1.0]
   factor_contributions: FactorContribution[];
 }
 
 export interface FactorContribution {
   factor_name: string;
-  raw_value: number;
+  value: number;
   weight: number;
-  weighted_value: number;
+  contribution: number;
 }
 
 export interface AttackPath {
@@ -287,15 +333,21 @@ export interface AttackPath {
   goal_id: string;
   goal_name: string;
   steps: PathStep[];
-  path_probability: number;
+  max_access_level: number;
+  max_skill_level: number;
   access_probability: number;
-  entry_point_probability: number;
+  cost_probability: number;
+  is_realistic: boolean;
+  overall_probability: number;
 }
 
 export interface PathStep {
-  step_id: string;
-  step_name: string;
-  probability: number;
+  entity_id: string;
+  entity_type: string;
+  name: string;
+  access_level: number;
+  skill_level: number;
+  cost_probability: number;
 }
 
 // ─── Tags ───────────────────────────────────────────────────────
@@ -303,53 +355,57 @@ export interface Tag {
   id: string;
   entity_id: string;
   entity_type: string;
-  tag_name: string;
-  tag_value: string;
+  key: string;
+  value: string;
   created_at: string;
 }
 
 export interface CreateTag {
   entity_id: string;
   entity_type: string;
-  tag_name: string;
-  tag_value?: string;
+  key: string;
+  value: string;
 }
 
 export interface AttackTechniqueMapping {
   id: string;
-  step_id: string;
+  entity_id: string;
+  entity_type: string;
+  framework: string;
   technique_id: string;
   technique_name: string;
-  source: string;
   created_at: string;
 }
 
 export interface CreateTechniqueMapping {
-  step_id: string;
+  entity_id: string;
+  entity_type: string;
+  framework?: string;
   technique_id: string;
-  technique_name: string;
-  source?: string;
+  technique_name?: string;
 }
 
 // ─── Catalog ────────────────────────────────────────────────────
 export interface CatalogEntry {
   id: string;
+  entry_type: string;
   name: string;
   description: string;
-  category: string;
-  severity: string;
-  tree_data: string; // JSON blob
-  source: string;
+  tree_data: string;         // JSON blob
+  source_framework: string;
+  version: string;
+  tags: string;              // JSON array
   created_at: string;
+  updated_at: string;
 }
 
 export interface CreateCatalogEntry {
   name: string;
   description?: string;
-  category?: string;
-  severity?: string;
-  tree_data?: string;
-  source?: string;
+  tree_data: string;
+  source_framework?: string;
+  version?: string;
+  tags?: string;
 }
 
 // ─── Versioning ─────────────────────────────────────────────────
@@ -406,10 +462,21 @@ export interface ProjectExport {
   project: Project;
   attacker_profiles: AttackerProfile[];
   goals: GoalExport[];
+  catalog_sources: CatalogEntry[];
+  change_log: ChangeLogEntry[];
 }
 
 export interface GoalExport {
   goal: Goal;
+  categories: CategoryExport[];
+  steps: StepExport[];
+  technique_mappings: AttackTechniqueMapping[];
+  tags: Tag[];
+}
+
+export interface CategoryExport {
+  category: Category;
+  subcategories: CategoryExport[];
   steps: StepExport[];
 }
 
@@ -421,32 +488,39 @@ export interface StepExport {
   assessments: Assessment[];
   technique_mappings: AttackTechniqueMapping[];
   tags: Tag[];
-  children: StepExport[];
 }
 
 export interface SubstepExport {
   substep: Substep;
   countermeasures: Countermeasure[];
   weaknesses: Weakness[];
+  assessments: Assessment[];
+  technique_mappings: AttackTechniqueMapping[];
+  tags: Tag[];
 }
 
 // ─── Factor Definitions ─────────────────────────────────────────
+// The 7 cost factors used by the Rust backend (scored 1–5 each).
 export const DEFAULT_FACTORS = [
-  'Elapsed Time',
-  'Expertise',
-  'Knowledge of Target',
-  'Window of Opportunity',
-  'Equipment',
+  'time_effort',
+  'prior_knowledge',
+  'exploitability',
+  'window_of_opportunity',
+  'detection_probability',
+  'preparation_effort',
+  'abort_risk',
 ] as const;
 
 export type FactorName = (typeof DEFAULT_FACTORS)[number];
 
 export const DEFAULT_FACTOR_WEIGHTS: Record<FactorName, number> = {
-  'Elapsed Time': 0.2,
-  'Expertise': 0.25,
-  'Knowledge of Target': 0.2,
-  'Window of Opportunity': 0.15,
-  'Equipment': 0.2,
+  time_effort: 1 / 7,
+  prior_knowledge: 1 / 7,
+  exploitability: 1 / 7,
+  window_of_opportunity: 1 / 7,
+  detection_probability: 1 / 7,
+  preparation_effort: 1 / 7,
+  abort_risk: 1 / 7,
 };
 
 // ─── Tree node for UI ───────────────────────────────────────────

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { Goal, Assessment, AttackPath, UpsertAssessment } from '$lib/types';
+  import type { Goal, Assessment, AttackPath, CreateAssessment } from '$lib/types';
   import { currentProject, goals, setError, setSuccess } from '$lib/stores';
-  import { parseFactorWeights, aggregateProbabilities, formatProbability } from '$lib/calculations';
+  import { parseFactorWeights, formatProbability } from '$lib/calculations';
   import * as api from '$lib/api';
   import AssessmentForm from '$components/AssessmentForm.svelte';
   import PathProbabilityTable from '$components/PathProbabilityTable.svelte';
@@ -9,8 +9,9 @@
 
   let goalList: Goal[] = [];
   let selectedGoalId = '';
-  let leafSteps: { id: string; name: string }[] = [];
-  let selectedStepId = '';
+  let leafEntities: { id: string; name: string; entityType: string }[] = [];
+  let selectedEntityId = '';
+  let selectedEntityType = 'step';
   let stepAssessments: Assessment[] = [];
   let attackPaths: AttackPath[] = [];
   let aggregatedProb = 0;
@@ -34,55 +35,65 @@
   async function selectGoal(g: Goal) {
     selectedGoalId = g.id;
     selectedGoal = g;
-    selectedStepId = '';
+    selectedEntityId = '';
     stepAssessments = [];
 
-    // Find leaf steps.
-    leafSteps = [];
-    await findLeafSteps(g.id, 'goal');
+    // Find assessable entities (leaf steps and substeps).
+    leafEntities = [];
+    await findAssessableEntities(g.id, 'goal');
 
     // Calculate paths.
     try {
-      attackPaths = await api.calculateAttackPaths(g.id, $currentProject!.id);
-      aggregatedProb = await api.calculateAggregatedProbability(g.id, $currentProject!.id);
+      attackPaths = await api.calculateAttackPaths($currentProject!.id, g.id);
+      aggregatedProb = await api.calculateAggregatedProbability($currentProject!.id, g.id, 'goal');
     } catch (e) {
       attackPaths = [];
       aggregatedProb = 0;
     }
   }
 
-  async function findLeafSteps(parentId: string, parentType: string) {
+  async function findAssessableEntities(parentId: string, parentType: string) {
     const steps = await api.listSteps(parentId, parentType);
     for (const s of steps) {
-      if (s.is_leaf) {
-        leafSteps.push({ id: s.id, name: s.name });
-        leafSteps = leafSteps; // trigger reactivity
-      } else {
-        await findLeafSteps(s.id, 'step');
+      const childSteps = await api.listSteps(s.id, 'step');
+      // Add substeps of this step.
+      const substeps = await api.listSubsteps(s.id);
+      for (const sub of substeps) {
+        leafEntities.push({ id: sub.id, name: `${s.name} › ${sub.name}`, entityType: 'substep' });
+        leafEntities = leafEntities;
+      }
+      if (childSteps.length === 0 && substeps.length === 0) {
+        // Leaf step with no substeps — assess the step itself.
+        leafEntities.push({ id: s.id, name: s.name, entityType: 'step' });
+        leafEntities = leafEntities;
+      } else if (childSteps.length > 0) {
+        // Recurse into child steps.
+        await findAssessableEntities(s.id, 'step');
       }
     }
   }
 
-  async function selectStep(stepId: string) {
-    selectedStepId = stepId;
+  async function selectEntity(entityId: string, entityType: string) {
+    selectedEntityId = entityId;
+    selectedEntityType = entityType;
     try {
-      stepAssessments = await api.listAssessments(stepId);
+      stepAssessments = await api.getAssessments(entityId, entityType);
     } catch (e) {
       stepAssessments = [];
       setError(`Load assessments failed: ${e}`);
     }
   }
 
-  async function handleSaveAssessment(data: UpsertAssessment) {
+  async function handleSaveAssessment(data: CreateAssessment) {
     try {
       await api.upsertAssessment(data);
-      stepAssessments = await api.listAssessments(data.step_id);
+      stepAssessments = await api.getAssessments(data.entity_id, data.entity_type);
       setSuccess('Assessment saved.');
 
       // Recalculate paths for the selected goal.
       if (selectedGoalId && $currentProject) {
-        attackPaths = await api.calculateAttackPaths(selectedGoalId, $currentProject.id);
-        aggregatedProb = await api.calculateAggregatedProbability(selectedGoalId, $currentProject.id);
+        attackPaths = await api.calculateAttackPaths($currentProject.id, selectedGoalId);
+        aggregatedProb = await api.calculateAggregatedProbability($currentProject.id, selectedGoalId, 'goal');
       }
     } catch (e) { setError(`Save failed: ${e}`); }
   }
@@ -113,32 +124,33 @@
   {#if selectedGoalId}
     <div class="two-col">
       <div class="step-selector">
-        <h3>Leaf Steps ({leafSteps.length})</h3>
+        <h3>Assessable Entities ({leafEntities.length})</h3>
         <div class="step-list">
-          {#each leafSteps as s (s.id)}
+          {#each leafEntities as s (s.id)}
             <button
               class="step-item"
-              class:active={selectedStepId === s.id}
-              on:click={() => selectStep(s.id)}
+              class:active={selectedEntityId === s.id}
+              on:click={() => selectEntity(s.id, s.entityType)}
             >
-              ⚡ {s.name}
+              {s.entityType === 'substep' ? '🔹' : '⚡'} {s.name}
             </button>
           {:else}
-            <p class="muted">No leaf steps found under this goal.</p>
+            <p class="muted">No assessable entities found under this goal.</p>
           {/each}
         </div>
       </div>
 
       <div class="assessment-area">
-        {#if selectedStepId}
+        {#if selectedEntityId}
           <AssessmentForm
-            stepId={selectedStepId}
+            entityId={selectedEntityId}
+            entityType={selectedEntityType}
             assessments={stepAssessments}
             {factorWeights}
             onSave={handleSaveAssessment}
           />
         {:else}
-          <p class="muted">Select a leaf step to assess.</p>
+          <p class="muted">Select an entity to assess.</p>
         {/if}
       </div>
     </div>
@@ -147,7 +159,7 @@
       paths={attackPaths}
       goalName={selectedGoal?.name ?? ''}
       aggregatedProbability={aggregatedProb}
-      aggregationType={(selectedGoal?.aggregation_type ?? 'or') === 'and' ? 'and' : 'or'}
+      aggregationType={(selectedGoal?.impact_category ?? 'or') === 'and' ? 'and' : 'or'}
     />
   {/if}
 </div>

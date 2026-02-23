@@ -9,20 +9,22 @@
   let name = '';
   let description = '';
   let deviceType = '';
-  let networkConn = '';
-  let firmwareUpdate = '';
-  let accessProb = 0.5;
-  let entryPointProb = 0.5;
+  let architecture = '';
+  let interfaces = '[]';
+  let assets = '[]';
+  let deploymentContext = '{}';
   let factorWeights: Record<string, number> = {};
+  let accessProbabilities = '{}';
 
   $: if ($currentProject) {
     name = $currentProject.name;
     description = $currentProject.description;
     deviceType = $currentProject.device_type;
-    networkConn = $currentProject.network_connectivity;
-    firmwareUpdate = $currentProject.firmware_update_mechanism;
-    accessProb = $currentProject.access_probability;
-    entryPointProb = $currentProject.entry_point_probability;
+    architecture = $currentProject.architecture;
+    interfaces = $currentProject.interfaces;
+    assets = $currentProject.assets;
+    deploymentContext = $currentProject.deployment_context;
+    accessProbabilities = $currentProject.access_probabilities;
     factorWeights = parseFactorWeights($currentProject.factor_weights);
   }
 
@@ -34,11 +36,12 @@
         name,
         description,
         device_type: deviceType,
-        network_connectivity: networkConn,
-        firmware_update_mechanism: firmwareUpdate,
-        access_probability: accessProb,
-        entry_point_probability: entryPointProb,
+        architecture,
+        interfaces,
+        assets,
+        deployment_context: deploymentContext,
         factor_weights: JSON.stringify(factorWeights),
+        access_probabilities: accessProbabilities,
       };
       const updated = await api.updateProject(data);
       currentProject.set(updated);
@@ -91,39 +94,47 @@
           {/if}
         </div>
         <div class="form-group">
-          <label>Network Connectivity</label>
+          <label>Architecture</label>
           {#if editing}
-            <input class="input" bind:value={networkConn} />
+            <input class="input" bind:value={architecture} />
           {:else}
-            <p class="field-value">{networkConn || '—'}</p>
+            <p class="field-value">{architecture || '—'}</p>
           {/if}
         </div>
         <div class="form-group">
-          <label>Firmware Update Mechanism</label>
+          <label>Interfaces (JSON)</label>
           {#if editing}
-            <input class="input" bind:value={firmwareUpdate} />
+            <textarea class="input" rows="2" bind:value={interfaces}></textarea>
           {:else}
-            <p class="field-value">{firmwareUpdate || '—'}</p>
+            <p class="field-value">{interfaces || '—'}</p>
+          {/if}
+        </div>
+        <div class="form-group">
+          <label>Assets (JSON)</label>
+          {#if editing}
+            <textarea class="input" rows="2" bind:value={assets}></textarea>
+          {:else}
+            <p class="field-value">{assets || '—'}</p>
           {/if}
         </div>
       </div>
 
       <div class="card">
-        <h3>Probability Parameters</h3>
+        <h3>Deployment & Probabilities</h3>
         <div class="form-group">
-          <label>Access Probability (P_access)</label>
+          <label>Deployment Context (JSON)</label>
           {#if editing}
-            <input class="input" type="number" min="0" max="1" step="0.05" bind:value={accessProb} />
+            <textarea class="input" rows="3" bind:value={deploymentContext}></textarea>
           {:else}
-            <p class="field-value">{(accessProb * 100).toFixed(0)}%</p>
+            <p class="field-value">{deploymentContext || '—'}</p>
           {/if}
         </div>
         <div class="form-group">
-          <label>Entry Point Probability (E_P)</label>
+          <label>Access Probabilities (JSON)</label>
           {#if editing}
-            <input class="input" type="number" min="0" max="1" step="0.05" bind:value={entryPointProb} />
+            <textarea class="input" rows="2" bind:value={accessProbabilities}></textarea>
           {:else}
-            <p class="field-value">{(entryPointProb * 100).toFixed(0)}%</p>
+            <p class="field-value">{accessProbabilities || '—'}</p>
           {/if}
         </div>
 

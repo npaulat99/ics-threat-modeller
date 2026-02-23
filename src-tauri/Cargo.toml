@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Database-backed threat modeling tool for embedded field devices"
 authors = ["ICS Threat Modeller Team"]
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.88"
 
 [lib]
 name = "ics_threat_modeller_lib"

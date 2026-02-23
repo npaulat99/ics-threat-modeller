@@ -250,8 +250,8 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        // We expect 13 tables.
-        assert_eq!(count, 13);
+        // We expect 14 tables.
+        assert_eq!(count, 14);
     }
 
     #[test]

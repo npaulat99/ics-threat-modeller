@@ -1,4 +1,6 @@
 // Tauri invoke wrappers for all backend commands.
+// Top-level invoke arguments use camelCase (Tauri auto-converts to snake_case).
+// Struct fields within data objects use snake_case (matching Rust serde serialization).
 
 import { invoke } from '@tauri-apps/api/core';
 import type {
@@ -10,7 +12,7 @@ import type {
   Substep, CreateSubstep, UpdateSubstep,
   Countermeasure, CreateCountermeasure, UpdateCountermeasure,
   Weakness, CreateWeakness, UpdateWeakness,
-  Assessment, CreateAssessment, UpdateAssessment, UpsertAssessment,
+  Assessment, CreateAssessment, UpdateAssessment,
   StepCalculation, AttackPath,
   Tag, CreateTag,
   AttackTechniqueMapping, CreateTechniqueMapping,
@@ -45,8 +47,15 @@ export const listAttackerProfiles = (projectId: string) =>
 export const getAttackerProfile = (id: string) =>
   invoke<AttackerProfile>('get_attacker_profile', { id });
 
+// Rust takes individual params, not a struct.
 export const updateAttackerProfile = (data: UpdateAttackerProfile) =>
-  invoke<AttackerProfile>('update_attacker_profile', { data });
+  invoke<AttackerProfile>('update_attacker_profile', {
+    id: data.id,
+    name: data.name,
+    skillLevel: data.skill_level,
+    accessLevel: data.access_level,
+    description: data.description,
+  });
 
 export const deleteAttackerProfile = (id: string) =>
   invoke<void>('delete_attacker_profile', { id });
@@ -61,8 +70,15 @@ export const listGoals = (projectId: string) =>
 export const getGoal = (id: string) =>
   invoke<Goal>('get_goal', { id });
 
+// Rust takes individual params, not a struct.
 export const updateGoal = (data: UpdateGoal) =>
-  invoke<Goal>('update_goal', { data });
+  invoke<Goal>('update_goal', {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    impactCategory: data.impact_category,
+    sortOrder: data.sort_order,
+  });
 
 export const deleteGoal = (id: string) =>
   invoke<void>('delete_goal', { id });
@@ -77,8 +93,16 @@ export const listCategories = (parentId: string, parentType: string) =>
 export const getCategory = (id: string) =>
   invoke<Category>('get_category', { id });
 
+// Rust takes individual params, not a struct.
 export const updateCategory = (data: UpdateCategory) =>
-  invoke<Category>('update_category', { data });
+  invoke<Category>('update_category', {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    sortOrder: data.sort_order,
+    parentId: data.parent_id,
+    parentType: data.parent_type,
+  });
 
 export const deleteCategory = (id: string) =>
   invoke<void>('delete_category', { id });
@@ -93,6 +117,7 @@ export const listSteps = (parentId: string, parentType: string) =>
 export const getStep = (id: string) =>
   invoke<Step>('get_step', { id });
 
+// Rust takes a data struct (UpdateStep).
 export const updateStep = (data: UpdateStep) =>
   invoke<Step>('update_step', { data });
 
@@ -103,14 +128,23 @@ export const deleteStep = (id: string) =>
 export const createSubstep = (data: CreateSubstep) =>
   invoke<Substep>('create_substep', { data });
 
-export const listSubsteps = (stepId: string) =>
-  invoke<Substep[]>('list_substeps', { stepId });
+export const listSubsteps = (parentStepId: string) =>
+  invoke<Substep[]>('list_substeps', { parentStepId });
 
 export const getSubstep = (id: string) =>
   invoke<Substep>('get_substep', { id });
 
+// Rust takes individual params, not a struct.
 export const updateSubstep = (data: UpdateSubstep) =>
-  invoke<Substep>('update_substep', { data });
+  invoke<Substep>('update_substep', {
+    id: data.id,
+    conjunction: data.conjunction,
+    name: data.name,
+    description: data.description,
+    accessLevel: data.access_level,
+    skillLevel: data.skill_level,
+    sortOrder: data.sort_order,
+  });
 
 export const deleteSubstep = (id: string) =>
   invoke<void>('delete_substep', { id });
@@ -125,8 +159,15 @@ export const listCountermeasures = (parentId: string, parentType: string) =>
 export const getCountermeasure = (id: string) =>
   invoke<Countermeasure>('get_countermeasure', { id });
 
+// Rust takes individual params, not a struct.
 export const updateCountermeasure = (data: UpdateCountermeasure) =>
-  invoke<Countermeasure>('update_countermeasure', { data });
+  invoke<Countermeasure>('update_countermeasure', {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    effectiveness: data.effectiveness,
+    implementationCost: data.implementation_cost,
+  });
 
 export const deleteCountermeasure = (id: string) =>
   invoke<void>('delete_countermeasure', { id });
@@ -141,8 +182,15 @@ export const listWeaknesses = (parentId: string, parentType: string) =>
 export const getWeakness = (id: string) =>
   invoke<Weakness>('get_weakness', { id });
 
+// Rust takes individual params, not a struct.
 export const updateWeakness = (data: UpdateWeakness) =>
-  invoke<Weakness>('update_weakness', { data });
+  invoke<Weakness>('update_weakness', {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    severity: data.severity,
+    cveId: data.cve_id,
+  });
 
 export const deleteWeakness = (id: string) =>
   invoke<void>('delete_weakness', { id });
@@ -154,27 +202,32 @@ export const createAssessment = (data: CreateAssessment) =>
 export const getAssessments = (entityId: string, entityType: string) =>
   invoke<Assessment[]>('get_assessments', { entityId, entityType });
 
-export const listAssessments = (stepId: string) =>
-  invoke<Assessment[]>('get_assessments', { entityId: stepId, entityType: 'step' });
-
 export const updateAssessment = (data: UpdateAssessment) =>
   invoke<Assessment>('update_assessment', { data });
 
 export const deleteAssessment = (id: string) =>
   invoke<void>('delete_assessment', { id });
 
-export const upsertAssessment = (data: UpsertAssessment) =>
+// Upsert uses CreateAssessment struct (same as create).
+export const upsertAssessment = (data: CreateAssessment) =>
   invoke<Assessment>('upsert_assessment', { data });
 
 // ─── Calculations ───────────────────────────────────────────────
-export const calculateStepProbability = (stepId: string, projectId: string) =>
-  invoke<StepCalculation>('calculate_step_probability', { stepId, projectId });
+export const calculateStepProbability = (entityId: string, entityType: string, projectId: string) =>
+  invoke<StepCalculation>('calculate_step_probability', { entityId, entityType, projectId });
 
-export const calculateAttackPaths = (goalId: string, projectId: string) =>
-  invoke<AttackPath[]>('calculate_attack_paths', { goalId, projectId });
+export const calculateAttackPaths = (
+  projectId: string,
+  goalId: string,
+  attackerSkill?: number,
+  attackerAccess?: number,
+) =>
+  invoke<AttackPath[]>('calculate_attack_paths', {
+    projectId, goalId, attackerSkill, attackerAccess,
+  });
 
-export const calculateAggregatedProbability = (goalId: string, projectId: string) =>
-  invoke<number>('calculate_aggregated_probability', { goalId, projectId });
+export const calculateAggregatedProbability = (projectId: string, parentId: string, parentType: string) =>
+  invoke<number>('calculate_aggregated_probability', { projectId, parentId, parentType });
 
 // ─── Tags ───────────────────────────────────────────────────────
 export const createTag = (data: CreateTag) =>
@@ -190,8 +243,8 @@ export const deleteTag = (id: string) =>
 export const createTechniqueMapping = (data: CreateTechniqueMapping) =>
   invoke<AttackTechniqueMapping>('create_technique_mapping', { data });
 
-export const listTechniqueMappings = (stepId: string) =>
-  invoke<AttackTechniqueMapping[]>('list_technique_mappings', { stepId });
+export const listTechniqueMappings = (entityId: string, entityType: string) =>
+  invoke<AttackTechniqueMapping[]>('list_technique_mappings', { entityId, entityType });
 
 export const deleteTechniqueMapping = (id: string) =>
   invoke<void>('delete_technique_mapping', { id });
@@ -219,7 +272,7 @@ export const importCatalogEntry = (catalogId: string, projectId: string) =>
   invoke<string>('import_catalog_entry', { catalogId, projectId });
 
 export const seedCatalog = () =>
-  invoke<number>('seed_catalog_command');
+  invoke<void>('seed_catalog_command');
 
 // ─── Export / Import ────────────────────────────────────────────
 export const exportProjectJson = (projectId: string) =>
@@ -229,13 +282,13 @@ export const exportProjectYaml = (projectId: string) =>
   invoke<string>('export_project_yaml', { projectId });
 
 export const exportProjectDirectory = (projectId: string) =>
-  invoke<Record<string, string>>('export_project_directory', { projectId });
+  invoke<string>('export_project_directory', { projectId });
 
-export const importProjectJson = (jsonData: string) =>
-  invoke<string>('import_project_json', { jsonData });
+export const importProjectJson = (jsonStr: string) =>
+  invoke<string>('import_project_json', { jsonStr });
 
-export const importProjectYaml = (yamlData: string) =>
-  invoke<string>('import_project_yaml', { yamlData });
+export const importProjectYaml = (yamlStr: string) =>
+  invoke<string>('import_project_yaml', { yamlStr });
 
 // ─── Versioning ─────────────────────────────────────────────────
 export const createSnapshot = (data: CreateSnapshot) =>

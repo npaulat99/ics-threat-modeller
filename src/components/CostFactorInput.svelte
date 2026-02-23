@@ -2,9 +2,9 @@
   import { createEventDispatcher } from 'svelte';
 
   export let name: string;
-  export let value = 0;
+  export let value = 1;
   export let rationale = '';
-  export let weight = 0.2;
+  export let weight = 1 / 7;
   export let readonly = false;
 
   const dispatch = createEventDispatcher<{
@@ -40,15 +40,15 @@
   <div class="slider-row">
     <input
       type="range"
-      min="0"
-      max="10"
+      min="1"
+      max="5"
       step="1"
       bind:value={localValue}
       on:change={handleSlider}
       disabled={readonly}
       class="slider"
     />
-    <span class="value-display" class:low={localValue <= 3} class:mid={localValue > 3 && localValue <= 6} class:high={localValue > 6}>
+    <span class="value-display" class:low={localValue <= 2} class:mid={localValue > 2 && localValue <= 3} class:high={localValue > 3}>
       {localValue}
     </span>
   </div>

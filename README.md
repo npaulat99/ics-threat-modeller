@@ -34,10 +34,10 @@ A desktop application for **attack-tree based threat modelling** of Industrial C
 ## Features
 
 - **Attack Tree Modelling** — Build hierarchical attack trees with goals, categories, steps, and substeps.  AND/OR conjunctions for flexible modelling.
-- **Quantitative Assessment** — Five cost factors (Elapsed Time, Expertise, Knowledge of Target, Window of Opportunity, Equipment) scored 0–10 with configurable weights.
+- **Quantitative Assessment** — Seven cost factors (Time Effort, Prior Knowledge, Exploitability, Window of Opportunity, Detection Probability, Preparation Effort, Abort Risk) scored 1–5 with configurable weights.
 - **Probability Calculation** — Automatic computation of attack path probabilities using the cost-based methodology from the thesis (§4). Supports AND/OR aggregation.
 - **Countermeasures & Weaknesses** — Attach countermeasures (with effectiveness ratings) and weaknesses to any step or substep.
-- **Attacker Profiles** — Define attacker archetypes with capability levels, motivations, and resources.
+- **Attacker Profiles** — Define attacker archetypes with skill levels and access levels.
 - **MITRE ATT&CK for ICS Mappings** — Map attack steps to ATT&CK technique IDs.
 - **Catalog** — Pre-built attack tree templates (firmware compromise, process manipulation, persistent access, etc.) with one-click import.
 - **Export / Import** — Full project export/import in JSON or YAML format.
@@ -74,7 +74,7 @@ A desktop application for **attack-tree based threat modelling** of Industrial C
 
 | Tool        | Version  | Install                                                |
 |-------------|----------|--------------------------------------------------------|
-| **Rust**    | ≥ 1.70   | [rustup.rs](https://rustup.rs/)                        |
+| **Rust**    | ≥ 1.88   | [rustup.rs](https://rustup.rs/)                        |
 | **Node.js** | ≥ 18     | [nodejs.org](https://nodejs.org/)                      |
 | **npm**     | ≥ 9      | Included with Node.js                                  |
 | **WebView2**| Latest   | Pre-installed on Windows 10/11; or download from [Microsoft](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) |
@@ -204,6 +204,11 @@ xhost +local:docker
 docker compose up ics-threat-modeller
 ```
 
+> **After running `docker compose build`:**
+> 1. **Option A (container):** Run `xhost +local:docker && docker compose up ics-threat-modeller` to launch the GUI inside the container (Linux X11 only).
+> 2. **Option B (extract binary):** Run `docker compose run --rm build-only` to extract the compiled binary to `./output/`. You can then run `./output/ics-threat-modeller` directly on your host (Linux) — no Docker needed at runtime.
+> 3. **Windows:** Use the native build (`npm run tauri build`) instead, since Docker GUI forwarding is not straightforward on Windows.
+
 **Fallback (plain Docker without Compose):**
 
 ```bash
@@ -232,8 +237,11 @@ docker run --rm -e DISPLAY=$DISPLAY \
 2. Click **"Open Projects"** on the home page or use the sidebar.
 3. Click **"+ New Project"** and enter a name, description, and device type.
 4. Configure project-specific parameters:
-   - **Access Probability (P_access)** — likelihood the attacker has network/physical access.
-   - **Entry Point Probability (E_P)** — probability of a viable entry point existing.
+   - **Architecture** — device architecture description.
+   - **Interfaces** — communication interfaces of the device.
+   - **Assets** — critical assets to protect.
+   - **Deployment Context** — deployment environment.
+   - **Access Probabilities** — JSON object mapping access types to probability values.
    - **Factor Weights** — relative importance of each cost factor (must sum to ~1.0).
 
 ### Building Attack Trees
@@ -250,25 +258,27 @@ docker run --rm -e DISPLAY=$DISPLAY \
 
 1. Navigate to the **Assessment** page.
 2. Select a goal, then select a leaf step.
-3. For each cost factor, set a value from 0 (trivial) to 10 (extremely difficult):
-   - **Elapsed Time** — time required for the attack.
-   - **Expertise** — technical skill level needed.
-   - **Knowledge of Target** — target-specific knowledge required.
+3. For each cost factor, set a value from 1 (trivial) to 5 (extremely difficult):
+   - **Time Effort** — time required for the attack.
+   - **Prior Knowledge** — target-specific knowledge required.
+   - **Exploitability** — how exploitable the target is.
    - **Window of Opportunity** — access conditions needed.
-   - **Equipment** — specialised tools required.
+   - **Detection Probability** — likelihood of being detected.
+   - **Preparation Effort** — preparation work required.
+   - **Abort Risk** — risk of needing to abort the attack.
 4. Add a rationale explaining each rating.
 5. The probability is computed automatically:
-   - $C(s_i) = \sum_j w_j \cdot v_j$ (weighted cost)
-   - $P_{cost}(s_i) = 1 - C(s_i) / 10$ (cost-to-probability mapping)
+   - $C(s_i) = \sum_j w_j \cdot v_j$ (weighted cost, range 1–5)
+   - $P_{cost}(s_i) = (6 - C(s_i)) / 5$ (cost-to-probability mapping, range 0.2–1.0)
 
 ### Probability Calculations
 
 Attack path probabilities are computed as:
 
-$$P(P | A) = E_P \cdot P_{access} \cdot \prod_{i \in P} P_{cost}(s_i)$$
+$$P(Path) = P_{access} \cdot \prod_{i \in P} P_{cost}(s_i)$$
 
 Goal-level aggregation:
-- **OR**: $P_{goal} = 1 - \prod_k (1 - P_k)$ (any path succeeds)
+- **OR**: $P_{goal} = \max_k(P_k)$ (highest path probability)
 - **AND**: $P_{goal} = \prod_k P_k$ (all paths must succeed)
 
 Results are shown in the **Path Probability Table** with severity ratings (Low/Medium/High/Critical).
@@ -345,7 +355,7 @@ ics-threat-modeller/
 │   │   ├── lib.rs                # Tauri app setup & command registration
 │   │   ├── db/
 │   │   │   ├── mod.rs            # Database connection management
-│   │   │   ├── schema.rs         # 13-table SQLite schema
+│   │   │   ├── schema.rs         # 14-table SQLite schema
 │   │   │   └── models.rs         # All data structs (entities, DTOs)
 │   │   ├── commands/
 │   │   │   ├── mod.rs            # Command module declarations
@@ -411,14 +421,14 @@ cd src-tauri && cargo clippy
 The SQLite database is created automatically at `ics_threat_modeller.db` in the application's working directory. It uses:
 - **WAL mode** for concurrent read performance.
 - **Foreign keys** enforced.
-- **13 tables**: projects, goals, categories, steps, substeps, countermeasures, weaknesses, assessments, attacker_profiles, attack_technique_mappings, tags, catalog_entries, snapshots, change_log.
+- **14 tables**: projects, goals, categories, steps, substeps, countermeasures, weaknesses, assessments, attacker_profiles, attack_technique_mappings, tags, catalog_entries, snapshots, change_log.
 
 ### Technology Stack
 
 | Layer     | Technology                             |
 |-----------|----------------------------------------|
 | Framework | Tauri 2.x                              |
-| Frontend  | Svelte 4, TypeScript, Vite 6           |
+| Frontend  | Svelte 4, TypeScript, Vite 5           |
 | Backend   | Rust (edition 2021)                    |
 | Database  | SQLite via rusqlite 0.31 (bundled)     |
 | Routing   | svelte-spa-router 4                    |

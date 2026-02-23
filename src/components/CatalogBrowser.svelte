@@ -49,11 +49,12 @@
   // Load on mount.
   loadCatalog();
 
-  const severityColors: Record<string, string> = {
-    critical: '#e53e3e',
-    high: '#dd6b20',
-    medium: '#d69e2e',
-    low: '#38a169',
+  const entryTypeColors: Record<string, string> = {
+    attack_pattern: '#e53e3e',
+    technique: '#dd6b20',
+    weakness: '#d69e2e',
+    countermeasure: '#38a169',
+    threat: '#805ad5',
   };
 </script>
 
@@ -75,15 +76,20 @@
           <h4 class="card-title">{entry.name}</h4>
           <span
             class="severity-tag"
-            style="background: {severityColors[entry.severity] ?? '#718096'}20; color: {severityColors[entry.severity] ?? '#718096'}"
+            style="background: {entryTypeColors[entry.entry_type] ?? '#718096'}20; color: {entryTypeColors[entry.entry_type] ?? '#718096'}"
           >
-            {entry.severity}
+            {entry.entry_type}
           </span>
         </div>
         <p class="card-desc">{entry.description}</p>
         <div class="card-meta">
-          <span class="meta-item">📂 {entry.category}</span>
-          <span class="meta-item">📖 {entry.source}</span>
+          <span class="meta-item">📂 {entry.source_framework}</span>
+          {#if entry.version}
+            <span class="meta-item">📖 v{entry.version}</span>
+          {/if}
+          {#if entry.tags}
+            <span class="meta-item">🏷️ {entry.tags}</span>
+          {/if}
         </div>
         <div class="card-actions">
           {#if $currentProject}

@@ -56,11 +56,10 @@
 
   async function buildStepNode(s: Step): Promise<TreeNodeData> {
     const children: TreeNodeData[] = [];
-    if (!s.is_leaf) {
-      const childSteps = await api.listSteps(s.id, 'step');
-      for (const cs of childSteps) {
-        children.push(await buildStepNode(cs));
-      }
+    // Load child steps.
+    const childSteps = await api.listSteps(s.id, 'step');
+    for (const cs of childSteps) {
+      children.push(await buildStepNode(cs));
     }
     // Load substeps.
     const subs = await api.listSubsteps(s.id);
@@ -107,7 +106,7 @@
         await api.createCategory(data);
       } else if (addType === 'substep') {
         const data: CreateSubstep = {
-          step_id: addParent.id,
+          parent_step_id: addParent.id,
           name: addName,
           description: addDesc || undefined,
         };
@@ -175,17 +174,21 @@
             <dt>Description</dt>
             <dd>{selectedDetail.description || '—'}</dd>
           {/if}
-          {#if 'aggregation_type' in selectedDetail}
-            <dt>Aggregation</dt>
-            <dd>{selectedDetail.aggregation_type}</dd>
+          {#if 'impact_category' in selectedDetail}
+            <dt>Impact Category</dt>
+            <dd>{selectedDetail.impact_category}</dd>
           {/if}
           {#if 'conjunction' in selectedDetail}
             <dt>Conjunction</dt>
             <dd>{selectedDetail.conjunction}</dd>
           {/if}
-          {#if 'is_leaf' in selectedDetail}
-            <dt>Leaf Node</dt>
-            <dd>{selectedDetail.is_leaf ? 'Yes' : 'No'}</dd>
+          {#if 'access_level' in selectedDetail && selectedDetail.access_level !== undefined}
+            <dt>Access Level</dt>
+            <dd>{selectedDetail.access_level}</dd>
+          {/if}
+          {#if 'skill_level' in selectedDetail && selectedDetail.skill_level !== undefined}
+            <dt>Skill Level</dt>
+            <dd>{selectedDetail.skill_level}</dd>
           {/if}
         </dl>
       </div>

@@ -27,8 +27,9 @@
           <th>#</th>
           <th>Path Steps</th>
           <th>P(access)</th>
-          <th>E(P)</th>
-          <th>P(path)</th>
+          <th>P(cost)</th>
+          <th>Realistic</th>
+          <th>P(overall)</th>
           <th>Severity</th>
         </tr>
       </thead>
@@ -38,8 +39,8 @@
             <td class="path-num">{i + 1}</td>
             <td class="path-steps">
               {#each path.steps as step, j}
-                <span class="step-chip" title="P={formatProbability(step.probability)}">
-                  {step.step_name}
+                <span class="step-chip" title="P={formatProbability(step.cost_probability)}">
+                  {step.name}
                   {#if j < path.steps.length - 1}
                     <span class="arrow">→</span>
                   {/if}
@@ -47,13 +48,14 @@
               {/each}
             </td>
             <td>{formatProbability(path.access_probability)}</td>
-            <td>{formatProbability(path.entry_point_probability)}</td>
-            <td class="path-prob {getSeverityColor(path.path_probability)}">
-              {formatProbability(path.path_probability)}
+            <td>{formatProbability(path.cost_probability)}</td>
+            <td>{path.is_realistic ? '✓' : '✗'}</td>
+            <td class="path-prob {getSeverityColor(path.overall_probability)}">
+              {formatProbability(path.overall_probability)}
             </td>
             <td>
-              <span class="severity-badge {getSeverityColor(path.path_probability)}">
-                {getSeverityLabel(path.path_probability)}
+              <span class="severity-badge {getSeverityColor(path.overall_probability)}">
+                {getSeverityLabel(path.overall_probability)}
               </span>
             </td>
           </tr>
