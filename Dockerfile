@@ -3,10 +3,10 @@ FROM rust:1.88-bookworm AS rust-builder
 
 # Install corporate root certificate.
 COPY vegarootcert2.crt /usr/local/share/ca-certificates/vegarootcert2.crt
-RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && update-ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Install system dependencies for Tauri.
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libwebkit2gtk-4.1-dev \
     librsvg2-dev \
     patchelf \
@@ -30,7 +30,7 @@ FROM node:22-bookworm AS node-builder
 
 # Install corporate root certificate.
 COPY vegarootcert2.crt /usr/local/share/ca-certificates/vegarootcert2.crt
-RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && update-ca-certificates && rm -rf /var/lib/apt/lists/*
 ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 
 WORKDIR /app
@@ -57,10 +57,10 @@ FROM rust:1.88-bookworm AS builder
 
 # Install corporate root certificate.
 COPY vegarootcert2.crt /usr/local/share/ca-certificates/vegarootcert2.crt
-RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && update-ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Install system dependencies.
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libwebkit2gtk-4.1-dev \
     librsvg2-dev \
     patchelf \
@@ -72,7 +72,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install Node.js for tauri build.
 RUN wget -qO- https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs
+    && apt-get install -y --no-install-recommends nodejs
 
 WORKDIR /app
 
@@ -92,7 +92,7 @@ RUN cargo build --release
 # ─── Output Stage ───────────────────────────────────────────────
 FROM debian:bookworm-slim AS runtime
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libwebkit2gtk-4.1-0 \
     libgtk-3-0 \
     libayatana-appindicator3-1 \
