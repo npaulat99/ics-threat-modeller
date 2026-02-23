@@ -2,7 +2,7 @@ name: Secure Supply Chain Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
     tags: ["v*"]
   workflow_dispatch:
 
