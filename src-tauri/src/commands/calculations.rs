@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use tauri::State;
 
 /// Default factor weights per §4.5.
-const DEFAULT_WEIGHTS: [(& str, f64); 7] = [
+const DEFAULT_WEIGHTS: [(&str, f64); 7] = [
     ("time_effort", 0.25),
     ("exploitability", 0.20),
     ("window_of_opportunity", 0.15),
@@ -27,13 +27,7 @@ const DEFAULT_WEIGHTS: [(& str, f64); 7] = [
 ];
 
 /// Default access probabilities per §4.4.
-const DEFAULT_ACCESS_PROBS: [(i32, f64); 5] = [
-    (1, 0.9),
-    (2, 0.7),
-    (3, 0.5),
-    (4, 0.3),
-    (5, 0.1),
-];
+const DEFAULT_ACCESS_PROBS: [(i32, f64); 5] = [(1, 0.9), (2, 0.7), (3, 0.5), (4, 0.3), (5, 0.1)];
 
 #[derive(Debug, Deserialize)]
 struct FactorWeights {
@@ -88,15 +82,28 @@ pub fn calculate_step_prob_internal(
         )
         .ok();
 
-    let (te, pk, ex, wo, dp, pe, ar) = assessment.unwrap_or((None, None, None, None, None, None, None));
+    let (te, pk, ex, wo, dp, pe, ar) =
+        assessment.unwrap_or((None, None, None, None, None, None, None));
 
     let factors = [
         ("time_effort", te.unwrap_or(3), weights.time_effort),
         ("exploitability", ex.unwrap_or(3), weights.exploitability),
-        ("window_of_opportunity", wo.unwrap_or(3), weights.window_of_opportunity),
-        ("detection_probability", dp.unwrap_or(3), weights.detection_probability),
+        (
+            "window_of_opportunity",
+            wo.unwrap_or(3),
+            weights.window_of_opportunity,
+        ),
+        (
+            "detection_probability",
+            dp.unwrap_or(3),
+            weights.detection_probability,
+        ),
         ("prior_knowledge", pk.unwrap_or(3), weights.prior_knowledge),
-        ("preparation_effort", pe.unwrap_or(3), weights.preparation_effort),
+        (
+            "preparation_effort",
+            pe.unwrap_or(3),
+            weights.preparation_effort,
+        ),
         ("abort_risk", ar.unwrap_or(3), weights.abort_risk),
     ];
 
@@ -132,7 +139,7 @@ pub fn calculate_attack_paths(
     project_id: String,
     goal_id: String,
     attacker_skill: Option<i32>,
-    attacker_access: Option<i32>,
+    _attacker_access: Option<i32>,
 ) -> Result<Vec<AttackPath>, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let access_probs = get_access_probabilities(&conn, &project_id)?;
@@ -140,13 +147,22 @@ pub fn calculate_attack_paths(
 
     // Get goal name.
     let goal_name: String = conn
-        .query_row("SELECT name FROM goals WHERE id = ?1", params![goal_id], |row| {
-            row.get(0)
-        })
+        .query_row(
+            "SELECT name FROM goals WHERE id = ?1",
+            params![goal_id],
+            |row| row.get(0),
+        )
         .map_err(|e| format!("Goal not found: {}", e))?;
 
     // Build tree structure and extract paths.
-    let paths = extract_paths_for_goal(&conn, &project_id, &goal_id, &goal_name, &access_probs, _attacker_skill)?;
+    let paths = extract_paths_for_goal(
+        &conn,
+        &project_id,
+        &goal_id,
+        &goal_name,
+        &access_probs,
+        _attacker_skill,
+    )?;
 
     Ok(paths)
 }
@@ -169,7 +185,13 @@ fn extract_paths_for_goal(
     // Collect paths from direct steps.
     for step in &steps {
         let mut current_path = Vec::new();
-        collect_leaf_paths(conn, project_id, step, &mut current_path, &mut all_leaf_paths)?;
+        collect_leaf_paths(
+            conn,
+            project_id,
+            step,
+            &mut current_path,
+            &mut all_leaf_paths,
+        )?;
     }
 
     // Collect paths from categories (recursively down to steps).
@@ -226,7 +248,11 @@ fn extract_paths_for_goal(
     }
 
     // Sort by overall probability descending.
-    result.sort_by(|a, b| b.overall_probability.partial_cmp(&a.overall_probability).unwrap());
+    result.sort_by(|a, b| {
+        b.overall_probability
+            .partial_cmp(&a.overall_probability)
+            .unwrap()
+    });
 
     Ok(result)
 }
@@ -340,18 +366,19 @@ fn collect_leaf_paths(
         let mut stmt = conn
             .prepare("SELECT id, name, access_level, skill_level, conjunction FROM substeps WHERE parent_step_id = ?1 ORDER BY sort_order")
             .map_err(|e| e.to_string())?;
-        stmt.query_map(params![step.id], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, i32>(2)?,
-                row.get::<_, i32>(3)?,
-                row.get::<_, String>(4)?,
-            ))
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?
+        let rows = stmt
+            .query_map(params![step.id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i32>(2)?,
+                    row.get::<_, i32>(3)?,
+                    row.get::<_, String>(4)?,
+                ))
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
     };
 
     // Get child steps (steps with parent_type='step').
@@ -396,7 +423,10 @@ fn collect_leaf_paths(
 }
 
 /// Get the factor weights for a project, with defaults.
-fn get_factor_weights(conn: &rusqlite::Connection, project_id: &str) -> Result<FactorWeights, String> {
+fn get_factor_weights(
+    conn: &rusqlite::Connection,
+    project_id: &str,
+) -> Result<FactorWeights, String> {
     let json: String = conn
         .query_row(
             "SELECT factor_weights FROM projects WHERE id = ?1",

@@ -127,10 +127,10 @@ fn delete_goal_cascade(conn: &rusqlite::Connection, goal_id: &str) -> Result<(),
         let mut stmt = conn
             .prepare("SELECT id FROM steps WHERE parent_id = ?1 AND parent_type = 'goal'")
             .map_err(|e| e.to_string())?;
-        stmt.query_map(params![goal_id], |row| row.get(0))
-            .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect()
+        let rows = stmt
+            .query_map(params![goal_id], |row| row.get(0))
+            .map_err(|e| e.to_string())?;
+        rows.filter_map(|r| r.ok()).collect()
     };
     for sid in &step_ids {
         super::steps::delete_step_cascade(conn, sid)?;
@@ -141,10 +141,10 @@ fn delete_goal_cascade(conn: &rusqlite::Connection, goal_id: &str) -> Result<(),
         let mut stmt = conn
             .prepare("SELECT id FROM categories WHERE parent_id = ?1 AND parent_type = 'goal'")
             .map_err(|e| e.to_string())?;
-        stmt.query_map(params![goal_id], |row| row.get(0))
-            .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect()
+        let rows = stmt
+            .query_map(params![goal_id], |row| row.get(0))
+            .map_err(|e| e.to_string())?;
+        rows.filter_map(|r| r.ok()).collect()
     };
     for cid in &cat_ids {
         super::categories::delete_category_cascade(conn, cid)?;

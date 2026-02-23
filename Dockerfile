@@ -1,6 +1,10 @@
 # ─── Build Stage ─────────────────────────────────────────────────
 FROM rust:1.88-bookworm AS rust-builder
 
+# Install corporate root certificate.
+COPY vegarootcert2.crt /usr/local/share/ca-certificates/vegarootcert2.crt
+RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
+
 # Install system dependencies for Tauri.
 RUN apt-get update && apt-get install -y \
     libwebkit2gtk-4.1-dev \
@@ -24,6 +28,11 @@ RUN cargo fetch
 # ─── Node.js Build Stage ────────────────────────────────────────
 FROM node:22-bookworm AS node-builder
 
+# Install corporate root certificate.
+COPY vegarootcert2.crt /usr/local/share/ca-certificates/vegarootcert2.crt
+RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+
 WORKDIR /app
 
 # Copy package files for dependency caching.
@@ -45,6 +54,10 @@ RUN npm run build
 
 # ─── Final Build Stage ──────────────────────────────────────────
 FROM rust:1.88-bookworm AS builder
+
+# Install corporate root certificate.
+COPY vegarootcert2.crt /usr/local/share/ca-certificates/vegarootcert2.crt
+RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
 
 # Install system dependencies.
 RUN apt-get update && apt-get install -y \
@@ -68,6 +81,9 @@ COPY . .
 
 # Copy pre-built frontend from node stage.
 COPY --from=node-builder /app/dist/ dist/
+
+# Copy pre-fetched cargo registry from rust-builder stage.
+COPY --from=rust-builder /usr/local/cargo/registry /usr/local/cargo/registry
 
 # Build the Tauri application.
 WORKDIR /app/src-tauri

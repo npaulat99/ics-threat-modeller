@@ -127,8 +127,11 @@ pub fn delete_step(db: State<'_, Database>, id: String) -> Result<(), String> {
 /// Recursively delete a step and all its children.
 pub fn delete_step_cascade(conn: &rusqlite::Connection, step_id: &str) -> Result<(), String> {
     // Delete substeps.
-    conn.execute("DELETE FROM substeps WHERE parent_step_id = ?1", params![step_id])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM substeps WHERE parent_step_id = ?1",
+        params![step_id],
+    )
+    .map_err(|e| e.to_string())?;
 
     // Delete countermeasures attached to this step.
     conn.execute(
@@ -145,8 +148,11 @@ pub fn delete_step_cascade(conn: &rusqlite::Connection, step_id: &str) -> Result
     .map_err(|e| e.to_string())?;
 
     // Delete assessments.
-    conn.execute("DELETE FROM assessments WHERE entity_id = ?1", params![step_id])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM assessments WHERE entity_id = ?1",
+        params![step_id],
+    )
+    .map_err(|e| e.to_string())?;
 
     // Delete technique mappings and tags.
     conn.execute(
@@ -162,10 +168,10 @@ pub fn delete_step_cascade(conn: &rusqlite::Connection, step_id: &str) -> Result
         let mut stmt = conn
             .prepare("SELECT id FROM steps WHERE parent_id = ?1 AND parent_type = 'step'")
             .map_err(|e| e.to_string())?;
-        stmt.query_map(params![step_id], |row| row.get(0))
-            .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect()
+        let rows = stmt
+            .query_map(params![step_id], |row| row.get(0))
+            .map_err(|e| e.to_string())?;
+        rows.filter_map(|r| r.ok()).collect()
     };
     for cid in &child_ids {
         delete_step_cascade(conn, cid)?;

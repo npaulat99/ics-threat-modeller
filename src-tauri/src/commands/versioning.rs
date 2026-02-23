@@ -81,10 +81,10 @@ pub fn restore_snapshot(db: State<'_, Database>, snapshot_id: String) -> Result<
             let mut stmt = conn
                 .prepare("SELECT id FROM goals WHERE project_id = ?1")
                 .map_err(|e| e.to_string())?;
-            stmt.query_map(params![project_id], |row| row.get(0))
-                .map_err(|e| e.to_string())?
-                .filter_map(|r| r.ok())
-                .collect()
+            let rows = stmt
+                .query_map(params![project_id], |row| row.get(0))
+                .map_err(|e| e.to_string())?;
+            rows.filter_map(|r| r.ok()).collect()
         };
 
         for gid in &goal_ids {
@@ -95,12 +95,21 @@ pub fn restore_snapshot(db: State<'_, Database>, snapshot_id: String) -> Result<
                 .ok();
         }
 
-        conn.execute("DELETE FROM goals WHERE project_id = ?1", params![project_id])
-            .ok();
-        conn.execute("DELETE FROM attacker_profiles WHERE project_id = ?1", params![project_id])
-            .ok();
-        conn.execute("DELETE FROM change_log WHERE project_id = ?1", params![project_id])
-            .ok();
+        conn.execute(
+            "DELETE FROM goals WHERE project_id = ?1",
+            params![project_id],
+        )
+        .ok();
+        conn.execute(
+            "DELETE FROM attacker_profiles WHERE project_id = ?1",
+            params![project_id],
+        )
+        .ok();
+        conn.execute(
+            "DELETE FROM change_log WHERE project_id = ?1",
+            params![project_id],
+        )
+        .ok();
     }
 
     // Re-import the snapshot data.
@@ -210,7 +219,7 @@ fn compute_diff(a: &serde_json::Value, b: &serde_json::Value) -> Vec<DiffChange>
     let entities_b = extract_entities(b);
 
     // Find additions (in B but not in A).
-    for (id, (entity_type, name, val_b)) in &entities_b {
+    for (id, (entity_type, name, _val_b)) in &entities_b {
         if !entities_a.contains_key(id) {
             changes.push(DiffChange {
                 entity_id: id.clone(),
@@ -265,8 +274,15 @@ fn extract_entities(
     // Project itself.
     if let Some(project) = val.get("project") {
         if let Some(id) = project.get("id").and_then(|v| v.as_str()) {
-            let name = project.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            map.insert(id.to_string(), ("project".to_string(), name, project.clone()));
+            let name = project
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            map.insert(
+                id.to_string(),
+                ("project".to_string(), name, project.clone()),
+            );
         }
     }
 
@@ -274,8 +290,15 @@ fn extract_entities(
     if let Some(profiles) = val.get("attacker_profiles").and_then(|v| v.as_array()) {
         for p in profiles {
             if let Some(id) = p.get("id").and_then(|v| v.as_str()) {
-                let name = p.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                map.insert(id.to_string(), ("attacker_profile".to_string(), name, p.clone()));
+                let name = p
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                map.insert(
+                    id.to_string(),
+                    ("attacker_profile".to_string(), name, p.clone()),
+                );
             }
         }
     }
@@ -285,7 +308,11 @@ fn extract_entities(
         for ge in goals {
             if let Some(goal) = ge.get("goal") {
                 if let Some(id) = goal.get("id").and_then(|v| v.as_str()) {
-                    let name = goal.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let name = goal
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
                     map.insert(id.to_string(), ("goal".to_string(), name, goal.clone()));
                 }
             }
@@ -307,7 +334,11 @@ fn extract_step_entities(
 ) {
     if let Some(step) = se.get("step") {
         if let Some(id) = step.get("id").and_then(|v| v.as_str()) {
-            let name = step.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let name = step
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             map.insert(id.to_string(), ("step".to_string(), name, step.clone()));
         }
     }
@@ -317,8 +348,15 @@ fn extract_step_entities(
         for ss in substeps {
             if let Some(substep) = ss.get("substep") {
                 if let Some(id) = substep.get("id").and_then(|v| v.as_str()) {
-                    let name = substep.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    map.insert(id.to_string(), ("substep".to_string(), name, substep.clone()));
+                    let name = substep
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    map.insert(
+                        id.to_string(),
+                        ("substep".to_string(), name, substep.clone()),
+                    );
                 }
             }
         }
@@ -328,7 +366,14 @@ fn extract_step_entities(
     if let Some(assessments) = se.get("assessments").and_then(|v| v.as_array()) {
         for a in assessments {
             if let Some(id) = a.get("id").and_then(|v| v.as_str()) {
-                map.insert(id.to_string(), ("assessment".to_string(), "Assessment".to_string(), a.clone()));
+                map.insert(
+                    id.to_string(),
+                    (
+                        "assessment".to_string(),
+                        "Assessment".to_string(),
+                        a.clone(),
+                    ),
+                );
             }
         }
     }
