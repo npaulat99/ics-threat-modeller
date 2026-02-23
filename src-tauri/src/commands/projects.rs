@@ -108,7 +108,8 @@ pub fn update_project(db: State<'_, Database>, data: UpdateProject) -> Result<Pr
     );
     params_vec.push(Box::new(data.id.clone()));
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|b| b.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|b| b.as_ref()).collect();
     conn.execute(&sql, params_refs.as_slice())
         .map_err(|e| e.to_string())?;
 

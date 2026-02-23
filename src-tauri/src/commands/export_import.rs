@@ -439,7 +439,11 @@ pub fn import_project_data(db: &Database, data: ProjectExport) -> Result<String,
                 )
                 .map(|c| c > 0)
                 .unwrap_or(false);
-            if exists { Some(csid.clone()) } else { None }
+            if exists {
+                Some(csid.clone())
+            } else {
+                None
+            }
         } else {
             None
         };

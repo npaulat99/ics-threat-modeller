@@ -12,10 +12,10 @@ pub struct Project {
     pub description: String,
     pub device_type: String,
     pub architecture: String,
-    pub interfaces: String,       // JSON array
-    pub assets: String,           // JSON array
-    pub deployment_context: String, // JSON object
-    pub factor_weights: String,   // JSON object
+    pub interfaces: String,           // JSON array
+    pub assets: String,               // JSON array
+    pub deployment_context: String,   // JSON object
+    pub factor_weights: String,       // JSON object
     pub access_probabilities: String, // JSON object
     pub created_at: String,
     pub updated_at: String,
@@ -338,10 +338,10 @@ pub struct CatalogEntry {
     pub entry_type: String,
     pub name: String,
     pub description: String,
-    pub tree_data: String,  // JSON
+    pub tree_data: String, // JSON
     pub source_framework: String,
     pub version: String,
-    pub tags: String,       // JSON array
+    pub tags: String, // JSON array
     pub created_at: String,
     pub updated_at: String,
 }
@@ -400,8 +400,8 @@ pub struct ChangeLogEntry {
 pub struct StepCalculation {
     pub entity_id: String,
     pub entity_type: String,
-    pub weighted_cost: f64,      // C(s_i) ∈ [1, 5]
-    pub cost_probability: f64,   // P_cost(s_i) ∈ [0.2, 1.0]
+    pub weighted_cost: f64,    // C(s_i) ∈ [1, 5]
+    pub cost_probability: f64, // P_cost(s_i) ∈ [0.2, 1.0]
     pub factor_contributions: Vec<FactorContribution>,
 }
 
@@ -422,10 +422,10 @@ pub struct AttackPath {
     pub steps: Vec<PathStep>,
     pub max_access_level: i32,
     pub max_skill_level: i32,
-    pub access_probability: f64,   // P_access
-    pub cost_probability: f64,     // P_cost(P) = product of step probabilities
-    pub is_realistic: bool,        // E_P
-    pub overall_probability: f64,  // P(P|A)
+    pub access_probability: f64,  // P_access
+    pub cost_probability: f64,    // P_cost(P) = product of step probabilities
+    pub is_realistic: bool,       // E_P
+    pub overall_probability: f64, // P(P|A)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

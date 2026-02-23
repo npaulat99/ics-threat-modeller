@@ -73,7 +73,9 @@ fn firmware_compromise() -> CatalogEntry {
         id: Uuid::new_v4().to_string(),
         entry_type: "attack_tree".to_string(),
         name: "Firmware Compromise".to_string(),
-        description: "Attack tree template for firmware compromise scenarios on embedded ICS devices.".to_string(),
+        description:
+            "Attack tree template for firmware compromise scenarios on embedded ICS devices."
+                .to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
         source_framework: "ICS-CERT / MITRE ATT&CK for ICS".to_string(),
         version: "1.0".to_string(),
@@ -136,7 +138,8 @@ fn process_manipulation() -> CatalogEntry {
         id: Uuid::new_v4().to_string(),
         entry_type: "attack_tree".to_string(),
         name: "Process Manipulation".to_string(),
-        description: "Attack tree template for industrial process manipulation scenarios.".to_string(),
+        description: "Attack tree template for industrial process manipulation scenarios."
+            .to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
         source_framework: "ICS-CERT / MITRE ATT&CK for ICS".to_string(),
         version: "1.0".to_string(),
@@ -199,7 +202,8 @@ fn persistent_access() -> CatalogEntry {
         id: Uuid::new_v4().to_string(),
         entry_type: "attack_tree".to_string(),
         name: "Persistent Access".to_string(),
-        description: "Attack tree template for establishing persistent access to ICS environments.".to_string(),
+        description: "Attack tree template for establishing persistent access to ICS environments."
+            .to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
         source_framework: "ICS-CERT / MITRE ATT&CK for ICS".to_string(),
         version: "1.0".to_string(),
@@ -262,7 +266,8 @@ fn information_leakage() -> CatalogEntry {
         id: Uuid::new_v4().to_string(),
         entry_type: "attack_tree".to_string(),
         name: "Information Leakage".to_string(),
-        description: "Attack tree template for exfiltration of sensitive process data from ICS.".to_string(),
+        description: "Attack tree template for exfiltration of sensitive process data from ICS."
+            .to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
         source_framework: "ICS-CERT / MITRE ATT&CK for ICS".to_string(),
         version: "1.0".to_string(),
@@ -306,7 +311,8 @@ fn supply_chain_attack() -> CatalogEntry {
         id: Uuid::new_v4().to_string(),
         entry_type: "attack_tree".to_string(),
         name: "Supply Chain Attack".to_string(),
-        description: "Attack tree template for supply chain compromise of ICS components.".to_string(),
+        description: "Attack tree template for supply chain compromise of ICS components."
+            .to_string(),
         tree_data: serde_json::to_string(&tree_data).unwrap(),
         source_framework: "MITRE ATT&CK for ICS".to_string(),
         version: "1.0".to_string(),
