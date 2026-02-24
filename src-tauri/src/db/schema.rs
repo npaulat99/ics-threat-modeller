@@ -7,9 +7,86 @@
 
 use rusqlite::{Connection, Result};
 
-/// Create all tables if they do not already exist.
+/// Create all tables if they do not already exist, then run migrations.
 pub fn initialize(conn: &Connection) -> Result<()> {
-    conn.execute_batch(SCHEMA_SQL)
+    conn.execute_batch(SCHEMA_SQL)?;
+    run_migrations(conn)?;
+    Ok(())
+}
+
+/// Run schema migrations for existing databases.
+fn run_migrations(conn: &Connection) -> Result<()> {
+    // Migration: Add impact_scores column to goals table.
+    let has_impact_scores: bool = conn
+        .prepare("SELECT impact_scores FROM goals LIMIT 0")
+        .is_ok();
+    if !has_impact_scores {
+        conn.execute_batch(
+            "ALTER TABLE goals ADD COLUMN impact_scores TEXT NOT NULL DEFAULT '{}'",
+        )?;
+    }
+
+    // Migration: Allow categories under steps (parent_type 'step').
+    // SQLite doesn't support altering CHECK constraints, so we recreate the table if needed.
+    let sql: String = conn.query_row(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='categories'",
+        [],
+        |row| row.get(0),
+    )?;
+    if !sql.contains("'step'") {
+        conn.execute_batch(
+            "
+            CREATE TABLE categories_new (
+                id          TEXT PRIMARY KEY,
+                parent_id   TEXT NOT NULL,
+                parent_type TEXT NOT NULL CHECK(parent_type IN ('goal', 'category', 'step')),
+                name        TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                sort_order  INTEGER NOT NULL DEFAULT 0,
+                created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            INSERT INTO categories_new SELECT * FROM categories;
+            DROP TABLE categories;
+            ALTER TABLE categories_new RENAME TO categories;
+            ",
+        )?;
+    }
+
+    // Migration: Allow assessments on countermeasures and weaknesses (entity_type).
+    let sql: String = conn.query_row(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='assessments'",
+        [],
+        |row| row.get(0),
+    )?;
+    if !sql.contains("'countermeasure'") {
+        conn.execute_batch(
+            "
+            CREATE TABLE assessments_new (
+                id                    TEXT PRIMARY KEY,
+                entity_id             TEXT NOT NULL,
+                entity_type           TEXT NOT NULL CHECK(entity_type IN ('step', 'substep', 'countermeasure', 'weakness')),
+                is_reference          INTEGER NOT NULL DEFAULT 0,
+                time_effort           INTEGER,
+                prior_knowledge       INTEGER,
+                exploitability        INTEGER,
+                window_of_opportunity INTEGER,
+                detection_probability INTEGER,
+                preparation_effort    INTEGER,
+                abort_risk            INTEGER,
+                rationale_json        TEXT NOT NULL DEFAULT '{}',
+                override_rationale    TEXT,
+                created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            INSERT INTO assessments_new SELECT * FROM assessments;
+            DROP TABLE assessments;
+            ALTER TABLE assessments_new RENAME TO assessments;
+            "
+        )?;
+    }
+
+    Ok(())
 }
 
 const SCHEMA_SQL: &str = r#"
@@ -38,6 +115,7 @@ CREATE TABLE IF NOT EXISTS goals (
     name              TEXT NOT NULL,
     description       TEXT NOT NULL DEFAULT '',
     impact_category   TEXT NOT NULL DEFAULT '',
+    impact_scores     TEXT NOT NULL DEFAULT '{}', -- JSON: OWASP impact factors {financial, reputation, compliance, safety, operational}
     catalog_source_id TEXT,                      -- nullable FK to catalog_entries
     sort_order        INTEGER NOT NULL DEFAULT 0,
     created_at        TEXT NOT NULL DEFAULT (datetime('now')),
@@ -47,8 +125,8 @@ CREATE TABLE IF NOT EXISTS goals (
 
 CREATE TABLE IF NOT EXISTS categories (
     id          TEXT PRIMARY KEY,                 -- UUID
-    parent_id   TEXT NOT NULL,                    -- FK to goals or categories
-    parent_type TEXT NOT NULL CHECK(parent_type IN ('goal', 'category')),
+    parent_id   TEXT NOT NULL,                    -- FK to goals, categories, or steps
+    parent_type TEXT NOT NULL CHECK(parent_type IN ('goal', 'category', 'step')),
     name        TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     sort_order  INTEGER NOT NULL DEFAULT 0,
@@ -118,7 +196,7 @@ CREATE TABLE IF NOT EXISTS weaknesses (
 CREATE TABLE IF NOT EXISTS assessments (
     id                    TEXT PRIMARY KEY,       -- UUID
     entity_id             TEXT NOT NULL,
-    entity_type           TEXT NOT NULL CHECK(entity_type IN ('step', 'substep')),
+    entity_type           TEXT NOT NULL CHECK(entity_type IN ('step', 'substep', 'countermeasure', 'weakness')),
     is_reference          INTEGER NOT NULL DEFAULT 0,  -- boolean: 1 = catalog ref, 0 = project override
     time_effort           INTEGER CHECK(time_effort BETWEEN 1 AND 5),
     prior_knowledge       INTEGER CHECK(prior_knowledge BETWEEN 1 AND 5),

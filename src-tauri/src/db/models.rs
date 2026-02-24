@@ -56,6 +56,7 @@ pub struct Goal {
     pub name: String,
     pub description: String,
     pub impact_category: String,
+    pub impact_scores: String,
     pub catalog_source_id: Option<String>,
     pub sort_order: i32,
     pub created_at: String,
@@ -68,6 +69,7 @@ pub struct CreateGoal {
     pub name: String,
     pub description: Option<String>,
     pub impact_category: Option<String>,
+    pub impact_scores: Option<String>,
     pub catalog_source_id: Option<String>,
 }
 

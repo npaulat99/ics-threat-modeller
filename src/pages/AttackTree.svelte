@@ -1,44 +1,76 @@
 <script lang="ts">
-  import type { TreeNodeData, Goal, Step, Category, Substep, Countermeasure, Weakness, CreateGoal, CreateStep, CreateCategory, CreateSubstep } from '$lib/types';
-  import { currentProject, goals, treeData, selectedNodeId, selectedNodeType, setError, setSuccess } from '$lib/stores';
-  import * as api from '$lib/api';
-  import TreeView from '$components/TreeView.svelte';
-  import AttackTreeDiagram from '$components/AttackTreeDiagram.svelte';
-  import ConfirmDialog from '$components/ConfirmDialog.svelte';
-  import { onMount } from 'svelte';
+  import type {
+    TreeNodeData,
+    Goal,
+    Step,
+    Category,
+    Substep,
+    Countermeasure,
+    Weakness,
+    CreateGoal,
+    CreateStep,
+    CreateCategory,
+    CreateSubstep,
+  } from "$lib/types";
+  import {
+    currentProject,
+    goals,
+    treeData,
+    selectedNodeId,
+    selectedNodeType,
+    setError,
+    setSuccess,
+  } from "$lib/stores";
+  import * as api from "$lib/api";
+  import TreeView from "$components/TreeView.svelte";
+  import AttackTreeDiagram from "$components/AttackTreeDiagram.svelte";
+  import ConfirmDialog from "$components/ConfirmDialog.svelte";
+  import { onMount } from "svelte";
 
   let selectedNode: TreeNodeData | null = null;
   let selectedDetail: Goal | Step | Category | Substep | null = null;
   let showAddDialog = false;
   let addParent: TreeNodeData | null = null;
-  let addType: 'goal' | 'category' | 'step' | 'substep' = 'step';
-  let addName = '';
-  let addDesc = '';
+  let addType: "goal" | "category" | "step" | "substep" = "step";
+  let addName = "";
+  let addDesc = "";
   let deleteTarget: TreeNodeData | null = null;
   let editing = false;
-  let editName = '';
-  let editDesc = '';
-  let editConjunction = 'OR';
+  let editName = "";
+  let editDesc = "";
+  let editConjunction = "OR";
   let editAccessLevel = 1;
   let editSkillLevel = 1;
-  let editImpactCategory = '';
+  let editImpactCategory = "";
 
   // Countermeasures & Weaknesses
   let nodeCountermeasures: Countermeasure[] = [];
   let nodeWeaknesses: Weakness[] = [];
   let showAddCM = false;
   let showAddWK = false;
-  let newCMName = '';
-  let newCMDesc = '';
+  let newCMName = "";
+  let newCMDesc = "";
   let newCMEffectiveness = 3;
   let newCMCost = 3;
-  let newWKName = '';
-  let newWKDesc = '';
+  let newWKName = "";
+  let newWKDesc = "";
   let newWKSeverity = 3;
-  let newWKCve = '';
+  let newWKCve = "";
 
-  const skillLabels = ['Novice', 'Beginner', 'Competent', 'Professional', 'Expert'];
-  const accessLabels = ['Public', 'Limited', 'Moderate', 'Privileged', 'Unrestricted'];
+  const skillLabels = [
+    "Novice",
+    "Beginner",
+    "Competent",
+    "Professional",
+    "Expert",
+  ];
+  const accessLabels = [
+    "Public",
+    "Limited",
+    "Moderate",
+    "Privileged",
+    "Unrestricted",
+  ];
 
   onMount(loadTree);
 
@@ -52,46 +84,80 @@
         tree.push(await buildGoalNode(g));
       }
       treeData.set(tree);
-    } catch (e) { setError(`Load tree failed: ${e}`); }
+    } catch (e) {
+      setError(`Load tree failed: ${e}`);
+    }
   }
 
   async function buildGoalNode(g: Goal): Promise<TreeNodeData> {
     const children: TreeNodeData[] = [];
     // Load steps under goal.
-    const steps = await api.listSteps(g.id, 'goal');
+    const steps = await api.listSteps(g.id, "goal");
     for (const s of steps) {
       children.push(await buildStepNode(s));
     }
     // Load categories under goal.
-    const cats = await api.listCategories(g.id, 'goal');
+    const cats = await api.listCategories(g.id, "goal");
     for (const c of cats) {
       children.push(await buildCategoryNode(c));
     }
-    return { id: g.id, name: g.name, type: 'goal', children, expanded: true, data: g };
+    return {
+      id: g.id,
+      name: g.name,
+      type: "goal",
+      children,
+      expanded: true,
+      data: g,
+    };
   }
 
   async function buildCategoryNode(c: Category): Promise<TreeNodeData> {
     const children: TreeNodeData[] = [];
-    const steps = await api.listSteps(c.id, 'category');
+    const steps = await api.listSteps(c.id, "category");
     for (const s of steps) {
       children.push(await buildStepNode(s));
     }
-    return { id: c.id, name: c.name, type: 'category', children, expanded: true, data: c };
+    return {
+      id: c.id,
+      name: c.name,
+      type: "category",
+      children,
+      expanded: true,
+      data: c,
+    };
   }
 
   async function buildStepNode(s: Step): Promise<TreeNodeData> {
     const children: TreeNodeData[] = [];
     // Load child steps.
-    const childSteps = await api.listSteps(s.id, 'step');
+    const childSteps = await api.listSteps(s.id, "step");
     for (const cs of childSteps) {
       children.push(await buildStepNode(cs));
+    }
+    // Load categories under this step.
+    const cats = await api.listCategories(s.id, "step");
+    for (const c of cats) {
+      children.push(await buildCategoryNode(c));
     }
     // Load substeps.
     const subs = await api.listSubsteps(s.id);
     for (const sub of subs) {
-      children.push({ id: sub.id, name: sub.name, type: 'substep', children: [], data: sub });
+      children.push({
+        id: sub.id,
+        name: sub.name,
+        type: "substep",
+        children: [],
+        data: sub,
+      });
     }
-    return { id: s.id, name: s.name, type: 'step', children, expanded: true, data: s };
+    return {
+      id: s.id,
+      name: s.name,
+      type: "step",
+      children,
+      expanded: true,
+      data: s,
+    };
   }
 
   async function handleSelect(node: TreeNodeData) {
@@ -102,13 +168,17 @@
     showAddWK = false;
 
     // Load countermeasures and weaknesses for steps/substeps
-    if (node.type === 'step' || node.type === 'substep') {
+    if (node.type === "step" || node.type === "substep") {
       try {
         nodeCountermeasures = await api.listCountermeasures(node.id, node.type);
-      } catch { nodeCountermeasures = []; }
+      } catch {
+        nodeCountermeasures = [];
+      }
       try {
         nodeWeaknesses = await api.listWeaknesses(node.id, node.type);
-      } catch { nodeWeaknesses = []; }
+      } catch {
+        nodeWeaknesses = [];
+      }
     } else {
       nodeCountermeasures = [];
       nodeWeaknesses = [];
@@ -118,25 +188,40 @@
   function startEditing() {
     if (!selectedNode || !selectedDetail) return;
     editing = true;
-    editName = selectedDetail.name ?? '';
-    editDesc = ('description' in selectedDetail) ? (selectedDetail as any).description ?? '' : '';
-    editConjunction = ('conjunction' in selectedDetail) ? (selectedDetail as any).conjunction ?? 'OR' : 'OR';
-    editAccessLevel = ('access_level' in selectedDetail) ? (selectedDetail as any).access_level ?? 1 : 1;
-    editSkillLevel = ('skill_level' in selectedDetail) ? (selectedDetail as any).skill_level ?? 1 : 1;
-    editImpactCategory = ('impact_category' in selectedDetail) ? (selectedDetail as any).impact_category ?? '' : '';
+    editName = selectedDetail.name ?? "";
+    editDesc =
+      "description" in selectedDetail
+        ? ((selectedDetail as any).description ?? "")
+        : "";
+    editConjunction =
+      "conjunction" in selectedDetail
+        ? ((selectedDetail as any).conjunction ?? "OR")
+        : "OR";
+    editAccessLevel =
+      "access_level" in selectedDetail
+        ? ((selectedDetail as any).access_level ?? 1)
+        : 1;
+    editSkillLevel =
+      "skill_level" in selectedDetail
+        ? ((selectedDetail as any).skill_level ?? 1)
+        : 1;
+    editImpactCategory =
+      "impact_category" in selectedDetail
+        ? ((selectedDetail as any).impact_category ?? "")
+        : "";
   }
 
   async function saveEdit() {
     if (!selectedNode || !selectedDetail) return;
     try {
-      if (selectedNode.type === 'goal') {
+      if (selectedNode.type === "goal") {
         await api.updateGoal({
           id: selectedNode.id,
           name: editName,
           description: editDesc,
           impact_category: editImpactCategory,
         });
-      } else if (selectedNode.type === 'step') {
+      } else if (selectedNode.type === "step") {
         await api.updateStep({
           id: selectedNode.id,
           name: editName,
@@ -145,13 +230,13 @@
           access_level: editAccessLevel,
           skill_level: editSkillLevel,
         });
-      } else if (selectedNode.type === 'category') {
+      } else if (selectedNode.type === "category") {
         await api.updateCategory({
           id: selectedNode.id,
           name: editName,
           description: editDesc,
         });
-      } else if (selectedNode.type === 'substep') {
+      } else if (selectedNode.type === "substep") {
         await api.updateSubstep({
           id: selectedNode.id,
           name: editName,
@@ -164,24 +249,26 @@
       setSuccess(`Updated ${selectedNode.type}: ${editName}`);
       editing = false;
       await loadTree();
-    } catch (e) { setError(`Update failed: ${e}`); }
+    } catch (e) {
+      setError(`Update failed: ${e}`);
+    }
   }
 
   function handleAddChild(parentNode: TreeNodeData) {
     addParent = parentNode;
-    addName = '';
-    addDesc = '';
+    addName = "";
+    addDesc = "";
     // Determine valid child type.
-    if (parentNode.type === 'goal') addType = 'step';
-    else if (parentNode.type === 'category') addType = 'step';
-    else if (parentNode.type === 'step') addType = 'step';
+    if (parentNode.type === "goal") addType = "step";
+    else if (parentNode.type === "category") addType = "step";
+    else if (parentNode.type === "step") addType = "step";
     showAddDialog = true;
   }
 
   async function createChild() {
     if (!addParent || !addName.trim()) return;
     try {
-      if (addType === 'step') {
+      if (addType === "step") {
         const data: CreateStep = {
           parent_id: addParent.id,
           parent_type: addParent.type,
@@ -189,7 +276,7 @@
           description: addDesc || undefined,
         };
         await api.createStep(data);
-      } else if (addType === 'category') {
+      } else if (addType === "category") {
         const data: CreateCategory = {
           parent_id: addParent.id,
           parent_type: addParent.type,
@@ -197,7 +284,7 @@
           description: addDesc || undefined,
         };
         await api.createCategory(data);
-      } else if (addType === 'substep') {
+      } else if (addType === "substep") {
         const data: CreateSubstep = {
           parent_step_id: addParent.id,
           name: addName,
@@ -208,19 +295,23 @@
       setSuccess(`Created ${addType}: ${addName}`);
       showAddDialog = false;
       await loadTree();
-    } catch (e) { setError(`Create failed: ${e}`); }
+    } catch (e) {
+      setError(`Create failed: ${e}`);
+    }
   }
 
   async function createGoal() {
     if (!$currentProject) return;
-    const name = prompt('Goal name:');
+    const name = prompt("Goal name:");
     if (!name?.trim()) return;
     try {
       const data: CreateGoal = { project_id: $currentProject.id, name };
       await api.createGoal(data);
       setSuccess(`Goal "${name}" created.`);
       await loadTree();
-    } catch (e) { setError(`Create goal failed: ${e}`); }
+    } catch (e) {
+      setError(`Create goal failed: ${e}`);
+    }
   }
 
   async function addCountermeasure() {
@@ -234,20 +325,33 @@
         effectiveness: newCMEffectiveness,
         implementation_cost: newCMCost,
       });
-      nodeCountermeasures = await api.listCountermeasures(selectedNode.id, selectedNode.type);
+      nodeCountermeasures = await api.listCountermeasures(
+        selectedNode.id,
+        selectedNode.type,
+      );
       showAddCM = false;
-      newCMName = ''; newCMDesc = ''; newCMEffectiveness = 3; newCMCost = 3;
-      setSuccess('Countermeasure added');
-    } catch (e) { setError(`Add countermeasure failed: ${e}`); }
+      newCMName = "";
+      newCMDesc = "";
+      newCMEffectiveness = 3;
+      newCMCost = 3;
+      setSuccess("Countermeasure added");
+    } catch (e) {
+      setError(`Add countermeasure failed: ${e}`);
+    }
   }
 
   async function deleteCountermeasure(id: string) {
     if (!selectedNode) return;
     try {
       await api.deleteCountermeasure(id);
-      nodeCountermeasures = await api.listCountermeasures(selectedNode.id, selectedNode.type);
-      setSuccess('Countermeasure deleted');
-    } catch (e) { setError(`Delete countermeasure failed: ${e}`); }
+      nodeCountermeasures = await api.listCountermeasures(
+        selectedNode.id,
+        selectedNode.type,
+      );
+      setSuccess("Countermeasure deleted");
+    } catch (e) {
+      setError(`Delete countermeasure failed: ${e}`);
+    }
   }
 
   async function addWeakness() {
@@ -261,82 +365,158 @@
         severity: newWKSeverity,
         cve_id: newWKCve || undefined,
       });
-      nodeWeaknesses = await api.listWeaknesses(selectedNode.id, selectedNode.type);
+      nodeWeaknesses = await api.listWeaknesses(
+        selectedNode.id,
+        selectedNode.type,
+      );
       showAddWK = false;
-      newWKName = ''; newWKDesc = ''; newWKSeverity = 3; newWKCve = '';
-      setSuccess('Weakness added');
-    } catch (e) { setError(`Add weakness failed: ${e}`); }
+      newWKName = "";
+      newWKDesc = "";
+      newWKSeverity = 3;
+      newWKCve = "";
+      setSuccess("Weakness added");
+    } catch (e) {
+      setError(`Add weakness failed: ${e}`);
+    }
   }
 
   async function deleteWeakness(id: string) {
     if (!selectedNode) return;
     try {
       await api.deleteWeakness(id);
-      nodeWeaknesses = await api.listWeaknesses(selectedNode.id, selectedNode.type);
-      setSuccess('Weakness deleted');
-    } catch (e) { setError(`Delete weakness failed: ${e}`); }
+      nodeWeaknesses = await api.listWeaknesses(
+        selectedNode.id,
+        selectedNode.type,
+      );
+      setSuccess("Weakness deleted");
+    } catch (e) {
+      setError(`Delete weakness failed: ${e}`);
+    }
   }
 
   async function confirmDelete() {
     if (!deleteTarget) return;
     try {
-      if (deleteTarget.type === 'goal') await api.deleteGoal(deleteTarget.id);
-      else if (deleteTarget.type === 'step') await api.deleteStep(deleteTarget.id);
-      else if (deleteTarget.type === 'category') await api.deleteCategory(deleteTarget.id);
-      else if (deleteTarget.type === 'substep') await api.deleteSubstep(deleteTarget.id);
+      if (deleteTarget.type === "goal") await api.deleteGoal(deleteTarget.id);
+      else if (deleteTarget.type === "step")
+        await api.deleteStep(deleteTarget.id);
+      else if (deleteTarget.type === "category")
+        await api.deleteCategory(deleteTarget.id);
+      else if (deleteTarget.type === "substep")
+        await api.deleteSubstep(deleteTarget.id);
       setSuccess(`Deleted ${deleteTarget.type}: ${deleteTarget.name}`);
       deleteTarget = null;
       selectedNode = null;
       selectedDetail = null;
       await loadTree();
-    } catch (e) { setError(`Delete failed: ${e}`); }
+    } catch (e) {
+      setError(`Delete failed: ${e}`);
+    }
+  }
+
+  async function handleDuplicate(node: TreeNodeData) {
+    try {
+      if (node.type === "goal") {
+        const src = node.data as Goal;
+        await api.createGoal({
+          project_id: src.project_id,
+          name: `${src.name} (copy)`,
+          description: src.description || undefined,
+          impact_category: src.impact_category || undefined,
+        });
+      } else if (node.type === "step") {
+        const src = node.data as Step;
+        await api.createStep({
+          parent_id: src.parent_id,
+          parent_type: src.parent_type,
+          name: `${src.name} (copy)`,
+          description: src.description || undefined,
+          conjunction: src.conjunction || undefined,
+          access_level: src.access_level,
+          skill_level: src.skill_level,
+        });
+      } else if (node.type === "category") {
+        const src = node.data as Category;
+        await api.createCategory({
+          parent_id: src.parent_id,
+          parent_type: src.parent_type,
+          name: `${src.name} (copy)`,
+          description: src.description || undefined,
+        });
+      } else if (node.type === "substep") {
+        const src = node.data as Substep;
+        await api.createSubstep({
+          parent_step_id: src.parent_step_id,
+          name: `${src.name} (copy)`,
+          description: src.description || undefined,
+          conjunction: src.conjunction || undefined,
+          access_level: src.access_level,
+          skill_level: src.skill_level,
+        });
+      }
+      setSuccess(`Duplicated ${node.type}: ${node.name}`);
+      await loadTree();
+    } catch (e) {
+      setError(`Duplicate failed: ${e}`);
+    }
   }
 
   // Find siblings of a node in the tree
-  function findSiblings(nodes: TreeNodeData[], targetId: string): TreeNodeData[] | null {
+  function findSiblings(
+    nodes: TreeNodeData[],
+    targetId: string,
+  ): TreeNodeData[] | null {
     for (const n of nodes) {
-      const idx = n.children.findIndex(c => c.id === targetId);
+      const idx = n.children.findIndex((c) => c.id === targetId);
       if (idx >= 0) return n.children;
       const found = findSiblings(n.children, targetId);
       if (found) return found;
     }
     // Check top-level
-    if (nodes.find(n => n.id === targetId)) return nodes;
+    if (nodes.find((n) => n.id === targetId)) return nodes;
     return null;
   }
 
-  async function handleReorder(detail: { draggedId: string; draggedType: string; targetId: string; targetType: string; position: 'before' | 'after' }) {
+  async function handleReorder(detail: {
+    draggedId: string;
+    draggedType: string;
+    targetId: string;
+    targetType: string;
+    position: "before" | "after";
+  }) {
     // Only reorder same-type siblings
     if (detail.draggedType !== detail.targetType) return;
 
     const siblings = findSiblings($treeData, detail.targetId);
     if (!siblings) return;
 
-    const dragIdx = siblings.findIndex(s => s.id === detail.draggedId);
+    const dragIdx = siblings.findIndex((s) => s.id === detail.draggedId);
     if (dragIdx < 0) return; // not a sibling
 
     // Remove dragged and insert at target position
     const [dragged] = siblings.splice(dragIdx, 1);
-    const targetIdx = siblings.findIndex(s => s.id === detail.targetId);
-    const insertIdx = detail.position === 'before' ? targetIdx : targetIdx + 1;
+    const targetIdx = siblings.findIndex((s) => s.id === detail.targetId);
+    const insertIdx = detail.position === "before" ? targetIdx : targetIdx + 1;
     siblings.splice(insertIdx, 0, dragged);
 
     // Update sort_order for all siblings
     try {
       for (let i = 0; i < siblings.length; i++) {
         const s = siblings[i];
-        if (s.type === 'goal') {
+        if (s.type === "goal") {
           await api.updateGoal({ id: s.id, sort_order: i });
-        } else if (s.type === 'step') {
+        } else if (s.type === "step") {
           await api.updateStep({ id: s.id, sort_order: i });
-        } else if (s.type === 'category') {
+        } else if (s.type === "category") {
           await api.updateCategory({ id: s.id, sort_order: i });
-        } else if (s.type === 'substep') {
+        } else if (s.type === "substep") {
           await api.updateSubstep({ id: s.id, sort_order: i });
         }
       }
       await loadTree();
-    } catch (e) { setError(`Reorder failed: ${e}`); }
+    } catch (e) {
+      setError(`Reorder failed: ${e}`);
+    }
   }
 </script>
 
@@ -344,7 +524,9 @@
   <div class="tree-panel">
     <div class="panel-header">
       <h3>Attack Tree</h3>
-      <button class="btn btn-sm btn-primary" on:click={createGoal}>+ Goal</button>
+      <button class="btn btn-sm btn-primary" on:click={createGoal}
+        >+ Goal</button
+      >
     </div>
     <div class="tree-container">
       <TreeView
@@ -352,6 +534,7 @@
         onSelect={handleSelect}
         onAddChild={handleAddChild}
         onDelete={(n) => (deleteTarget = n)}
+        onDuplicate={handleDuplicate}
         onReorder={handleReorder}
       />
     </div>
@@ -368,7 +551,9 @@
             <h3>{selectedNode.name}</h3>
           {/if}
           {#if !editing}
-            <button class="btn btn-sm btn-secondary" on:click={startEditing}>✏️ Edit</button>
+            <button class="btn btn-sm btn-secondary" on:click={startEditing}
+              >✏️ Edit</button
+            >
           {/if}
         </div>
 
@@ -378,7 +563,7 @@
               <label>Description</label>
               <textarea class="input" rows="3" bind:value={editDesc}></textarea>
             </div>
-            {#if selectedNode.type === 'goal'}
+            {#if selectedNode.type === "goal"}
               <div class="form-group">
                 <label>Aggregation Type</label>
                 <select class="input" bind:value={editImpactCategory}>
@@ -388,72 +573,129 @@
                 </select>
               </div>
             {/if}
-            {#if selectedNode.type === 'step' || selectedNode.type === 'substep'}
+            {#if (selectedNode.type === "step" || selectedNode.type === "substep") && selectedNode.children.length > 0}
               <div class="form-group">
-                <label>Conjunction</label>
+                <label>Conjunction (how children combine)</label>
                 <select class="input" bind:value={editConjunction}>
-                  <option value="OR">OR</option>
-                  <option value="AND">AND</option>
+                  <option value="OR">OR — any child path succeeds</option>
+                  <option value="AND">AND — all child paths required</option>
                 </select>
               </div>
+            {/if}
+            {#if selectedNode.type === "step" || selectedNode.type === "substep"}
               <div class="form-group">
-                <label>Access Level: {editAccessLevel} ({accessLabels[editAccessLevel - 1] ?? ''})</label>
-                <input type="range" min="1" max="5" bind:value={editAccessLevel} class="slider" />
+                <label
+                  >Access Level: {editAccessLevel} ({accessLabels[
+                    editAccessLevel - 1
+                  ] ?? ""})</label
+                >
+                <input
+                  type="range"
+                  min="1"
+                  max="5"
+                  bind:value={editAccessLevel}
+                  class="slider"
+                />
               </div>
               <div class="form-group">
-                <label>Skill Level: {editSkillLevel} ({skillLabels[editSkillLevel - 1] ?? ''})</label>
-                <input type="range" min="1" max="5" bind:value={editSkillLevel} class="slider" />
+                <label
+                  >Skill Level: {editSkillLevel} ({skillLabels[
+                    editSkillLevel - 1
+                  ] ?? ""})</label
+                >
+                <input
+                  type="range"
+                  min="1"
+                  max="5"
+                  bind:value={editSkillLevel}
+                  class="slider"
+                />
               </div>
             {/if}
             <div class="form-actions">
-              <button class="btn btn-secondary" on:click={() => (editing = false)}>Cancel</button>
+              <button
+                class="btn btn-secondary"
+                on:click={() => (editing = false)}>Cancel</button
+              >
               <button class="btn btn-primary" on:click={saveEdit}>Save</button>
             </div>
           </div>
         {:else}
           <dl class="detail-fields">
-            {#if 'description' in selectedDetail}
+            {#if "description" in selectedDetail}
               <dt>Description</dt>
-              <dd>{selectedDetail.description || '—'}</dd>
+              <dd>{selectedDetail.description || "—"}</dd>
             {/if}
-            {#if 'impact_category' in selectedDetail}
+            {#if "impact_category" in selectedDetail}
               <dt>Aggregation</dt>
-              <dd>{selectedDetail.impact_category || 'OR (default)'}</dd>
+              <dd>{selectedDetail.impact_category || "OR (default)"}</dd>
             {/if}
-            {#if 'conjunction' in selectedDetail}
+            {#if "conjunction" in selectedDetail && selectedNode.children.length > 0}
               <dt>Conjunction</dt>
               <dd>{selectedDetail.conjunction}</dd>
             {/if}
-            {#if 'access_level' in selectedDetail && selectedDetail.access_level !== undefined}
+            {#if "access_level" in selectedDetail && selectedDetail.access_level !== undefined}
               <dt>Access Level</dt>
-              <dd>{selectedDetail.access_level} ({accessLabels[Number(selectedDetail.access_level) - 1] ?? ''})</dd>
+              <dd>
+                {selectedDetail.access_level} ({accessLabels[
+                  Number(selectedDetail.access_level) - 1
+                ] ?? ""})
+              </dd>
             {/if}
-            {#if 'skill_level' in selectedDetail && selectedDetail.skill_level !== undefined}
+            {#if "skill_level" in selectedDetail && selectedDetail.skill_level !== undefined}
               <dt>Skill Level</dt>
-              <dd>{selectedDetail.skill_level} ({skillLabels[Number(selectedDetail.skill_level) - 1] ?? ''})</dd>
+              <dd>
+                {selectedDetail.skill_level} ({skillLabels[
+                  Number(selectedDetail.skill_level) - 1
+                ] ?? ""})
+              </dd>
             {/if}
           </dl>
 
-          {#if selectedNode.type === 'step' || selectedNode.type === 'substep'}
+          {#if selectedNode.type === "step" || selectedNode.type === "substep"}
             <!-- Countermeasures -->
             <div class="cm-section">
               <div class="cm-header">
                 <h4>🛡️ Countermeasures ({nodeCountermeasures.length})</h4>
-                <button class="btn btn-xs btn-primary" on:click={() => (showAddCM = !showAddCM)}>
-                  {showAddCM ? '✕' : '+ Add'}
+                <button
+                  class="btn btn-xs btn-primary"
+                  on:click={() => (showAddCM = !showAddCM)}
+                >
+                  {showAddCM ? "✕" : "+ Add"}
                 </button>
               </div>
               {#if showAddCM}
                 <div class="cm-form">
-                  <input class="input" bind:value={newCMName} placeholder="Name" />
-                  <input class="input" bind:value={newCMDesc} placeholder="Description" />
+                  <input
+                    class="input"
+                    bind:value={newCMName}
+                    placeholder="Name"
+                  />
+                  <input
+                    class="input"
+                    bind:value={newCMDesc}
+                    placeholder="Description"
+                  />
                   <div class="cm-fields">
                     <label>Effectiveness: {newCMEffectiveness}</label>
-                    <input type="range" min="1" max="5" bind:value={newCMEffectiveness} />
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      bind:value={newCMEffectiveness}
+                    />
                     <label>Cost: {newCMCost}</label>
-                    <input type="range" min="1" max="5" bind:value={newCMCost} />
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      bind:value={newCMCost}
+                    />
                   </div>
-                  <button class="btn btn-sm btn-primary" on:click={addCountermeasure}>Save</button>
+                  <button
+                    class="btn btn-sm btn-primary"
+                    on:click={addCountermeasure}>Save</button
+                  >
                 </div>
               {/if}
               <div class="cm-list">
@@ -461,10 +703,18 @@
                   <div class="cm-item">
                     <div class="cm-info">
                       <strong>{cm.name}</strong>
-                      {#if cm.description}<span class="cm-desc">{cm.description}</span>{/if}
-                      <span class="cm-meta">Eff: {cm.effectiveness} | Cost: {cm.implementation_cost}</span>
+                      {#if cm.description}<span class="cm-desc"
+                          >{cm.description}</span
+                        >{/if}
+                      <span class="cm-meta"
+                        >Eff: {cm.effectiveness} | Cost: {cm.implementation_cost}</span
+                      >
                     </div>
-                    <button class="btn-del" on:click={() => deleteCountermeasure(cm.id)} title="Delete">🗑</button>
+                    <button
+                      class="btn-del"
+                      on:click={() => deleteCountermeasure(cm.id)}
+                      title="Delete">🗑</button
+                    >
                   </div>
                 {:else}
                   <p class="muted">No countermeasures</p>
@@ -476,20 +726,42 @@
             <div class="cm-section">
               <div class="cm-header">
                 <h4>⚠️ Weaknesses ({nodeWeaknesses.length})</h4>
-                <button class="btn btn-xs btn-primary" on:click={() => (showAddWK = !showAddWK)}>
-                  {showAddWK ? '✕' : '+ Add'}
+                <button
+                  class="btn btn-xs btn-primary"
+                  on:click={() => (showAddWK = !showAddWK)}
+                >
+                  {showAddWK ? "✕" : "+ Add"}
                 </button>
               </div>
               {#if showAddWK}
                 <div class="cm-form">
-                  <input class="input" bind:value={newWKName} placeholder="Name" />
-                  <input class="input" bind:value={newWKDesc} placeholder="Description" />
+                  <input
+                    class="input"
+                    bind:value={newWKName}
+                    placeholder="Name"
+                  />
+                  <input
+                    class="input"
+                    bind:value={newWKDesc}
+                    placeholder="Description"
+                  />
                   <div class="cm-fields">
                     <label>Severity: {newWKSeverity}</label>
-                    <input type="range" min="1" max="5" bind:value={newWKSeverity} />
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      bind:value={newWKSeverity}
+                    />
                   </div>
-                  <input class="input" bind:value={newWKCve} placeholder="CVE ID (optional)" />
-                  <button class="btn btn-sm btn-primary" on:click={addWeakness}>Save</button>
+                  <input
+                    class="input"
+                    bind:value={newWKCve}
+                    placeholder="CVE ID (optional)"
+                  />
+                  <button class="btn btn-sm btn-primary" on:click={addWeakness}
+                    >Save</button
+                  >
                 </div>
               {/if}
               <div class="cm-list">
@@ -497,10 +769,20 @@
                   <div class="cm-item">
                     <div class="cm-info">
                       <strong>{wk.name}</strong>
-                      {#if wk.description}<span class="cm-desc">{wk.description}</span>{/if}
-                      <span class="cm-meta">Severity: {wk.severity}{wk.cve_id ? ` | ${wk.cve_id}` : ''}</span>
+                      {#if wk.description}<span class="cm-desc"
+                          >{wk.description}</span
+                        >{/if}
+                      <span class="cm-meta"
+                        >Severity: {wk.severity}{wk.cve_id
+                          ? ` | ${wk.cve_id}`
+                          : ""}</span
+                      >
                     </div>
-                    <button class="btn-del" on:click={() => deleteWeakness(wk.id)} title="Delete">🗑</button>
+                    <button
+                      class="btn-del"
+                      on:click={() => deleteWeakness(wk.id)}
+                      title="Delete">🗑</button
+                    >
                   </div>
                 {:else}
                   <p class="muted">No weaknesses</p>
@@ -541,10 +823,10 @@
         <label>Type</label>
         <select class="input" bind:value={addType}>
           <option value="step">Step</option>
-          {#if addParent?.type === 'goal'}
+          {#if addParent?.type === "goal" || addParent?.type === "step"}
             <option value="category">Category</option>
           {/if}
-          {#if addParent?.type === 'step'}
+          {#if addParent?.type === "step"}
             <option value="substep">Substep</option>
           {/if}
         </select>
@@ -558,8 +840,15 @@
         <textarea class="input" bind:value={addDesc} rows="2"></textarea>
       </div>
       <div class="dialog-actions">
-        <button class="btn btn-secondary" on:click={() => (showAddDialog = false)}>Cancel</button>
-        <button class="btn btn-primary" on:click={createChild} disabled={!addName.trim()}>Create</button>
+        <button
+          class="btn btn-secondary"
+          on:click={() => (showAddDialog = false)}>Cancel</button
+        >
+        <button
+          class="btn btn-primary"
+          on:click={createChild}
+          disabled={!addName.trim()}>Create</button
+        >
       </div>
     </div>
   </div>
@@ -584,7 +873,8 @@
     max-height: calc(100vh - 220px);
   }
 
-  .tree-panel, .detail-panel {
+  .tree-panel,
+  .detail-panel {
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
@@ -615,39 +905,149 @@
     border-bottom: 1px solid #e2e8f0;
   }
 
-  .panel-header h3 { margin: 0; font-size: 0.95rem; }
+  .panel-header h3 {
+    margin: 0;
+    font-size: 0.95rem;
+  }
 
-  .tree-container { flex: 1; overflow-y: auto; padding: 8px; }
+  .tree-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
 
-  .detail-card { padding: 20px; }
-  .detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-  .detail-header h3 { margin: 0; flex: 1; }
-  .type-badge { font-size: 0.65rem; text-transform: uppercase; background: #edf2f7; padding: 2px 8px; border-radius: 8px; font-weight: 600; }
+  .detail-card {
+    padding: 20px;
+  }
+  .detail-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .detail-header h3 {
+    margin: 0;
+    flex: 1;
+  }
+  .type-badge {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    background: #edf2f7;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-weight: 600;
+  }
 
-  .edit-name { flex: 1; font-size: 1rem; font-weight: 600; }
-  .edit-form { display: flex; flex-direction: column; gap: 12px; }
-  .slider { width: 100%; }
-  .form-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .edit-name {
+    flex: 1;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .slider {
+    width: 100%;
+  }
+  .form-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
 
-  .detail-fields dt { font-size: 0.75rem; font-weight: 600; color: #4a5568; margin-top: 10px; }
-  .detail-fields dd { margin: 2px 0 0; font-size: 0.88rem; }
+  .detail-fields dt {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #4a5568;
+    margin-top: 10px;
+  }
+  .detail-fields dd {
+    margin: 2px 0 0;
+    font-size: 0.88rem;
+  }
 
-  .no-selection { padding: 40px; text-align: center; color: #718096; }
+  .no-selection {
+    padding: 40px;
+    text-align: center;
+    color: #718096;
+  }
 
-  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-  .dialog { background: white; border-radius: 10px; padding: 24px; max-width: 440px; width: 90%; }
-  .dialog h3 { margin: 0 0 16px; font-size: 1rem; }
-  .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .dialog {
+    background: white;
+    border-radius: 10px;
+    padding: 24px;
+    max-width: 440px;
+    width: 90%;
+  }
+  .dialog h3 {
+    margin: 0 0 16px;
+    font-size: 1rem;
+  }
+  .dialog-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
 
-  .form-group { margin-bottom: 12px; }
-  .form-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; }
-  .input { width: 100%; border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px 12px; font-size: 0.85rem; font-family: inherit; }
-  .btn { border: none; border-radius: 4px; padding: 8px 16px; cursor: pointer; font-size: 0.85rem; font-weight: 500; }
-  .btn-primary { background: #1a365d; color: white; }
-  .btn-secondary { background: #edf2f7; color: #2d3748; border: 1px solid #e2e8f0; }
-  .btn-sm { padding: 4px 10px; font-size: 0.75rem; }
-  .btn-xs { padding: 2px 8px; font-size: 0.7rem; }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .form-group {
+    margin-bottom: 12px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .input {
+    width: 100%;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    font-family: inherit;
+  }
+  .btn {
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .btn-primary {
+    background: #1a365d;
+    color: white;
+  }
+  .btn-secondary {
+    background: #edf2f7;
+    color: #2d3748;
+    border: 1px solid #e2e8f0;
+  }
+  .btn-sm {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+  }
+  .btn-xs {
+    padding: 2px 8px;
+    font-size: 0.7rem;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 
   .cm-section {
     margin-top: 16px;
@@ -662,7 +1062,10 @@
     margin-bottom: 8px;
   }
 
-  .cm-header h4 { margin: 0; font-size: 0.85rem; }
+  .cm-header h4 {
+    margin: 0;
+    font-size: 0.85rem;
+  }
 
   .cm-form {
     display: flex;
@@ -683,7 +1086,11 @@
     font-size: 0.8rem;
   }
 
-  .cm-list { display: flex; flex-direction: column; gap: 4px; }
+  .cm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
 
   .cm-item {
     display: flex;
@@ -695,9 +1102,20 @@
     border: 1px solid #e2e8f0;
   }
 
-  .cm-info { display: flex; flex-direction: column; gap: 1px; font-size: 0.8rem; }
-  .cm-desc { color: #718096; font-size: 0.75rem; }
-  .cm-meta { color: #a0aec0; font-size: 0.7rem; }
+  .cm-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-size: 0.8rem;
+  }
+  .cm-desc {
+    color: #718096;
+    font-size: 0.75rem;
+  }
+  .cm-meta {
+    color: #a0aec0;
+    font-size: 0.7rem;
+  }
 
   .btn-del {
     border: none;
@@ -707,7 +1125,13 @@
     padding: 2px;
     opacity: 0.5;
   }
-  .btn-del:hover { opacity: 1; }
+  .btn-del:hover {
+    opacity: 1;
+  }
 
-  .muted { color: #718096; font-size: 0.8rem; font-style: italic; }
+  .muted {
+    color: #718096;
+    font-size: 0.8rem;
+    font-style: italic;
+  }
 </style>

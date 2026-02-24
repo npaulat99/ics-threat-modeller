@@ -211,10 +211,32 @@ jobs:
           output-file: attestations/sbom.spdx.json
 
       - name: Sign container image (keyless)
-        run: cosign sign --yes "${IMAGE_REF}"
+        run: |
+          # Retry up to 3 times with 30s delay on failure
+          MAX_RETRIES=3
+          RETRY_DELAY=30
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i of $MAX_RETRIES..."
+            if cosign sign --yes --timeout=5m "${IMAGE_REF}"; then
+              echo "Signature pushed successfully"
+              break
+            else
+              if [ $i -lt $MAX_RETRIES ]; then
+                echo "Failed, retrying in ${RETRY_DELAY}s..."
+                sleep $RETRY_DELAY
+              else
+                echo "All retry attempts exhausted"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Attach all attestations
         run: |
+          # Retry logic for attestations
+          MAX_RETRIES=3
+          RETRY_DELAY=30
+          
           for TYPE in provenance sbom vuln-source vuln-dockerfile vuln-image; do
             case $TYPE in
               provenance)      PRED=attestations/provenance.slsa.json;   T=https://slsa.dev/provenance/v1 ;;
@@ -223,7 +245,23 @@ jobs:
               vuln-dockerfile) PRED=attestations/vuln-dockerfile.json;   T=https://cosign.dev/attestation/vuln/dockerfile ;;
               vuln-image)      PRED=attestations/vuln-image.json;        T=https://cosign.dev/attestation/vuln/image ;;
             esac
-            cosign attest --yes --type "$T" --predicate "$PRED" "${IMAGE_REF}"
+            
+            echo "Attaching attestation: $TYPE"
+            for i in $(seq 1 $MAX_RETRIES); do
+              echo "  Attempt $i of $MAX_RETRIES..."
+              if cosign attest --yes --timeout=5m --type "$T" --predicate "$PRED" "${IMAGE_REF}"; then
+                echo "  Attestation $TYPE attached successfully"
+                break
+              else
+                if [ $i -lt $MAX_RETRIES ]; then
+                  echo "  Failed, retrying in ${RETRY_DELAY}s..."
+                  sleep $RETRY_DELAY
+                else
+                  echo "  All retry attempts exhausted for $TYPE"
+                  exit 1
+                fi
+              fi
+            done
           done
 
   # ===========================================================================

@@ -77,6 +77,7 @@ export interface Goal {
   name: string;
   description: string;
   impact_category: string;
+  impact_scores: string;
   catalog_source_id: string | null;
   sort_order: number;
   created_at: string;
@@ -88,6 +89,7 @@ export interface CreateGoal {
   name: string;
   description?: string;
   impact_category?: string;
+  impact_scores?: string;
   catalog_source_id?: string;
 }
 
@@ -97,6 +99,7 @@ export interface UpdateGoal {
   name?: string;
   description?: string;
   impact_category?: string;
+  impact_scores?: string;
   sort_order?: number;
 }
 

@@ -1,29 +1,36 @@
 <script lang="ts">
-  import Router from 'svelte-spa-router';
-  import Layout from '$components/Layout.svelte';
-  import Sidebar from '$components/Sidebar.svelte';
-  import { errorMessage, successMessage, currentProject, projectName } from '$lib/stores';
+  import Router from "svelte-spa-router";
+  import Layout from "$components/Layout.svelte";
+  import Sidebar from "$components/Sidebar.svelte";
+  import {
+    errorMessage,
+    successMessage,
+    currentProject,
+    projectName,
+  } from "$lib/stores";
 
-  import Home from '$pages/Home.svelte';
-  import ProjectList from '$pages/ProjectList.svelte';
-  import ProjectDetail from '$pages/ProjectDetail.svelte';
-  import AttackerProfiles from '$pages/AttackerProfiles.svelte';
-  import AttackTree from '$pages/AttackTree.svelte';
-  import Assessment from '$pages/Assessment.svelte';
-  import Catalog from '$pages/Catalog.svelte';
-  import ExportImport from '$pages/ExportImport.svelte';
-  import Versions from '$pages/Versions.svelte';
+  import Home from "$pages/Home.svelte";
+  import ProjectList from "$pages/ProjectList.svelte";
+  import ProjectDetail from "$pages/ProjectDetail.svelte";
+  import AttackerProfiles from "$pages/AttackerProfiles.svelte";
+  import AttackTree from "$pages/AttackTree.svelte";
+  import Assessment from "$pages/Assessment.svelte";
+  import Catalog from "$pages/Catalog.svelte";
+  import ExportImport from "$pages/ExportImport.svelte";
+  import Versions from "$pages/Versions.svelte";
+  import AttackVectors from "$pages/AttackVectors.svelte";
 
   const routes = {
-    '/': Home,
-    '/projects': ProjectList,
-    '/project/settings': ProjectDetail,
-    '/project/profiles': AttackerProfiles,
-    '/project/tree': AttackTree,
-    '/project/assessment': Assessment,
-    '/project/catalog': Catalog,
-    '/project/export': ExportImport,
-    '/project/versions': Versions,
+    "/": Home,
+    "/projects": ProjectList,
+    "/project/settings": ProjectDetail,
+    "/project/profiles": AttackerProfiles,
+    "/project/tree": AttackTree,
+    "/project/vectors": AttackVectors,
+    "/project/assessment": Assessment,
+    "/project/catalog": Catalog,
+    "/project/export": ExportImport,
+    "/project/versions": Versions,
   };
 </script>
 
@@ -67,7 +74,7 @@
 
 <style>
   .project-link {
-    color: rgba(255,255,255,0.85);
+    color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
     font-size: 0.82rem;
     padding: 4px 10px;
@@ -76,7 +83,7 @@
   }
 
   .project-link:hover {
-    background: rgba(255,255,255,0.15);
+    background: rgba(255, 255, 255, 0.15);
     color: white;
   }
 
@@ -91,7 +98,7 @@
     gap: 12px;
     font-size: 0.85rem;
     z-index: 2000;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
     animation: slideIn 0.3s ease;
   }
 
@@ -117,7 +124,13 @@
   }
 
   @keyframes slideIn {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
   }
 </style>

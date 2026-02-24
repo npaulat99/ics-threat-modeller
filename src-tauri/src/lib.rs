@@ -9,8 +9,13 @@ use std::path::Path;
 
 /// Build and configure the Tauri application.
 pub fn run() {
-    let database =
-        Database::open(Path::new("ics_threat_modeller.db")).expect("Failed to open database");
+    // Use /app/data/ directory if it exists (Docker volume mount), otherwise current directory.
+    let db_path = if Path::new("/app/data").is_dir() {
+        std::path::PathBuf::from("/app/data/ics_threat_modeller.db")
+    } else {
+        std::path::PathBuf::from("ics_threat_modeller.db")
+    };
+    let database = Database::open(&db_path).expect("Failed to open database");
 
     // Seed catalog on first run.
     {

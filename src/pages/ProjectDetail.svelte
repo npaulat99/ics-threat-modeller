@@ -1,20 +1,20 @@
 <script lang="ts">
-  import type { UpdateProject } from '$lib/types';
-  import { DEFAULT_FACTOR_WEIGHTS, type FactorName } from '$lib/types';
-  import { currentProject, setError, setSuccess } from '$lib/stores';
-  import * as api from '$lib/api';
-  import { parseFactorWeights } from '$lib/calculations';
+  import type { UpdateProject } from "$lib/types";
+  import { DEFAULT_FACTOR_WEIGHTS, type FactorName } from "$lib/types";
+  import { currentProject, setError, setSuccess } from "$lib/stores";
+  import * as api from "$lib/api";
+  import { parseFactorWeights } from "$lib/calculations";
 
   let editing = false;
-  let name = '';
-  let description = '';
-  let deviceType = '';
-  let architecture = '';
-  let interfaces = '[]';
-  let assets = '[]';
-  let deploymentContext = '{}';
+  let name = "";
+  let description = "";
+  let deviceType = "";
+  let architecture = "";
+  let interfaces = "[]";
+  let assets = "[]";
+  let deploymentContext = "{}";
   let factorWeights: Record<string, number> = {};
-  let accessProbabilities = '{}';
+  let accessProbabilities = "{}";
 
   $: if ($currentProject) {
     name = $currentProject.name;
@@ -46,15 +46,15 @@
       const updated = await api.updateProject(data);
       currentProject.set(updated);
       editing = false;
-      setSuccess('Project settings saved.');
+      setSuccess("Project settings saved.");
     } catch (e) {
       setError(`Save failed: ${e}`);
     }
   }
 
-  const factorNames: FactorName[] = [...DEFAULT_FACTOR_WEIGHTS].map(
-    (_, i, arr) => Object.keys(DEFAULT_FACTOR_WEIGHTS)[i] as FactorName
-  );
+  const factorNames: FactorName[] = Object.keys(
+    DEFAULT_FACTOR_WEIGHTS,
+  ) as FactorName[];
 </script>
 
 {#if $currentProject}
@@ -62,7 +62,7 @@
     <div class="detail-header">
       <h2>Project Settings</h2>
       <button class="btn btn-secondary" on:click={() => (editing = !editing)}>
-        {editing ? 'Cancel' : 'Edit'}
+        {editing ? "Cancel" : "Edit"}
       </button>
     </div>
 
@@ -80,9 +80,10 @@
         <div class="form-group">
           <label>Description</label>
           {#if editing}
-            <textarea class="input" rows="3" bind:value={description}></textarea>
+            <textarea class="input" rows="3" bind:value={description}
+            ></textarea>
           {:else}
-            <p class="field-value">{description || '—'}</p>
+            <p class="field-value">{description || "—"}</p>
           {/if}
         </div>
         <div class="form-group">
@@ -90,7 +91,7 @@
           {#if editing}
             <input class="input" bind:value={deviceType} />
           {:else}
-            <p class="field-value">{deviceType || '—'}</p>
+            <p class="field-value">{deviceType || "—"}</p>
           {/if}
         </div>
         <div class="form-group">
@@ -98,7 +99,7 @@
           {#if editing}
             <input class="input" bind:value={architecture} />
           {:else}
-            <p class="field-value">{architecture || '—'}</p>
+            <p class="field-value">{architecture || "—"}</p>
           {/if}
         </div>
         <div class="form-group">
@@ -106,7 +107,7 @@
           {#if editing}
             <textarea class="input" rows="2" bind:value={interfaces}></textarea>
           {:else}
-            <p class="field-value">{interfaces || '—'}</p>
+            <p class="field-value">{interfaces || "—"}</p>
           {/if}
         </div>
         <div class="form-group">
@@ -114,7 +115,7 @@
           {#if editing}
             <textarea class="input" rows="2" bind:value={assets}></textarea>
           {:else}
-            <p class="field-value">{assets || '—'}</p>
+            <p class="field-value">{assets || "—"}</p>
           {/if}
         </div>
       </div>
@@ -124,17 +125,19 @@
         <div class="form-group">
           <label>Deployment Context (JSON)</label>
           {#if editing}
-            <textarea class="input" rows="3" bind:value={deploymentContext}></textarea>
+            <textarea class="input" rows="3" bind:value={deploymentContext}
+            ></textarea>
           {:else}
-            <p class="field-value">{deploymentContext || '—'}</p>
+            <p class="field-value">{deploymentContext || "—"}</p>
           {/if}
         </div>
         <div class="form-group">
           <label>Access Probabilities (JSON)</label>
           {#if editing}
-            <textarea class="input" rows="2" bind:value={accessProbabilities}></textarea>
+            <textarea class="input" rows="2" bind:value={accessProbabilities}
+            ></textarea>
           {:else}
-            <p class="field-value">{accessProbabilities || '—'}</p>
+            <p class="field-value">{accessProbabilities || "—"}</p>
           {/if}
         </div>
 
@@ -143,7 +146,14 @@
           <div class="weight-row">
             <span class="weight-label">{factor}</span>
             {#if editing}
-              <input class="input weight-input" type="number" min="0" max="1" step="0.05" bind:value={factorWeights[factor]} />
+              <input
+                class="input weight-input"
+                type="number"
+                min="0"
+                max="1"
+                step="0.05"
+                bind:value={factorWeights[factor]}
+              />
             {:else}
               <span class="weight-value">{(weight * 100).toFixed(0)}%</span>
             {/if}
@@ -154,7 +164,9 @@
 
     {#if editing}
       <div class="save-bar">
-        <button class="btn btn-primary" on:click={saveProject}>Save Changes</button>
+        <button class="btn btn-primary" on:click={saveProject}
+          >Save Changes</button
+        >
       </div>
     {/if}
   </div>
@@ -163,7 +175,10 @@
 {/if}
 
 <style>
-  .project-detail { max-width: 900px; margin: 0 auto; }
+  .project-detail {
+    max-width: 900px;
+    margin: 0 auto;
+  }
 
   .detail-header {
     display: flex;
@@ -172,7 +187,10 @@
     margin-bottom: 20px;
   }
 
-  .detail-header h2 { margin: 0; font-size: 1.2rem; }
+  .detail-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+  }
 
   .settings-grid {
     display: grid;
@@ -187,24 +205,79 @@
     padding: 20px;
   }
 
-  .card h3 { margin: 0 0 16px; font-size: 1rem; }
-  .card h4 { margin: 16px 0 10px; font-size: 0.85rem; color: var(--color-text-muted, #718096); }
+  .card h3 {
+    margin: 0 0 16px;
+    font-size: 1rem;
+  }
+  .card h4 {
+    margin: 16px 0 10px;
+    font-size: 0.85rem;
+    color: var(--color-text-muted, #718096);
+  }
 
-  .form-group { margin-bottom: 12px; }
-  .form-group label { display: block; font-size: 0.78rem; font-weight: 600; margin-bottom: 4px; color: #4a5568; }
+  .form-group {
+    margin-bottom: 12px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #4a5568;
+  }
 
-  .field-value { margin: 0; font-size: 0.88rem; color: var(--color-text, #2d3748); }
+  .field-value {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--color-text, #2d3748);
+  }
 
-  .input { width: 100%; border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px 12px; font-size: 0.85rem; font-family: inherit; }
+  .input {
+    width: 100%;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    font-family: inherit;
+  }
 
-  .weight-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
-  .weight-label { font-size: 0.82rem; }
-  .weight-value { font-weight: 600; font-size: 0.85rem; }
-  .weight-input { width: 80px; }
+  .weight-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+  .weight-label {
+    font-size: 0.82rem;
+  }
+  .weight-value {
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+  .weight-input {
+    width: 80px;
+  }
 
-  .save-bar { margin-top: 20px; text-align: right; }
+  .save-bar {
+    margin-top: 20px;
+    text-align: right;
+  }
 
-  .btn { border: none; border-radius: 4px; padding: 8px 16px; cursor: pointer; font-size: 0.85rem; font-weight: 500; }
-  .btn-primary { background: var(--color-primary, #1a365d); color: white; }
-  .btn-secondary { background: #edf2f7; color: #2d3748; border: 1px solid #e2e8f0; }
+  .btn {
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .btn-primary {
+    background: var(--color-primary, #1a365d);
+    color: white;
+  }
+  .btn-secondary {
+    background: #edf2f7;
+    color: #2d3748;
+    border: 1px solid #e2e8f0;
+  }
 </style>

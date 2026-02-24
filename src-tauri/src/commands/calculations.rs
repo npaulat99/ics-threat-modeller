@@ -408,6 +408,12 @@ fn collect_leaf_paths(
             collect_leaf_paths(conn, project_id, child, current_path, all_paths)?;
         }
 
+        // Recurse into categories under this step.
+        let step_cats = get_child_categories(conn, &step.id, "step")?;
+        for (cat_id,) in &step_cats {
+            collect_category_paths(conn, project_id, cat_id, all_paths)?;
+        }
+
         // If there were substeps but no child steps, path was already recorded.
         // If no substeps but child steps exist, recursion handled it.
         // If both exist, both are recorded.

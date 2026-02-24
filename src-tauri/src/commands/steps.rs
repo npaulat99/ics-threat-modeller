@@ -177,6 +177,20 @@ pub fn delete_step_cascade(conn: &rusqlite::Connection, step_id: &str) -> Result
         delete_step_cascade(conn, cid)?;
     }
 
+    // Delete categories under this step.
+    let cat_ids: Vec<String> = {
+        let mut stmt = conn
+            .prepare("SELECT id FROM categories WHERE parent_id = ?1 AND parent_type = 'step'")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map(params![step_id], |row| row.get(0))
+            .map_err(|e| e.to_string())?;
+        rows.filter_map(|r| r.ok()).collect()
+    };
+    for cid in &cat_ids {
+        super::categories::delete_category_cascade(conn, cid)?;
+    }
+
     // Delete the step itself.
     conn.execute("DELETE FROM steps WHERE id = ?1", params![step_id])
         .map_err(|e| e.to_string())?;

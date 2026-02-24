@@ -1,17 +1,43 @@
 <script lang="ts">
-  import { push } from 'svelte-spa-router';
-  import { currentProject, activeTab, projectName } from '$lib/stores';
+  import { push } from "svelte-spa-router";
+  import { currentProject, activeTab, projectName } from "$lib/stores";
 
   const navItems = [
-    { id: 'tree',     label: 'Attack Tree',     icon: '🌳', path: '/project/tree' },
-    { id: 'assess',   label: 'Assessment',       icon: '📊', path: '/project/assessment' },
-    { id: 'profiles', label: 'Attacker Profiles', icon: '👤', path: '/project/profiles' },
-    { id: 'catalog',  label: 'Catalog',           icon: '📚', path: '/project/catalog' },
-    { id: 'export',   label: 'Export / Import',    icon: '📦', path: '/project/export' },
-    { id: 'versions', label: 'Versions',           icon: '📋', path: '/project/versions' },
+    { id: "tree", label: "Attack Tree", icon: "🌳", path: "/project/tree" },
+    {
+      id: "vectors",
+      label: "Attack Vectors",
+      icon: "⚔️",
+      path: "/project/vectors",
+    },
+    {
+      id: "assess",
+      label: "Assessment",
+      icon: "📊",
+      path: "/project/assessment",
+    },
+    {
+      id: "profiles",
+      label: "Attacker Profiles",
+      icon: "👤",
+      path: "/project/profiles",
+    },
+    { id: "catalog", label: "Catalog", icon: "📚", path: "/project/catalog" },
+    {
+      id: "export",
+      label: "Export / Import",
+      icon: "📦",
+      path: "/project/export",
+    },
+    {
+      id: "versions",
+      label: "Versions",
+      icon: "📋",
+      path: "/project/versions",
+    },
   ];
 
-  function navigate(item: typeof navItems[0]) {
+  function navigate(item: (typeof navItems)[0]) {
     if ($currentProject) {
       activeTab.set(item.id);
       push(item.path);
@@ -31,12 +57,12 @@
 
   <div class="nav-section-label">Navigation</div>
 
-  <button class="nav-item" on:click={() => push('/')}>
+  <button class="nav-item" on:click={() => push("/")}>
     <span class="nav-icon">🏠</span>
     <span>Home</span>
   </button>
 
-  <button class="nav-item" on:click={() => push('/projects')}>
+  <button class="nav-item" on:click={() => push("/projects")}>
     <span class="nav-icon">📁</span>
     <span>Projects</span>
   </button>

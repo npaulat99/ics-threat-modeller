@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import type { TreeNodeData } from '$lib/types';
+  import { createEventDispatcher } from "svelte";
+  import type { TreeNodeData } from "$lib/types";
 
   export let node: TreeNodeData;
   export let depth = 0;
@@ -10,11 +10,18 @@
     select: TreeNodeData;
     addChild: TreeNodeData;
     delete: TreeNodeData;
-    reorder: { draggedId: string; draggedType: string; targetId: string; targetType: string; position: 'before' | 'after' };
+    duplicate: TreeNodeData;
+    reorder: {
+      draggedId: string;
+      draggedType: string;
+      targetId: string;
+      targetType: string;
+      position: "before" | "after";
+    };
   }>();
 
   let expanded = node.expanded ?? true;
-  let dragOver: 'before' | 'after' | null = null;
+  let dragOver: "before" | "after" | null = null;
 
   function toggle() {
     expanded = !expanded;
@@ -22,29 +29,36 @@
   }
 
   function select() {
-    dispatch('select', node);
+    dispatch("select", node);
   }
 
   function addChild() {
-    dispatch('addChild', node);
+    dispatch("addChild", node);
   }
 
   function deleteNode() {
-    dispatch('delete', node);
+    dispatch("delete", node);
+  }
+
+  function duplicateNode() {
+    dispatch("duplicate", node);
   }
 
   function handleDragStart(e: DragEvent) {
-    e.dataTransfer?.setData('text/plain', JSON.stringify({ id: node.id, type: node.type }));
-    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer?.setData(
+      "text/plain",
+      JSON.stringify({ id: node.id, type: node.type }),
+    );
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
   }
 
   function handleDragOver(e: DragEvent) {
     e.preventDefault();
     if (!e.dataTransfer) return;
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.dropEffect = "move";
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
-    dragOver = e.clientY < midY ? 'before' : 'after';
+    dragOver = e.clientY < midY ? "before" : "after";
   }
 
   function handleDragLeave() {
@@ -54,46 +68,56 @@
   function handleDrop(e: DragEvent) {
     e.preventDefault();
     dragOver = null;
-    const raw = e.dataTransfer?.getData('text/plain');
+    const raw = e.dataTransfer?.getData("text/plain");
     if (!raw) return;
     try {
       const data = JSON.parse(raw);
       if (data.id === node.id) return;
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
-      const position = e.clientY < midY ? 'before' : 'after';
-      dispatch('reorder', { draggedId: data.id, draggedType: data.type, targetId: node.id, targetType: node.type, position });
+      const position = e.clientY < midY ? "before" : "after";
+      dispatch("reorder", {
+        draggedId: data.id,
+        draggedType: data.type,
+        targetId: node.id,
+        targetType: node.type,
+        position,
+      });
     } catch {}
   }
 
   function forwardSelect(e: CustomEvent<TreeNodeData>) {
-    dispatch('select', e.detail);
+    dispatch("select", e.detail);
   }
 
   function forwardAddChild(e: CustomEvent<TreeNodeData>) {
-    dispatch('addChild', e.detail);
+    dispatch("addChild", e.detail);
   }
 
   function forwardDelete(e: CustomEvent<TreeNodeData>) {
-    dispatch('delete', e.detail);
+    dispatch("delete", e.detail);
+  }
+
+  function forwardDuplicate(e: CustomEvent<TreeNodeData>) {
+    dispatch("duplicate", e.detail);
   }
 
   function forwardReorder(e: CustomEvent) {
-    dispatch('reorder', e.detail);
+    dispatch("reorder", e.detail);
   }
 
   const typeIcons: Record<string, string> = {
-    goal: '🎯',
-    category: '📂',
-    step: '⚡',
-    substep: '🔸',
+    goal: "🎯",
+    category: "📂",
+    step: "⚡",
+    substep: "🔸",
   };
 
   const typeLabels: Record<string, string> = {
-    goal: 'Goal',
-    category: 'Category',
-    step: 'Step',
-    substep: 'Substep',
+    goal: "Goal",
+    category: "Category",
+    step: "Step",
+    substep: "Substep",
   };
 </script>
 
@@ -101,8 +125,8 @@
   <div
     class="node-row"
     class:selected={selectedId === node.id}
-    class:drag-before={dragOver === 'before'}
-    class:drag-after={dragOver === 'after'}
+    class:drag-before={dragOver === "before"}
+    class:drag-after={dragOver === "after"}
     on:click={select}
     on:keypress={select}
     role="treeitem"
@@ -118,18 +142,31 @@
       class:invisible={node.children.length === 0}
       on:click|stopPropagation={toggle}
     >
-      {expanded ? '▼' : '▶'}
+      {expanded ? "▼" : "▶"}
     </button>
 
-    <span class="node-icon">{typeIcons[node.type] || '•'}</span>
+    <span class="node-icon">{typeIcons[node.type] || "•"}</span>
     <span class="node-label">{node.name}</span>
     <span class="node-type-badge">{typeLabels[node.type] || node.type}</span>
 
     <div class="node-actions">
-      {#if node.type !== 'substep'}
-        <button class="action-btn" title="Add child" on:click|stopPropagation={addChild}>+</button>
+      {#if node.type !== "substep"}
+        <button
+          class="action-btn"
+          title="Add child"
+          on:click|stopPropagation={addChild}>+</button
+        >
       {/if}
-      <button class="action-btn danger" title="Delete" on:click|stopPropagation={deleteNode}>×</button>
+      <button
+        class="action-btn"
+        title="Duplicate"
+        on:click|stopPropagation={duplicateNode}>⧉</button
+      >
+      <button
+        class="action-btn danger"
+        title="Delete"
+        on:click|stopPropagation={deleteNode}>×</button
+      >
     </div>
   </div>
 
@@ -143,6 +180,7 @@
           on:select={forwardSelect}
           on:addChild={forwardAddChild}
           on:delete={forwardDelete}
+          on:duplicate={forwardDuplicate}
           on:reorder={forwardReorder}
         />
       {/each}
@@ -204,8 +242,17 @@
     text-transform: uppercase;
     padding: 1px 6px;
     border-radius: 8px;
-    background: var(--color-badge-bg, #e2e8f0);
-    color: var(--color-text-muted, #718096);
+  }
+
+  :global(.tree-node) .node-type-badge {
+    background: #e2e8f0;
+    color: #718096;
+  }
+
+  .children {
+    border-left: 2px solid #cbd5e0;
+    margin-left: 9px;
+    padding-left: 2px;
   }
 
   .node-actions {
@@ -242,11 +289,10 @@
     border-color: #fc8181;
   }
 
-  .children {
-    border-left: 1px dashed var(--color-border, #cbd5e0);
-    margin-left: 9px;
+  .node-row.drag-before {
+    border-top: 2px solid #3182ce;
   }
-
-  .node-row.drag-before { border-top: 2px solid #3182ce; }
-  .node-row.drag-after { border-bottom: 2px solid #3182ce; }
+  .node-row.drag-after {
+    border-bottom: 2px solid #3182ce;
+  }
 </style>

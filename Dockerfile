@@ -100,6 +100,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     librsvg2-common \
     shared-mime-info \
     adwaita-icon-theme \
+    # Fonts (including emoji support)
+    fonts-noto-color-emoji \
+    fonts-noto-core \
+    fontconfig \
     # Virtual framebuffer + window manager
     xvfb \
     openbox \
@@ -109,6 +113,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-numpy \
     procps \
     git ca-certificates \
+    && fc-cache -fv \
     && rm -rf /var/lib/apt/lists/*
 
 # Install noVNC + websockify

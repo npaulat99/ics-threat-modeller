@@ -227,13 +227,14 @@ pub fn build_project_export(db: &Database, project_id: &str) -> Result<ProjectEx
     // Goals.
     let goal_rows = list_entities::<Goal>(
         &conn,
-        "SELECT id, project_id, name, description, impact_category, catalog_source_id, sort_order, created_at, updated_at FROM goals WHERE project_id = ?1 ORDER BY sort_order",
+        "SELECT id, project_id, name, description, impact_category, impact_scores, catalog_source_id, sort_order, created_at, updated_at FROM goals WHERE project_id = ?1 ORDER BY sort_order",
         project_id,
         |row| Ok(Goal {
             id: row.get(0)?, project_id: row.get(1)?, name: row.get(2)?,
             description: row.get(3)?, impact_category: row.get(4)?,
-            catalog_source_id: row.get(5)?, sort_order: row.get(6)?,
-            created_at: row.get(7)?, updated_at: row.get(8)?,
+            impact_scores: row.get(5)?,
+            catalog_source_id: row.get(6)?, sort_order: row.get(7)?,
+            created_at: row.get(8)?, updated_at: row.get(9)?,
         }),
     )?;
 
@@ -448,8 +449,8 @@ pub fn import_project_data(db: &Database, data: ProjectExport) -> Result<String,
             None
         };
         conn.execute(
-            "INSERT OR REPLACE INTO goals (id, project_id, name, description, impact_category, catalog_source_id, sort_order, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            params![ge.goal.id, ge.goal.project_id, ge.goal.name, ge.goal.description, ge.goal.impact_category, catalog_source_id, ge.goal.sort_order, ge.goal.created_at, now],
+            "INSERT OR REPLACE INTO goals (id, project_id, name, description, impact_category, impact_scores, catalog_source_id, sort_order, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![ge.goal.id, ge.goal.project_id, ge.goal.name, ge.goal.description, ge.goal.impact_category, ge.goal.impact_scores, catalog_source_id, ge.goal.sort_order, ge.goal.created_at, now],
         ).map_err(|e| e.to_string())?;
 
         import_categories_data(&conn, &ge.categories, &now)?;

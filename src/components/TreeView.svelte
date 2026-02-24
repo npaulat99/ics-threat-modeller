@@ -1,13 +1,22 @@
 <script lang="ts">
-  import type { TreeNodeData } from '$lib/types';
-  import TreeNode from './TreeNode.svelte';
-  import { selectedNodeId, selectedNodeType } from '$lib/stores';
+  import type { TreeNodeData } from "$lib/types";
+  import TreeNode from "./TreeNode.svelte";
+  import { selectedNodeId, selectedNodeType } from "$lib/stores";
 
   export let nodes: TreeNodeData[] = [];
   export let onSelect: (node: TreeNodeData) => void = () => {};
   export let onAddChild: ((parentNode: TreeNodeData) => void) | null = null;
   export let onDelete: ((node: TreeNodeData) => void) | null = null;
-  export let onReorder: ((detail: { draggedId: string; draggedType: string; targetId: string; targetType: string; position: 'before' | 'after' }) => void) | null = null;
+  export let onDuplicate: ((node: TreeNodeData) => void) | null = null;
+  export let onReorder:
+    | ((detail: {
+        draggedId: string;
+        draggedType: string;
+        targetId: string;
+        targetType: string;
+        position: "before" | "after";
+      }) => void)
+    | null = null;
 
   function handleSelect(node: TreeNodeData) {
     selectedNodeId.set(node.id);
@@ -31,6 +40,7 @@
         on:select={(e) => handleSelect(e.detail)}
         on:addChild={(e) => onAddChild?.(e.detail)}
         on:delete={(e) => onDelete?.(e.detail)}
+        on:duplicate={(e) => onDuplicate?.(e.detail)}
         on:reorder={(e) => onReorder?.(e.detail)}
       />
     {/each}

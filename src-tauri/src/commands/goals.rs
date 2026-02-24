@@ -22,14 +22,15 @@ pub fn create_goal(db: State<'_, Database>, data: CreateGoal) -> Result<Goal, St
         .unwrap_or(0);
 
     conn.execute(
-        "INSERT INTO goals (id, project_id, name, description, impact_category, catalog_source_id, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT INTO goals (id, project_id, name, description, impact_category, impact_scores, catalog_source_id, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
             id,
             data.project_id,
             data.name,
             data.description.unwrap_or_default(),
             data.impact_category.unwrap_or_default(),
+            data.impact_scores.unwrap_or_else(|| "{}".to_string()),
             data.catalog_source_id,
             sort_order,
             now,
@@ -46,7 +47,7 @@ pub fn list_goals(db: State<'_, Database>, project_id: String) -> Result<Vec<Goa
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, project_id, name, description, impact_category, catalog_source_id, sort_order, created_at, updated_at
+            "SELECT id, project_id, name, description, impact_category, impact_scores, catalog_source_id, sort_order, created_at, updated_at
              FROM goals WHERE project_id = ?1 ORDER BY sort_order",
         )
         .map_err(|e| e.to_string())?;
@@ -59,10 +60,11 @@ pub fn list_goals(db: State<'_, Database>, project_id: String) -> Result<Vec<Goa
                 name: row.get(2)?,
                 description: row.get(3)?,
                 impact_category: row.get(4)?,
-                catalog_source_id: row.get(5)?,
-                sort_order: row.get(6)?,
-                created_at: row.get(7)?,
-                updated_at: row.get(8)?,
+                impact_scores: row.get(5)?,
+                catalog_source_id: row.get(6)?,
+                sort_order: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -79,6 +81,7 @@ pub fn update_goal(
     name: Option<String>,
     description: Option<String>,
     impact_category: Option<String>,
+    impact_scores: Option<String>,
     sort_order: Option<i32>,
 ) -> Result<Goal, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
@@ -101,6 +104,7 @@ pub fn update_goal(
     opt!("name", name);
     opt!("description", description);
     opt!("impact_category", impact_category);
+    opt!("impact_scores", impact_scores);
     opt!("sort_order", sort_order);
 
     let sql = format!("UPDATE goals SET {} WHERE id = ?{}", sets.join(", "), idx);
@@ -174,7 +178,7 @@ pub fn get_goal(db: State<'_, Database>, id: String) -> Result<Goal, String> {
 
 fn get_goal_by_id(conn: &rusqlite::Connection, id: &str) -> Result<Goal, String> {
     conn.query_row(
-        "SELECT id, project_id, name, description, impact_category, catalog_source_id, sort_order, created_at, updated_at
+        "SELECT id, project_id, name, description, impact_category, impact_scores, catalog_source_id, sort_order, created_at, updated_at
          FROM goals WHERE id = ?1",
         params![id],
         |row| {
@@ -184,10 +188,11 @@ fn get_goal_by_id(conn: &rusqlite::Connection, id: &str) -> Result<Goal, String>
                 name: row.get(2)?,
                 description: row.get(3)?,
                 impact_category: row.get(4)?,
-                catalog_source_id: row.get(5)?,
-                sort_order: row.get(6)?,
-                created_at: row.get(7)?,
-                updated_at: row.get(8)?,
+                impact_scores: row.get(5)?,
+                catalog_source_id: row.get(6)?,
+                sort_order: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
             })
         },
     )
