@@ -8,26 +8,34 @@ A desktop application for **attack-tree based threat modelling** of Industrial C
 
 ## Table of Contents
 
-- [Features](#features)
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-  - [Windows](#windows)
-  - [Linux](#linux)
-- [Building from Source](#building-from-source)
-  - [Native Build](#native-build)
-  - [Docker Build](#docker-build)
-- [Usage](#usage)
-  - [Creating a Project](#creating-a-project)
-  - [Building Attack Trees](#building-attack-trees)
-  - [Cost Factor Assessment](#cost-factor-assessment)
-  - [Probability Calculations](#probability-calculations)
-  - [Catalog](#catalog)
-  - [Export & Import](#export--import)
-  - [Versioning & Snapshots](#versioning--snapshots)
-- [Project Structure](#project-structure)
-- [Development](#development)
-- [License](#license)
+- [ICS Threat Modeller](#ics-threat-modeller)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Architecture](#architecture)
+  - [Prerequisites](#prerequisites)
+    - [Windows](#windows)
+    - [Linux (Debian/Ubuntu)](#linux-debianubuntu)
+    - [Docker (for container builds)](#docker-for-container-builds)
+  - [Installation](#installation)
+    - [Pre-built Binaries](#pre-built-binaries)
+    - [Windows](#windows-1)
+    - [Linux](#linux)
+  - [Building from Source](#building-from-source)
+    - [Native Build](#native-build)
+    - [Docker Build](#docker-build)
+  - [Usage](#usage)
+    - [Creating a Project](#creating-a-project)
+    - [Building Attack Trees](#building-attack-trees)
+    - [Cost Factor Assessment](#cost-factor-assessment)
+    - [Probability Calculations](#probability-calculations)
+    - [Catalog](#catalog)
+    - [Export \& Import](#export--import)
+    - [Versioning \& Snapshots](#versioning--snapshots)
+  - [Project Structure](#project-structure)
+  - [Development](#development)
+    - [Database](#database)
+    - [Technology Stack](#technology-stack)
+  - [License](#license)
 
 ---
 
@@ -197,17 +205,28 @@ Or build the full image:
 docker compose build ics-threat-modeller
 ```
 
-To run the containerised application (Linux only, requires X11):
+To run the containerised application (**works on any OS** — Linux, WSL2, macOS, Windows):
 
 ```bash
-xhost +local:docker
 docker compose up ics-threat-modeller
 ```
 
+Then open your browser at **<http://localhost:6080/vnc.html?autoconnect=true>** to see and interact with the application.
+
+> The container runs its own virtual display (Xvfb) with a VNC server and
+> [noVNC](https://novnc.com/) web proxy. No X11 forwarding, XQuartz, or
+> VcXsrv is needed — just a browser.
+
+| Variable | Default | Description |
+|---|---|---|
+| `SCREEN_WIDTH` | `1400` | Virtual screen width (px) |
+| `SCREEN_HEIGHT` | `900` | Virtual screen height (px) |
+| `VNC_PASSWORD` | *(none)* | Optional VNC password |
+
 > **After running `docker compose build`:**
-> 1. **Option A (container):** Run `xhost +local:docker && docker compose up ics-threat-modeller` to launch the GUI inside the container (Linux X11 only).
+> 1. **Option A (container):** Run `docker compose up ics-threat-modeller` and open <http://localhost:6080/vnc.html?autoconnect=true> in a browser.
 > 2. **Option B (extract binary):** Run `docker compose run --rm build-only` to extract the compiled binary to `./output/`. You can then run `./output/ics-threat-modeller` directly on your host (Linux) — no Docker needed at runtime.
-> 3. **Windows:** Use the native build (`npm run tauri build`) instead, since Docker GUI forwarding is not straightforward on Windows.
+> 3. **Windows native:** Use the native build (`npm run tauri build`) instead.
 
 **Fallback (plain Docker without Compose):**
 
@@ -220,11 +239,9 @@ docker build --target builder -t ics-build .
 docker run --rm -v "$(pwd)/output:/output" ics-build sh -c \
   'mkdir -p /output && cp /app/src-tauri/target/release/ics-threat-modeller /output/'
 
-# Run the GUI (X11)
-xhost +local:docker
-docker run --rm -e DISPLAY=$DISPLAY \
-  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-  --net=host ics-threat-modeller
+# Run the GUI (browser access via noVNC)
+docker run --rm -p 6080:6080 ics-threat-modeller
+# Then open http://localhost:6080/vnc.html?autoconnect=true
 ```
 
 ---

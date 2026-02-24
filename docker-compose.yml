@@ -6,17 +6,14 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: ics-threat-modeller
+    ports:
+      - "6080:6080"
     environment:
-      - DISPLAY=${DISPLAY:-:0}
-      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}
+      - SCREEN_WIDTH=1400
+      - SCREEN_HEIGHT=900
     volumes:
-      # Mount X11 socket for GUI display (Linux).
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
       # Persist database across container restarts.
       - ics-data:/app/data
-    network_mode: host
-    # For GUI rendering on Linux.
-    privileged: false
     security_opt:
       - seccomp:unconfined
 
