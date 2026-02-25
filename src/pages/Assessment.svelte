@@ -6,6 +6,7 @@
     CreateAssessment,
     AttackerProfile,
   } from "$lib/types";
+  import { ACCESS_LABELS, SKILL_LABELS, IMPACT_LABELS } from "$lib/types";
   import { currentProject, goals, setError, setSuccess } from "$lib/stores";
   import {
     parseFactorWeights,
@@ -17,14 +18,8 @@
   import PathProbabilityTable from "$components/PathProbabilityTable.svelte";
   import { onMount } from "svelte";
 
-  const accessLabels = [
-    "Public",
-    "Limited",
-    "Moderate",
-    "Privileged",
-    "Unrestricted",
-  ];
-  const skillLabels = ["Novice", "Beginner", "Competent", "Expert", "Master"];
+  const accessLabels = ACCESS_LABELS;
+  const skillLabels = SKILL_LABELS;
 
   let goalList: Goal[] = [];
   let selectedGoalId = "";
@@ -69,31 +64,7 @@
     }
   > = {};
 
-  const impactLabels: Record<string, string[]> = {
-    financial: ["Negligible", "Minor", "Moderate", "Major", "Catastrophic"],
-    reputation: ["None", "Minor", "Noticeable", "Significant", "Devastating"],
-    compliance: [
-      "None",
-      "Minor violation",
-      "Regulatory issue",
-      "Major breach",
-      "Criminal",
-    ],
-    safety: [
-      "None",
-      "Minor injury",
-      "Serious injury",
-      "Life-threatening",
-      "Loss of life",
-    ],
-    operational: [
-      "None",
-      "Minor disruption",
-      "Partial outage",
-      "Major outage",
-      "Total shutdown",
-    ],
-  };
+  const impactLabels = IMPACT_LABELS;
 
   $: currentImpact = selectedGoalId
     ? ((impactScores[selectedGoalId] ?? {
@@ -149,7 +120,8 @@
   async function loadProfiles() {
     if (!$currentProject) return;
     try {
-      profiles = await api.listAttackerProfiles($currentProject.id);
+      const all = await api.listAttackerProfiles($currentProject.id);
+      profiles = all.filter((p: AttackerProfile) => p.is_active);
     } catch (e) {
       setError(`Load profiles failed: ${e}`);
     }
@@ -277,15 +249,17 @@
       const substeps = await api.listSubsteps(s.id);
       const stepLabel = prefix ? `${prefix} › ${s.name}` : s.name;
 
-      // Always add the step itself as assessable (even if it has children).
-      leafEntities.push({
-        id: s.id,
-        name: stepLabel,
-        entityType: "step",
-        accessLevel: s.access_level,
-        skillLevel: s.skill_level,
-      });
-      leafEntities = leafEntities;
+      // Only add non-path steps as assessable. Path-type steps are grouping only.
+      if ((s as any).step_type !== "path") {
+        leafEntities.push({
+          id: s.id,
+          name: stepLabel,
+          entityType: "step",
+          accessLevel: s.access_level,
+          skillLevel: s.skill_level,
+        });
+        leafEntities = leafEntities;
+      }
 
       // Add countermeasures of this step as assessable entities.
       const cms = await api.listCountermeasures(s.id, "step");

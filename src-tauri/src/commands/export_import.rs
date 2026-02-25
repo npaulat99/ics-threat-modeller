@@ -215,12 +215,13 @@ pub fn build_project_export(db: &Database, project_id: &str) -> Result<ProjectEx
     // Attacker profiles.
     let attacker_profiles = list_entities::<AttackerProfile>(
         &conn,
-        "SELECT id, project_id, name, skill_level, access_level, description, created_at, updated_at FROM attacker_profiles WHERE project_id = ?1",
+        "SELECT id, project_id, name, skill_level, access_level, description, created_at, updated_at, is_active FROM attacker_profiles WHERE project_id = ?1",
         project_id,
         |row| Ok(AttackerProfile {
             id: row.get(0)?, project_id: row.get(1)?, name: row.get(2)?,
             skill_level: row.get(3)?, access_level: row.get(4)?,
             description: row.get(5)?, created_at: row.get(6)?, updated_at: row.get(7)?,
+            is_active: row.get::<_, i32>(8).unwrap_or(1) != 0,
         }),
     )?;
 
@@ -414,9 +415,10 @@ pub fn import_project_data(db: &Database, data: ProjectExport) -> Result<String,
 
     // Attacker profiles.
     for ap in &data.attacker_profiles {
+        let active_int = if ap.is_active { 1 } else { 0 };
         conn.execute(
-            "INSERT OR REPLACE INTO attacker_profiles (id, project_id, name, skill_level, access_level, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![ap.id, ap.project_id, ap.name, ap.skill_level, ap.access_level, ap.description, ap.created_at, now],
+            "INSERT OR REPLACE INTO attacker_profiles (id, project_id, name, skill_level, access_level, description, created_at, updated_at, is_active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![ap.id, ap.project_id, ap.name, ap.skill_level, ap.access_level, ap.description, ap.created_at, now, active_int],
         ).map_err(|e| e.to_string())?;
     }
 
@@ -492,8 +494,8 @@ fn import_steps_data(
 ) -> Result<(), String> {
     for se in steps {
         conn.execute(
-            "INSERT OR REPLACE INTO steps (id, parent_id, parent_type, conjunction, name, description, access_level, skill_level, catalog_source_id, sort_order, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-            params![se.step.id, se.step.parent_id, se.step.parent_type, se.step.conjunction, se.step.name, se.step.description, se.step.access_level, se.step.skill_level, se.step.catalog_source_id, se.step.sort_order, se.step.created_at, now],
+            "INSERT OR REPLACE INTO steps (id, parent_id, parent_type, conjunction, name, description, access_level, skill_level, catalog_source_id, sort_order, created_at, updated_at, step_type) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            params![se.step.id, se.step.parent_id, se.step.parent_type, se.step.conjunction, se.step.name, se.step.description, se.step.access_level, se.step.skill_level, se.step.catalog_source_id, se.step.sort_order, se.step.created_at, now, se.step.step_type],
         ).map_err(|e| e.to_string())?;
 
         // Substeps.

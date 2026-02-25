@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher } from "svelte";
 
   export let name: string;
   export let value = 1;
-  export let rationale = '';
+  export let rationale = "";
   export let weight = 1 / 7;
   export let readonly = false;
 
@@ -17,21 +17,15 @@
   $: localValue = value;
   $: localRationale = rationale;
 
-  // Factor-specific labels for each level 1-5
-  const factorLabels: Record<string, string[]> = {
-    time_effort:           ['≤ 1 day', '≤ 1 week', '≤ 1 month', '≤ 6 months', '> 6 months'],
-    prior_knowledge:       ['Public info', 'Basic training', 'Domain expert', 'Deep specialist', 'Rare expertise'],
-    exploitability:        ['Trivial', 'Easy', 'Moderate', 'Difficult', 'Near impossible'],
-    window_of_opportunity: ['Unlimited', 'Large window', 'Medium window', 'Small window', 'Tiny window'],
-    detection_probability: ['Undetectable', 'Low detection', 'Moderate', 'Likely detected', 'Certain detection'],
-    preparation_effort:    ['None needed', 'Minimal', 'Moderate', 'Significant', 'Extensive'],
-    abort_risk:            ['No risk', 'Low risk', 'Moderate', 'High risk', 'Critical risk'],
-  };
+  import { COST_FACTOR_LABELS } from "$lib/types";
 
-  $: labels = factorLabels[name] || ['1', '2', '3', '4', '5'];
+  // Factor-specific labels for each level 1-5
+  const factorLabels: Record<string, string[]> = COST_FACTOR_LABELS;
+
+  $: labels = factorLabels[name] || ["1", "2", "3", "4", "5"];
 
   function emitChange() {
-    dispatch('change', { value: localValue, rationale: localRationale });
+    dispatch("change", { value: localValue, rationale: localRationale });
   }
 
   function selectValue(v: number) {
@@ -47,7 +41,7 @@
 
 <div class="cost-factor">
   <div class="factor-header">
-    <span class="factor-name">{name.replace(/_/g, ' ')}</span>
+    <span class="factor-name">{name.replace(/_/g, " ")}</span>
     <span class="factor-weight">w={weight.toFixed(2)}</span>
   </div>
 

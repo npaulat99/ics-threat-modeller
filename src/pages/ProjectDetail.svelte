@@ -10,22 +10,67 @@
   let description = "";
   let deviceType = "";
   let architecture = "";
-  let interfaces = "[]";
-  let assets = "[]";
+  let interfacesList: string[] = [];
+  let assetsList: string[] = [];
+  let newInterface = "";
+  let newAsset = "";
   let deploymentContext = "{}";
   let factorWeights: Record<string, number> = {};
   let accessProbabilities = "{}";
+  let lastProjectId = "";
 
-  $: if ($currentProject) {
+  // Only reset form fields when the project actually changes (different id)
+  $: if ($currentProject && $currentProject.id !== lastProjectId) {
+    lastProjectId = $currentProject.id;
+    loadFromProject();
+  }
+
+  function loadFromProject() {
+    if (!$currentProject) return;
     name = $currentProject.name;
     description = $currentProject.description;
     deviceType = $currentProject.device_type;
     architecture = $currentProject.architecture;
-    interfaces = $currentProject.interfaces;
-    assets = $currentProject.assets;
     deploymentContext = $currentProject.deployment_context;
     accessProbabilities = $currentProject.access_probabilities;
     factorWeights = parseFactorWeights($currentProject.factor_weights);
+    // Parse interfaces/assets from JSON to string arrays
+    try {
+      interfacesList = JSON.parse($currentProject.interfaces || "[]");
+    } catch {
+      interfacesList = [];
+    }
+    try {
+      assetsList = JSON.parse($currentProject.assets || "[]");
+    } catch {
+      assetsList = [];
+    }
+    if (!Array.isArray(interfacesList)) interfacesList = [];
+    if (!Array.isArray(assetsList)) assetsList = [];
+  }
+
+  function addInterface() {
+    const v = newInterface.trim();
+    if (v && !interfacesList.includes(v)) {
+      interfacesList = [...interfacesList, v];
+    }
+    newInterface = "";
+  }
+
+  function removeInterface(idx: number) {
+    interfacesList = interfacesList.filter((_, i) => i !== idx);
+  }
+
+  function addAsset() {
+    const v = newAsset.trim();
+    if (v && !assetsList.includes(v)) {
+      assetsList = [...assetsList, v];
+    }
+    newAsset = "";
+  }
+
+  function removeAsset(idx: number) {
+    assetsList = assetsList.filter((_, i) => i !== idx);
   }
 
   async function saveProject() {
@@ -37,13 +82,14 @@
         description,
         device_type: deviceType,
         architecture,
-        interfaces,
-        assets,
+        interfaces: JSON.stringify(interfacesList),
+        assets: JSON.stringify(assetsList),
         deployment_context: deploymentContext,
         factor_weights: JSON.stringify(factorWeights),
         access_probabilities: accessProbabilities,
       };
       const updated = await api.updateProject(data);
+      lastProjectId = ""; // force reload from project
       currentProject.set(updated);
       editing = false;
       setSuccess("Project settings saved.");
@@ -103,19 +149,75 @@
           {/if}
         </div>
         <div class="form-group">
-          <label>Interfaces (JSON)</label>
+          <label>Interfaces</label>
           {#if editing}
-            <textarea class="input" rows="2" bind:value={interfaces}></textarea>
+            <div class="tag-input-container">
+              <div class="tags-list">
+                {#each interfacesList as iface, idx}
+                  <span class="tag-pill"
+                    >{iface}<button
+                      class="tag-remove"
+                      on:click={() => removeInterface(idx)}>✕</button
+                    ></span
+                  >
+                {/each}
+              </div>
+              <input
+                class="input"
+                bind:value={newInterface}
+                placeholder="Type and press Enter…"
+                on:keydown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addInterface();
+                  }
+                }}
+              />
+            </div>
           {:else}
-            <p class="field-value">{interfaces || "—"}</p>
+            <div class="tags-list">
+              {#each interfacesList as iface}
+                <span class="tag-pill readonly">{iface}</span>
+              {:else}
+                <p class="field-value">—</p>
+              {/each}
+            </div>
           {/if}
         </div>
         <div class="form-group">
-          <label>Assets (JSON)</label>
+          <label>Assets</label>
           {#if editing}
-            <textarea class="input" rows="2" bind:value={assets}></textarea>
+            <div class="tag-input-container">
+              <div class="tags-list">
+                {#each assetsList as asset, idx}
+                  <span class="tag-pill"
+                    >{asset}<button
+                      class="tag-remove"
+                      on:click={() => removeAsset(idx)}>✕</button
+                    ></span
+                  >
+                {/each}
+              </div>
+              <input
+                class="input"
+                bind:value={newAsset}
+                placeholder="Type and press Enter…"
+                on:keydown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addAsset();
+                  }
+                }}
+              />
+            </div>
           {:else}
-            <p class="field-value">{assets || "—"}</p>
+            <div class="tags-list">
+              {#each assetsList as asset}
+                <span class="tag-pill readonly">{asset}</span>
+              {:else}
+                <p class="field-value">—</p>
+              {/each}
+            </div>
           {/if}
         </div>
       </div>
@@ -263,6 +365,43 @@
   }
   .weight-input {
     width: 80px;
+  }
+
+  .tag-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .tag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #edf2f7;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 3px 10px;
+    font-size: 0.78rem;
+    font-weight: 500;
+  }
+  .tag-pill.readonly {
+    background: #f7fafc;
+  }
+  .tag-remove {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.65rem;
+    color: #a0aec0;
+    padding: 0 2px;
+    line-height: 1;
+  }
+  .tag-remove:hover {
+    color: #e53e3e;
   }
 
   .save-bar {

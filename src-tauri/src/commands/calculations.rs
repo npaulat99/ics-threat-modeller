@@ -59,6 +59,26 @@ pub fn calculate_step_prob_internal(
     entity_type: &str,
     project_id: &str,
 ) -> Result<StepCalculation, String> {
+    // Path-type steps have no own assessment; they are transparent grouping nodes → P = 1.0
+    if entity_type == "step" {
+        let step_type: String = conn
+            .query_row(
+                "SELECT step_type FROM steps WHERE id = ?1",
+                params![entity_id],
+                |row| row.get(0),
+            )
+            .unwrap_or_else(|_| "step".to_string());
+        if step_type == "path" {
+            return Ok(StepCalculation {
+                entity_id: entity_id.to_string(),
+                entity_type: entity_type.to_string(),
+                weighted_cost: 1.0,
+                cost_probability: 1.0,
+                factor_contributions: vec![],
+            });
+        }
+    }
+
     // Get project's factor weights.
     let weights = get_factor_weights(conn, project_id)?;
 
@@ -82,6 +102,17 @@ pub fn calculate_step_prob_internal(
             },
         )
         .ok();
+
+    // If no assessment exists at all, the step is unassessed → P = 1.0 (worst case).
+    if assessment.is_none() {
+        return Ok(StepCalculation {
+            entity_id: entity_id.to_string(),
+            entity_type: entity_type.to_string(),
+            weighted_cost: 1.0,
+            cost_probability: 1.0,
+            factor_contributions: vec![],
+        });
+    }
 
     let (te, pk, ex, wo, dp, pe, ar) =
         assessment.unwrap_or((None, None, None, None, None, None, None));
@@ -257,8 +288,29 @@ fn extract_paths_for_goal(
             0.0
         };
 
+        // Build a descriptive path name from step names
+        let path_label = if path_step_results.len() <= 3 {
+            path_step_results
+                .iter()
+                .map(|s| s.name.as_str())
+                .collect::<Vec<_>>()
+                .join(" → ")
+        } else {
+            format!(
+                "{} → … → {}",
+                path_step_results
+                    .first()
+                    .map(|s| s.name.as_str())
+                    .unwrap_or("?"),
+                path_step_results
+                    .last()
+                    .map(|s| s.name.as_str())
+                    .unwrap_or("?")
+            )
+        };
+
         result.push(AttackPath {
-            path_id: format!("path-{}", idx + 1),
+            path_id: format!("P{}: {}", idx + 1, path_label),
             goal_id: goal_id.to_string(),
             goal_name: goal_name.to_string(),
             steps: path_step_results,
@@ -297,6 +349,7 @@ struct ChildStep {
     access_level: i32,
     skill_level: i32,
     conjunction: String,
+    step_type: String,
 }
 
 fn get_child_steps(
@@ -306,7 +359,7 @@ fn get_child_steps(
 ) -> Result<Vec<ChildStep>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, name, access_level, skill_level, conjunction FROM steps WHERE parent_id = ?1 AND parent_type = ?2 ORDER BY sort_order",
+            "SELECT id, name, access_level, skill_level, conjunction, step_type FROM steps WHERE parent_id = ?1 AND parent_type = ?2 ORDER BY sort_order",
         )
         .map_err(|e| e.to_string())?;
 
@@ -318,6 +371,9 @@ fn get_child_steps(
                 access_level: row.get(2)?,
                 skill_level: row.get(3)?,
                 conjunction: row.get(4)?,
+                step_type: row
+                    .get::<_, String>(5)
+                    .unwrap_or_else(|_| "step".to_string()),
             })
         })
         .map_err(|e| e.to_string())?
@@ -374,6 +430,8 @@ fn enumerate_step_paths(
     conn: &rusqlite::Connection,
     step: &ChildStep,
 ) -> Result<Vec<Vec<PathStepInfo>>, String> {
+    let is_path_type = step.step_type == "path";
+
     let info = PathStepInfo {
         id: step.id.clone(),
         entity_type: "step".to_string(),
@@ -431,6 +489,10 @@ fn enumerate_step_paths(
     }
 
     if child_path_sets.is_empty() {
+        if is_path_type {
+            // Path-type node with no children — empty path set (contributes nothing).
+            return Ok(vec![]);
+        }
         // Leaf node – single path containing just this step.
         return Ok(vec![vec![info]]);
     }
@@ -442,6 +504,11 @@ fn enumerate_step_paths(
         "AND" => cartesian_product_paths(&child_path_sets),
         _ => child_path_sets.into_iter().flatten().collect(),
     };
+
+    if is_path_type {
+        // Path-type: transparent — don't add self as a step, just return children's paths.
+        return Ok(sub_paths);
+    }
 
     // Prefix every sub-path with the current step.
     let result = sub_paths
@@ -537,22 +604,46 @@ fn calc_aggregated_internal(
     parent_id: &str,
     parent_type: &str,
 ) -> Result<f64, String> {
+    // Determine the parent's conjunction/aggregation:
+    // - goal: uses impact_category column ('and'/'or', default 'or')
+    // - step: uses its own conjunction column
+    // - category: OR (categories always act as OR containers)
+    let parent_conjunction = match parent_type {
+        "goal" => {
+            let cat: String = conn
+                .query_row(
+                    "SELECT COALESCE(impact_category, 'or') FROM goals WHERE id = ?1",
+                    params![parent_id],
+                    |row| row.get(0),
+                )
+                .unwrap_or_else(|_| "or".to_string());
+            if cat.to_lowercase() == "and" {
+                "AND".to_string()
+            } else {
+                "OR".to_string()
+            }
+        }
+        "step" => conn
+            .query_row(
+                "SELECT conjunction FROM steps WHERE id = ?1",
+                params![parent_id],
+                |row| row.get(0),
+            )
+            .unwrap_or_else(|_| "OR".to_string()),
+        _ => "OR".to_string(),
+    };
+
     let steps = get_child_steps(conn, parent_id, parent_type)?;
-
-    if steps.is_empty() {
-        return Ok(0.0);
-    }
-
-    // Determine conjunction from the first step (siblings share conjunction).
-    let conjunction = &steps[0].conjunction;
+    let categories = get_child_categories(conn, parent_id, parent_type)?;
 
     let mut probabilities: Vec<f64> = Vec::new();
+
     for step in &steps {
         let calc = calculate_step_prob_internal(conn, &step.id, "step", project_id)?;
-
         // Check if this step has children — if so, recurse.
         let child_steps = get_child_steps(conn, &step.id, "step")?;
-        if !child_steps.is_empty() {
+        let child_cats = get_child_categories(conn, &step.id, "step")?;
+        if !child_steps.is_empty() || !child_cats.is_empty() {
             let child_prob = calc_aggregated_internal(conn, project_id, &step.id, "step")?;
             probabilities.push(calc.cost_probability * child_prob);
         } else {
@@ -560,7 +651,19 @@ fn calc_aggregated_internal(
         }
     }
 
-    let result = match conjunction.as_str() {
+    // Recurse into categories
+    for (cat_id,) in &categories {
+        let cat_prob = calc_aggregated_internal(conn, project_id, cat_id, "category")?;
+        if cat_prob > 0.0 {
+            probabilities.push(cat_prob);
+        }
+    }
+
+    if probabilities.is_empty() {
+        return Ok(0.0);
+    }
+
+    let result = match parent_conjunction.as_str() {
         "AND" => probabilities.iter().product(),
         "OR" | _ => probabilities.iter().cloned().fold(0.0_f64, f64::max),
     };

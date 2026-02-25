@@ -21,13 +21,14 @@ pub fn create_step(db: State<'_, Database>, data: CreateStep) -> Result<Step, St
         .unwrap_or(0);
 
     conn.execute(
-        "INSERT INTO steps (id, parent_id, parent_type, conjunction, name, description, access_level, skill_level, catalog_source_id, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        "INSERT INTO steps (id, parent_id, parent_type, conjunction, step_type, name, description, access_level, skill_level, catalog_source_id, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         params![
             id,
             data.parent_id,
             data.parent_type,
             data.conjunction.unwrap_or_else(|| "OR".to_string()),
+            data.step_type.unwrap_or_else(|| "step".to_string()),
             data.name,
             data.description.unwrap_or_default(),
             data.access_level.unwrap_or(1),
@@ -60,7 +61,7 @@ pub fn list_steps_internal(
 ) -> Result<Vec<Step>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, parent_id, parent_type, conjunction, name, description, access_level, skill_level, catalog_source_id, sort_order, created_at, updated_at
+            "SELECT id, parent_id, parent_type, conjunction, name, description, access_level, skill_level, catalog_source_id, sort_order, created_at, updated_at, step_type
              FROM steps WHERE parent_id = ?1 AND parent_type = ?2 ORDER BY sort_order",
         )
         .map_err(|e| e.to_string())?;
@@ -100,6 +101,7 @@ pub fn update_step(db: State<'_, Database>, data: UpdateStep) -> Result<Step, St
     }
 
     opt!("conjunction", data.conjunction);
+    opt!("step_type", data.step_type);
     opt!("name", data.name);
     opt!("description", data.description);
     opt!("access_level", data.access_level);
@@ -200,7 +202,7 @@ pub fn delete_step_cascade(conn: &rusqlite::Connection, step_id: &str) -> Result
 
 pub fn get_step_by_id(conn: &rusqlite::Connection, id: &str) -> Result<Step, String> {
     conn.query_row(
-        "SELECT id, parent_id, parent_type, conjunction, name, description, access_level, skill_level, catalog_source_id, sort_order, created_at, updated_at
+        "SELECT id, parent_id, parent_type, conjunction, name, description, access_level, skill_level, catalog_source_id, sort_order, created_at, updated_at, step_type
          FROM steps WHERE id = ?1",
         params![id],
         |row| row_to_step(row),
@@ -222,5 +224,8 @@ fn row_to_step(row: &rusqlite::Row) -> rusqlite::Result<Step> {
         sort_order: row.get(9)?,
         created_at: row.get(10)?,
         updated_at: row.get(11)?,
+        step_type: row
+            .get::<_, String>(12)
+            .unwrap_or_else(|_| "step".to_string()),
     })
 }

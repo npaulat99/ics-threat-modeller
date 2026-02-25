@@ -47,7 +47,6 @@ export const listAttackerProfiles = (projectId: string) =>
 export const getAttackerProfile = (id: string) =>
   invoke<AttackerProfile>('get_attacker_profile', { id });
 
-// Rust takes individual params, not a struct.
 export const updateAttackerProfile = (data: UpdateAttackerProfile) =>
   invoke<AttackerProfile>('update_attacker_profile', {
     id: data.id,
@@ -55,6 +54,7 @@ export const updateAttackerProfile = (data: UpdateAttackerProfile) =>
     skillLevel: data.skill_level,
     accessLevel: data.access_level,
     description: data.description,
+    isActive: data.is_active,
   });
 
 export const deleteAttackerProfile = (id: string) =>
@@ -77,6 +77,7 @@ export const updateGoal = (data: UpdateGoal) =>
     name: data.name,
     description: data.description,
     impactCategory: data.impact_category,
+    impactScores: data.impact_scores,
     sortOrder: data.sort_order,
   });
 

@@ -16,8 +16,8 @@ pub fn create_attacker_profile(
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
-        "INSERT INTO attacker_profiles (id, project_id, name, skill_level, access_level, description, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO attacker_profiles (id, project_id, name, skill_level, access_level, description, is_active, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8)",
         params![
             id,
             data.project_id,
@@ -42,7 +42,7 @@ pub fn list_attacker_profiles(
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, project_id, name, skill_level, access_level, description, created_at, updated_at
+            "SELECT id, project_id, name, skill_level, access_level, description, created_at, updated_at, is_active
              FROM attacker_profiles WHERE project_id = ?1 ORDER BY name",
         )
         .map_err(|e| e.to_string())?;
@@ -58,6 +58,7 @@ pub fn list_attacker_profiles(
                 description: row.get(5)?,
                 created_at: row.get(6)?,
                 updated_at: row.get(7)?,
+                is_active: row.get::<_, i32>(8).unwrap_or(1) != 0,
             })
         })
         .map_err(|e| e.to_string())?
@@ -75,6 +76,7 @@ pub fn update_attacker_profile(
     skill_level: Option<i32>,
     access_level: Option<i32>,
     description: Option<String>,
+    is_active: Option<bool>,
 ) -> Result<AttackerProfile, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
@@ -101,6 +103,11 @@ pub fn update_attacker_profile(
     if let Some(v) = description {
         sets.push(format!("description = ?{}", param_idx));
         params_vec.push(Box::new(v));
+        param_idx += 1;
+    }
+    if let Some(v) = is_active {
+        sets.push(format!("is_active = ?{}", param_idx));
+        params_vec.push(Box::new(v as i32));
         param_idx += 1;
     }
 
@@ -134,7 +141,7 @@ pub fn get_attacker_profile(db: State<'_, Database>, id: String) -> Result<Attac
 
 fn get_profile_by_id(conn: &rusqlite::Connection, id: &str) -> Result<AttackerProfile, String> {
     conn.query_row(
-        "SELECT id, project_id, name, skill_level, access_level, description, created_at, updated_at
+        "SELECT id, project_id, name, skill_level, access_level, description, created_at, updated_at, is_active
          FROM attacker_profiles WHERE id = ?1",
         params![id],
         |row| {
@@ -147,6 +154,7 @@ fn get_profile_by_id(conn: &rusqlite::Connection, id: &str) -> Result<AttackerPr
                 description: row.get(5)?,
                 created_at: row.get(6)?,
                 updated_at: row.get(7)?,
+                is_active: row.get::<_, i32>(8).unwrap_or(1) != 0,
             })
         },
     )

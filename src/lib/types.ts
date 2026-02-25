@@ -49,6 +49,7 @@ export interface AttackerProfile {
   skill_level: number;
   access_level: number;
   description: string;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -61,13 +62,13 @@ export interface CreateAttackerProfile {
   description?: string;
 }
 
-// UpdateAttackerProfile — Rust command takes individual params, not a struct.
 export interface UpdateAttackerProfile {
   id: string;
   name?: string;
   skill_level?: number;
   access_level?: number;
   description?: string;
+  is_active?: boolean;
 }
 
 // ─── Goal ───────────────────────────────────────────────────────
@@ -138,6 +139,7 @@ export interface Step {
   parent_id: string;
   parent_type: string;
   conjunction: string;
+  step_type: string;  // 'step' | 'path'
   name: string;
   description: string;
   access_level: number;
@@ -152,6 +154,7 @@ export interface CreateStep {
   parent_id: string;
   parent_type: string;  // "goal" | "category" | "step"
   conjunction?: string;
+  step_type?: string;  // 'step' | 'path'
   name: string;
   description?: string;
   access_level?: number;
@@ -162,6 +165,7 @@ export interface CreateStep {
 export interface UpdateStep {
   id: string;
   conjunction?: string;
+  step_type?: string;  // 'step' | 'path'
   name?: string;
   description?: string;
   access_level?: number;
@@ -527,12 +531,48 @@ export const DEFAULT_FACTOR_WEIGHTS: Record<FactorName, number> = {
   abort_risk: 0.05,
 };
 
+// ─── Canonical Enum Labels ───────────────────────────────────────
+
+export const ACCESS_LABELS: string[] = [
+  'Remote (unauth.)',  // 1
+  'Remote (auth.)',    // 2
+  'Adjacent',          // 3
+  'Local',             // 4
+  'Physical',          // 5
+];
+
+export const SKILL_LABELS: string[] = [
+  'Script Kiddie',     // 1
+  'Exp. Hacker',       // 2
+  'Sec. Engineer',     // 3
+  'Exp. Team',         // 4
+  'Nation State',      // 5
+];
+
+export const COST_FACTOR_LABELS: Record<string, string[]> = {
+  time_effort: ['Minutes', 'Hours', 'Days', 'Weeks', 'Months+'],
+  prior_knowledge: ['Public', 'Known', 'Limited', 'Internal', 'Unknown'],
+  exploitability: ['Trivial', 'Easy', 'Moderate', 'Difficult', 'Very Diff.'],
+  window_of_opportunity: ['Permanent', 'Regular', 'Occasional', 'Brief', 'One-Time'],
+  detection_probability: ['None', 'Low', 'Moderate', 'High', 'Very High'],
+  preparation_effort: ['None', 'SW Setup', 'Test Env', 'Procure', 'Infra'],
+  abort_risk: ['Robust', 'Rare', 'Moderate', 'Frequent', 'Very Likely'],
+};
+
+export const IMPACT_LABELS: Record<string, string[]> = {
+  financial: ['Negligible', 'Minor', 'Moderate', 'Major', 'Catastrophic'],
+  reputation: ['None', 'Minor', 'Noticeable', 'Significant', 'Devastating'],
+  compliance: ['None', 'Minor violation', 'Regulatory issue', 'Major breach', 'Criminal'],
+  safety: ['None', 'Minor injury', 'Serious injury', 'Life-threatening', 'Loss of life'],
+  operational: ['None', 'Minor disruption', 'Partial outage', 'Major outage', 'Total shutdown'],
+};
+
 // ─── Tree node for UI ───────────────────────────────────────────
 export interface TreeNodeData {
   id: string;
   name: string;
-  type: 'goal' | 'category' | 'step' | 'substep';
+  type: 'goal' | 'category' | 'step' | 'substep' | 'path' | 'countermeasure';
   children: TreeNodeData[];
   expanded?: boolean;
-  data?: Goal | Category | Step | Substep;
+  data?: Goal | Category | Step | Substep | Countermeasure;
 }

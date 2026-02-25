@@ -10,6 +10,8 @@
     category: "#2b6cb0",
     step: "#c53030",
     substep: "#e53e3e",
+    path: "#6b46c1",
+    countermeasure: "#22543d",
   };
 
   const typeIcons: Record<string, string> = {
@@ -17,6 +19,8 @@
     category: "📂",
     step: "⚡",
     substep: "🔸",
+    path: "🔀",
+    countermeasure: "🛡️",
   };
 
   function getConjunctionLabel(node: TreeNodeData): string {
@@ -38,6 +42,8 @@
         <button
           class="tree-node-box"
           class:selected={selectedId === node.id}
+          class:countermeasure-node={node.type === "countermeasure"}
+          class:path-node={node.type === "path"}
           style="--node-color: {typeColors[node.type] ||
             '#718096'}; --node-bg: {selectedId === node.id
             ? typeColors[node.type]
@@ -128,6 +134,24 @@
   .tree-node-box.selected {
     background: var(--node-color);
     color: white;
+  }
+
+  .tree-node-box.countermeasure-node {
+    border-style: dashed;
+    border-width: 2px;
+    background: #f0fff4;
+  }
+  .tree-node-box.countermeasure-node.selected {
+    background: #22543d;
+  }
+
+  .tree-node-box.path-node {
+    border-style: dotted;
+    border-width: 2px;
+    background: #faf5ff;
+  }
+  .tree-node-box.path-node.selected {
+    background: #6b46c1;
   }
 
   .node-icon {

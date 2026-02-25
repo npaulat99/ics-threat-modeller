@@ -7,6 +7,7 @@
         AttackPath,
         PathStep,
     } from "$lib/types";
+    import { ACCESS_LABELS, SKILL_LABELS } from "$lib/types";
     import { currentProject, setError, setSuccess } from "$lib/stores";
     import { formatProbability, getSeverityLabel } from "$lib/calculations";
     import * as api from "$lib/api";
@@ -91,20 +92,8 @@
     let editAccess = 1;
     let editSkill = 1;
 
-    const skillLabels = [
-        "Novice",
-        "Beginner",
-        "Competent",
-        "Professional",
-        "Expert",
-    ];
-    const accessLabels = [
-        "Public",
-        "Limited",
-        "Moderate",
-        "Privileged",
-        "Unrestricted",
-    ];
+    const skillLabels = SKILL_LABELS;
+    const accessLabels = ACCESS_LABELS;
 
     onMount(loadGoals);
 

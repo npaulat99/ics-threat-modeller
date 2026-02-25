@@ -21,6 +21,7 @@
     setError,
     setSuccess,
   } from "$lib/stores";
+  import { ACCESS_LABELS, SKILL_LABELS, IMPACT_LABELS } from "$lib/types";
   import * as api from "$lib/api";
   import TreeView from "$components/TreeView.svelte";
   import AttackTreeDiagram from "$components/AttackTreeDiagram.svelte";
@@ -31,7 +32,7 @@
   let selectedDetail: Goal | Step | Category | Substep | null = null;
   let showAddDialog = false;
   let addParent: TreeNodeData | null = null;
-  let addType: "goal" | "category" | "step" | "substep" = "step";
+  let addType: "goal" | "category" | "step" | "substep" | "path" = "step";
   let addName = "";
   let addDesc = "";
   let deleteTarget: TreeNodeData | null = null;
@@ -42,6 +43,16 @@
   let editAccessLevel = 1;
   let editSkillLevel = 1;
   let editImpactCategory = "";
+  let editStepType = "step";
+
+  // Impact scores for goal editing
+  let editImpactScores: Record<string, number> = {
+    financial: 1,
+    reputation: 1,
+    compliance: 1,
+    safety: 1,
+    operational: 1,
+  };
 
   // Countermeasures & Weaknesses
   let nodeCountermeasures: Countermeasure[] = [];
@@ -57,20 +68,8 @@
   let newWKSeverity = 3;
   let newWKCve = "";
 
-  const skillLabels = [
-    "Novice",
-    "Beginner",
-    "Competent",
-    "Professional",
-    "Expert",
-  ];
-  const accessLabels = [
-    "Public",
-    "Limited",
-    "Moderate",
-    "Privileged",
-    "Unrestricted",
-  ];
+  const skillLabels = SKILL_LABELS;
+  const accessLabels = ACCESS_LABELS;
 
   onMount(loadTree);
 
@@ -142,18 +141,51 @@
     // Load substeps.
     const subs = await api.listSubsteps(s.id);
     for (const sub of subs) {
+      const subCmChildren: TreeNodeData[] = [];
+      try {
+        const subCms = await api.listCountermeasures(sub.id, "substep");
+        for (const cm of subCms) {
+          subCmChildren.push({
+            id: cm.id,
+            name: `🛡️ ${cm.name}`,
+            type: "countermeasure",
+            children: [],
+            data: cm,
+          });
+        }
+      } catch (_) {
+        /* ignore */
+      }
       children.push({
         id: sub.id,
         name: sub.name,
         type: "substep",
-        children: [],
+        children: subCmChildren,
         data: sub,
       });
     }
+    // Load countermeasures as defense child nodes
+    try {
+      const cms = await api.listCountermeasures(s.id, "step");
+      for (const cm of cms) {
+        children.push({
+          id: cm.id,
+          name: `🛡️ ${cm.name}`,
+          type: "countermeasure",
+          children: [],
+          data: cm,
+        });
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    const nodeType = (
+      s.step_type === "path" ? "path" : "step"
+    ) as TreeNodeData["type"];
     return {
       id: s.id,
       name: s.name,
-      type: "step",
+      type: nodeType,
       children,
       expanded: true,
       data: s,
@@ -209,6 +241,33 @@
       "impact_category" in selectedDetail
         ? ((selectedDetail as any).impact_category ?? "")
         : "";
+    editStepType =
+      "step_type" in selectedDetail
+        ? ((selectedDetail as any).step_type ?? "step")
+        : "step";
+    // Load impact scores for goals
+    if (selectedNode.type === "goal") {
+      try {
+        const scores = JSON.parse(
+          (selectedDetail as any).impact_scores || "{}",
+        );
+        editImpactScores = {
+          financial: scores.financial ?? 1,
+          reputation: scores.reputation ?? 1,
+          compliance: scores.compliance ?? 1,
+          safety: scores.safety ?? 1,
+          operational: scores.operational ?? 1,
+        };
+      } catch {
+        editImpactScores = {
+          financial: 1,
+          reputation: 1,
+          compliance: 1,
+          safety: 1,
+          operational: 1,
+        };
+      }
+    }
   }
 
   async function saveEdit() {
@@ -220,15 +279,17 @@
           name: editName,
           description: editDesc,
           impact_category: editImpactCategory,
+          impact_scores: JSON.stringify(editImpactScores),
         });
-      } else if (selectedNode.type === "step") {
+      } else if (selectedNode.type === "step" || selectedNode.type === "path") {
         await api.updateStep({
           id: selectedNode.id,
           name: editName,
           description: editDesc,
           conjunction: editConjunction,
-          access_level: editAccessLevel,
-          skill_level: editSkillLevel,
+          step_type: editStepType,
+          access_level: editStepType === "path" ? undefined : editAccessLevel,
+          skill_level: editStepType === "path" ? undefined : editSkillLevel,
         });
       } else if (selectedNode.type === "category") {
         await api.updateCategory({
@@ -261,25 +322,27 @@
     // Determine valid child type.
     if (parentNode.type === "goal") addType = "step";
     else if (parentNode.type === "category") addType = "step";
-    else if (parentNode.type === "step") addType = "step";
+    else if (parentNode.type === "step" || parentNode.type === "path")
+      addType = "step";
     showAddDialog = true;
   }
 
   async function createChild() {
     if (!addParent || !addName.trim()) return;
     try {
-      if (addType === "step") {
+      if (addType === "step" || addType === "path") {
         const data: CreateStep = {
           parent_id: addParent.id,
-          parent_type: addParent.type,
+          parent_type: addParent.type === "path" ? "step" : addParent.type,
           name: addName,
           description: addDesc || undefined,
+          step_type: addType === "path" ? "path" : "step",
         };
         await api.createStep(data);
       } else if (addType === "category") {
         const data: CreateCategory = {
           parent_id: addParent.id,
-          parent_type: addParent.type,
+          parent_type: addParent.type === "path" ? "step" : addParent.type,
           name: addName,
           description: addDesc || undefined,
         };
@@ -572,8 +635,49 @@
                   <option value="and">AND</option>
                 </select>
               </div>
+              <!-- Impact Assessment for Goal -->
+              <div class="impact-edit-section">
+                <h4>Impact Assessment</h4>
+                <div class="impact-edit-grid">
+                  {#each Object.entries(IMPACT_LABELS) as [factor, labels]}
+                    <div class="impact-edit-row">
+                      <span class="impact-factor-name">{factor}</span>
+                      <div class="impact-btns">
+                        {#each [1, 2, 3, 4, 5] as v}
+                          <button
+                            class="impact-btn"
+                            class:active={editImpactScores[factor] === v}
+                            class:low={v <= 2}
+                            class:mid={v === 3}
+                            class:high={v >= 4}
+                            on:click={() => {
+                              editImpactScores[factor] = v;
+                              editImpactScores = editImpactScores;
+                            }}
+                            title={labels[v - 1]}>{v}</button
+                          >
+                        {/each}
+                      </div>
+                      <span class="impact-lbl"
+                        >{labels[editImpactScores[factor] - 1] ?? ""}</span
+                      >
+                    </div>
+                  {/each}
+                </div>
+              </div>
             {/if}
-            {#if (selectedNode.type === "step" || selectedNode.type === "substep") && selectedNode.children.length > 0}
+            {#if selectedNode.type === "step" || selectedNode.type === "path"}
+              <div class="form-group">
+                <label>Entity Type</label>
+                <select class="input" bind:value={editStepType}>
+                  <option value="step">Step (assessable)</option>
+                  <option value="path"
+                    >Path (grouping only, no assessment)</option
+                  >
+                </select>
+              </div>
+            {/if}
+            {#if (selectedNode.type === "step" || selectedNode.type === "substep" || selectedNode.type === "path") && selectedNode.children.length > 0}
               <div class="form-group">
                 <label>Conjunction (how children combine)</label>
                 <select class="input" bind:value={editConjunction}>
@@ -582,7 +686,7 @@
                 </select>
               </div>
             {/if}
-            {#if selectedNode.type === "step" || selectedNode.type === "substep"}
+            {#if (selectedNode.type === "step" || selectedNode.type === "substep") && editStepType !== "path"}
               <div class="form-group">
                 <label
                   >Access Level: {editAccessLevel} ({accessLabels[
@@ -626,6 +730,14 @@
               <dt>Description</dt>
               <dd>{selectedDetail.description || "—"}</dd>
             {/if}
+            {#if selectedNode.type === "step" || selectedNode.type === "path"}
+              <dt>Entity Type</dt>
+              <dd>
+                {selectedNode.type === "path"
+                  ? "Path (grouping)"
+                  : "Step (assessable)"}
+              </dd>
+            {/if}
             {#if "impact_category" in selectedDetail}
               <dt>Aggregation</dt>
               <dd>{selectedDetail.impact_category || "OR (default)"}</dd>
@@ -652,7 +764,7 @@
             {/if}
           </dl>
 
-          {#if selectedNode.type === "step" || selectedNode.type === "substep"}
+          {#if selectedNode.type === "step" || selectedNode.type === "substep" || selectedNode.type === "path"}
             <!-- Countermeasures -->
             <div class="cm-section">
               <div class="cm-header">
@@ -822,11 +934,12 @@
       <div class="form-group">
         <label>Type</label>
         <select class="input" bind:value={addType}>
-          <option value="step">Step</option>
-          {#if addParent?.type === "goal" || addParent?.type === "step"}
+          <option value="step">Step (assessable)</option>
+          <option value="path">Path (grouping only)</option>
+          {#if addParent?.type === "goal" || addParent?.type === "step" || addParent?.type === "path"}
             <option value="category">Category</option>
           {/if}
-          {#if addParent?.type === "step"}
+          {#if addParent?.type === "step" || addParent?.type === "path"}
             <option value="substep">Substep</option>
           {/if}
         </select>
@@ -865,6 +978,64 @@
 />
 
 <style>
+  /* Impact edit UI */
+  .impact-edit-section {
+    margin-top: 12px;
+  }
+  .impact-edit-section h4 {
+    margin: 0 0 8px;
+    font-size: 14px;
+  }
+  .impact-edit-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .impact-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .impact-factor-name {
+    width: 180px;
+    font-size: 13px;
+    text-transform: capitalize;
+  }
+  .impact-btns {
+    display: flex;
+    gap: 3px;
+  }
+  .impact-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    background: var(--surface);
+    color: var(--text);
+  }
+  .impact-btn.active.low {
+    background: #22c55e;
+    border-color: #16a34a;
+    color: #fff;
+  }
+  .impact-btn.active.mid {
+    background: #eab308;
+    border-color: #ca8a04;
+    color: #fff;
+  }
+  .impact-btn.active.high {
+    background: #ef4444;
+    border-color: #dc2626;
+    color: #fff;
+  }
+  .impact-lbl {
+    font-size: 11px;
+    color: var(--text-secondary);
+    min-width: 60px;
+  }
+
   .attack-tree-page {
     display: grid;
     grid-template-columns: 1fr 1fr;

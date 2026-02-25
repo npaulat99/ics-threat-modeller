@@ -86,6 +86,26 @@ fn run_migrations(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    // Migration: Add step_type column to steps table.
+    let has_step_type: bool = conn
+        .prepare("SELECT step_type FROM steps LIMIT 0")
+        .is_ok();
+    if !has_step_type {
+        conn.execute_batch(
+            "ALTER TABLE steps ADD COLUMN step_type TEXT NOT NULL DEFAULT 'step'",
+        )?;
+    }
+
+    // Migration: Add is_active column to attacker_profiles table.
+    let has_is_active: bool = conn
+        .prepare("SELECT is_active FROM attacker_profiles LIMIT 0")
+        .is_ok();
+    if !has_is_active {
+        conn.execute_batch(
+            "ALTER TABLE attacker_profiles ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
+        )?;
+    }
+
     Ok(())
 }
 
