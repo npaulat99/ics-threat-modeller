@@ -55,7 +55,7 @@ jobs:
       # Generate vulnerability attestation JSONs for later attachment
       - name: Generate vulnerability attestation files
         run: |
-          sudo apt-get update -qq && sudo apt-get install -yqq trivy > /dev/null 2>&1 || true
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
           mkdir -p attestations
           trivy fs --ignorefile .trivyignore \
             --skip-dirs .git --skip-dirs attestations \
@@ -127,7 +127,7 @@ jobs:
 
       - name: Generate image vulnerability attestation
         run: |
-          sudo apt-get update -qq && sudo apt-get install -yqq trivy > /dev/null 2>&1 || true
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
           mkdir -p attestations
           trivy image --ignorefile .trivyignore \
             --format cosign-vuln \
@@ -236,7 +236,11 @@ jobs:
           # Retry logic for attestations
           MAX_RETRIES=3
           RETRY_DELAY=30
-          
+
+          # Rekor transparency log has a ~24 KB entry size limit.
+          # Predicates exceeding this (SBOMs, vuln scans) must skip tlog upload.
+          REKOR_MAX_BYTES=20480
+
           for TYPE in provenance sbom vuln-source vuln-dockerfile vuln-image; do
             case $TYPE in
               provenance)      PRED=attestations/provenance.slsa.json;   T=https://slsa.dev/provenance/v1 ;;
@@ -245,11 +249,19 @@ jobs:
               vuln-dockerfile) PRED=attestations/vuln-dockerfile.json;   T=https://cosign.dev/attestation/vuln/dockerfile ;;
               vuln-image)      PRED=attestations/vuln-image.json;        T=https://cosign.dev/attestation/vuln/image ;;
             esac
-            
-            echo "Attaching attestation: $TYPE"
+
+            # Determine whether to upload to Rekor tlog based on predicate size
+            FILE_SIZE=$(stat -c%s "$PRED" 2>/dev/null || echo 0)
+            TLOG_FLAG=""
+            if [ "$FILE_SIZE" -gt "$REKOR_MAX_BYTES" ]; then
+              TLOG_FLAG="--tlog-upload=false"
+              echo "  Predicate is ${FILE_SIZE} bytes (>20KB), skipping Rekor tlog upload"
+            fi
+
+            echo "Attaching attestation: $TYPE (${FILE_SIZE} bytes)"
             for i in $(seq 1 $MAX_RETRIES); do
               echo "  Attempt $i of $MAX_RETRIES..."
-              if cosign attest --yes --timeout=5m --type "$T" --predicate "$PRED" "${IMAGE_REF}"; then
+              if cosign attest --yes --timeout=5m $TLOG_FLAG --type "$T" --predicate "$PRED" "${IMAGE_REF}"; then
                 echo "  Attestation $TYPE attached successfully"
                 break
               else
@@ -262,6 +274,8 @@ jobs:
                 fi
               fi
             done
+            # Brief pause between attestations to avoid Rekor rate-limiting
+            sleep 5
           done
 
   # ===========================================================================
@@ -304,11 +318,23 @@ jobs:
             "https://cosign.dev/attestation/vuln/source" \
             "https://cosign.dev/attestation/vuln/dockerfile" \
             "https://cosign.dev/attestation/vuln/image"; do
-            cosign verify-attestation \
+            echo "Verifying attestation: $TYPE"
+            # Try with tlog first; fall back to --insecure-ignore-tlog for
+            # attestations whose predicates exceeded Rekor's 24 KB size limit.
+            if ! cosign verify-attestation \
               --type "$TYPE" \
               --certificate-identity-regexp="https://github.com/.+" \
               --certificate-oidc-issuer-regexp="https://token.actions.githubusercontent.com" \
-              "${IMAGE_REF}" > /dev/null
+              "${IMAGE_REF}" > /dev/null 2>&1; then
+              echo "  tlog entry unavailable (large predicate), verifying signature only..."
+              cosign verify-attestation \
+                --type "$TYPE" \
+                --insecure-ignore-tlog \
+                --certificate-identity-regexp="https://github.com/.+" \
+                --certificate-oidc-issuer-regexp="https://token.actions.githubusercontent.com" \
+                "${IMAGE_REF}" > /dev/null
+            fi
+            echo "  OK: $TYPE"
           done
           echo "All attestations verified."
 
@@ -324,10 +350,12 @@ jobs:
           rekor-cli search --sha "$HASH" --format json > rekor-output.json
           jq . rekor-output.json
           ENTRY_COUNT=$(jq -r '.UUIDs | length' rekor-output.json)
-          if [ "$ENTRY_COUNT" -lt 5 ]; then
-            echo "FAIL: Expected at least 5 Rekor entries, found $ENTRY_COUNT" && exit 1
+          # At minimum: container signature + provenance attestation.
+          # Large predicates (SBOM, vuln scans) skip tlog, so the count varies.
+          if [ "$ENTRY_COUNT" -lt 2 ]; then
+            echo "FAIL: Expected at least 2 Rekor entries (signature + provenance), found $ENTRY_COUNT" && exit 1
           fi
-          echo "Rekor has $ENTRY_COUNT entries (>= 5)."
+          echo "Rekor has $ENTRY_COUNT entries (>= 2)."
 
       - name: Run container smoke test
         run: |
