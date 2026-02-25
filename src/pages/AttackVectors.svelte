@@ -58,6 +58,12 @@
     let extendStepName = "";
     let extendStepDesc = "";
 
+    // Insert before a step in a path chain
+    let insertBeforeStepId = "";
+    let insertBeforePathIdx = -1;
+    let insertStepName = "";
+    let insertStepDesc = "";
+
     // Weakness / countermeasure add
     let addingWKForId = "";
     let addingWKForType = "";
@@ -224,6 +230,40 @@
             await loadPaths();
         } catch (e) {
             setError(`Extend path failed: ${e}`);
+        }
+    }
+
+    // ── Insert before step ──
+    // Insert a new step between a step's parent and the step itself.
+    async function insertBeforeStep() {
+        if (!insertBeforeStepId || !insertStepName.trim()) return;
+        try {
+            // Get the target step's parent info
+            const targetStep = await api.getStep(insertBeforeStepId);
+            // Create a new step under the same parent
+            const newStep = await api.createStep({
+                parent_id: targetStep.parent_id,
+                parent_type: targetStep.parent_type,
+                name: insertStepName,
+                description: insertStepDesc || undefined,
+                conjunction: "AND",
+            });
+            // Reparent the target step to be child of the new step
+            await api.updateStep({
+                id: insertBeforeStepId,
+                parent_id: newStep.id,
+                parent_type: "step",
+            });
+            setSuccess(
+                `Inserted "${insertStepName}" before "${targetStep.name}".`,
+            );
+            insertBeforeStepId = "";
+            insertStepName = "";
+            insertStepDesc = "";
+            insertBeforePathIdx = -1;
+            await loadPaths();
+        } catch (e) {
+            setError(`Insert step failed: ${e}`);
         }
     }
 
@@ -566,7 +606,50 @@
                 <div class="path-scroll">
                     <div class="path-chain" role="list">
                         {#each path.steps as step, sIdx (step.entity_id + "-" + sIdx)}
+                            <!-- Insert-before button -->
+                            {#if sIdx === 0}
+                                <button
+                                    class="add-circle add-circle-md inline-add"
+                                    on:click={() => {
+                                        insertBeforeStepId = step.entity_id;
+                                        insertBeforePathIdx = pIdx;
+                                        insertStepName = "";
+                                        insertStepDesc = "";
+                                    }}
+                                    title="Insert step before '{step.name}'"
+                                    >+</button
+                                >
+                                <div class="arrow-connector">
+                                    <svg
+                                        width="40"
+                                        height="20"
+                                        viewBox="0 0 40 20"
+                                        ><line
+                                            x1="0"
+                                            y1="10"
+                                            x2="30"
+                                            y2="10"
+                                            stroke="#1a202c"
+                                            stroke-width="2"
+                                        /><polygon
+                                            points="30,5 40,10 30,15"
+                                            fill="#1a202c"
+                                        /></svg
+                                    >
+                                </div>
+                            {/if}
                             {#if sIdx > 0}
+                                <button
+                                    class="add-circle add-circle-md inline-add"
+                                    on:click={() => {
+                                        insertBeforeStepId = step.entity_id;
+                                        insertBeforePathIdx = pIdx;
+                                        insertStepName = "";
+                                        insertStepDesc = "";
+                                    }}
+                                    title="Insert step before '{step.name}'"
+                                    >+</button
+                                >
                                 <div class="arrow-connector">
                                     <svg
                                         width="40"
@@ -667,7 +750,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Countermeasures BELOW -->
+                                <!-- Countermeasures BELOW as defense nodes -->
                                 <div class="attachments att-bottom">
                                     <button
                                         class="add-circle add-circle-sm"
@@ -678,17 +761,16 @@
                                         }}
                                         title="Add Countermeasure">+</button
                                     >
-                                    {#if step.countermeasures.length > 0}<div
-                                            class="dashed-conn"
-                                        ></div>{/if}
                                     {#each step.countermeasures as cm (cm.id)}
-                                        <div class="att-card att-cm">
-                                            <span class="att-name"
-                                                >🛡️ {cm.name}</span
-                                            >
-                                            <span class="att-meta"
-                                                >Eff: {cm.effectiveness}</span
-                                            >
+                                        <div class="dashed-conn-defense"></div>
+                                        <div class="node-box cm-box">
+                                            <div class="nb-type">DEFENSE</div>
+                                            <div class="nb-name">
+                                                🛡️ {cm.name}
+                                            </div>
+                                            <div class="nb-meta">
+                                                Eff: {cm.effectiveness}
+                                            </div>
                                             <button
                                                 class="att-del"
                                                 on:click|stopPropagation={() =>
@@ -968,6 +1050,46 @@
     </div>
 {/if}
 
+{#if insertBeforeStepId}
+    <div
+        class="overlay"
+        on:click={() => (insertBeforeStepId = "")}
+        role="dialog"
+    >
+        <div class="dlg" on:click|stopPropagation role="document">
+            <h3>Insert Step</h3>
+            <p class="dlg-hint">
+                Inserts a new step before the selected step in the chain.
+            </p>
+            <div class="fg">
+                <label>Step Name *</label><input
+                    class="inp"
+                    bind:value={insertStepName}
+                    placeholder="e.g. Scan network"
+                />
+            </div>
+            <div class="fg">
+                <label>Description</label><textarea
+                    class="inp"
+                    rows="2"
+                    bind:value={insertStepDesc}
+                ></textarea>
+            </div>
+            <div class="da">
+                <button
+                    class="btn btn-sec"
+                    on:click={() => (insertBeforeStepId = "")}>Cancel</button
+                >
+                <button
+                    class="btn btn-pri"
+                    on:click={insertBeforeStep}
+                    disabled={!insertStepName.trim()}>Insert</button
+                >
+            </div>
+        </div>
+    </div>
+{/if}
+
 {#if addingWKForId}
     <div class="overlay" on:click={() => (addingWKForId = "")} role="dialog">
         <div class="dlg" on:click|stopPropagation role="document">
@@ -1189,6 +1311,12 @@
         height: 36px;
         font-size: 1.3rem;
     }
+    .add-circle-md {
+        width: 26px;
+        height: 26px;
+        font-size: 0.9rem;
+        border-width: 1.5px;
+    }
     .add-circle-sm {
         width: 22px;
         height: 22px;
@@ -1373,6 +1501,24 @@
         background: #ebf8ff;
         border-width: 3px;
         cursor: default;
+    }
+    .cm-box {
+        border: 2px dashed #38a169;
+        background: #f0fff4;
+        position: relative;
+        min-width: 100px;
+        max-width: 170px;
+    }
+    .cm-box:hover {
+        border-color: #276749;
+    }
+    .cm-box .nb-type {
+        color: #276749;
+    }
+    .dashed-conn-defense {
+        width: 0;
+        border-left: 2px dashed #38a169;
+        height: 12px;
     }
 
     .nb-type {

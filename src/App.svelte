@@ -19,6 +19,7 @@
   import ExportImport from "$pages/ExportImport.svelte";
   import Versions from "$pages/Versions.svelte";
   import AttackVectors from "$pages/AttackVectors.svelte";
+  import Dashboard from "$pages/Dashboard.svelte";
 
   const routes = {
     "/": Home,
@@ -28,6 +29,7 @@
     "/project/tree": AttackTree,
     "/project/vectors": AttackVectors,
     "/project/assessment": Assessment,
+    "/project/dashboard": Dashboard,
     "/project/catalog": Catalog,
     "/project/export": ExportImport,
     "/project/versions": Versions,

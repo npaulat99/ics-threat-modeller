@@ -17,6 +17,12 @@
       path: "/project/assessment",
     },
     {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: "📈",
+      path: "/project/dashboard",
+    },
+    {
       id: "profiles",
       label: "Attacker Profiles",
       icon: "👤",

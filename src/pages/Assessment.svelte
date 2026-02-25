@@ -237,9 +237,11 @@
     }
 
     for (const p of profiles) {
-      // Filter: a path is realistic for this profile if max_skill <= profile.skill_level.
+      // Filter: a path is realistic for this profile if attacker has sufficient skill AND access.
       const realistic = allPaths.filter(
-        (path) => path.max_skill_level <= p.skill_level,
+        (path) =>
+          p.skill_level >= path.max_skill_level &&
+          p.access_level >= path.max_access_level,
       );
       const maxProb =
         realistic.length > 0
@@ -284,6 +286,19 @@
         skillLevel: s.skill_level,
       });
       leafEntities = leafEntities;
+
+      // Add countermeasures of this step as assessable entities.
+      const cms = await api.listCountermeasures(s.id, "step");
+      for (const cm of cms) {
+        leafEntities.push({
+          id: cm.id,
+          name: `${stepLabel} › 🛡️ ${cm.name}`,
+          entityType: "countermeasure",
+          accessLevel: undefined,
+          skillLevel: undefined,
+        });
+        leafEntities = leafEntities;
+      }
 
       // Add substeps of this step.
       for (const sub of substeps) {
@@ -481,7 +496,12 @@
               on:click={() => selectEntity(s.id, s.entityType)}
             >
               <span class="step-name"
-                >{s.entityType === "substep" ? "🔹" : "⚡"} {s.name}</span
+                >{s.entityType === "substep"
+                  ? "🔹"
+                  : s.entityType === "countermeasure"
+                    ? "🛡️"
+                    : "⚡"}
+                {s.name}</span
               >
               {#if s.accessLevel || s.skillLevel}
                 <span class="step-tags">

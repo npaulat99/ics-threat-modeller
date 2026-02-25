@@ -518,13 +518,13 @@ export const DEFAULT_FACTORS = [
 export type FactorName = (typeof DEFAULT_FACTORS)[number];
 
 export const DEFAULT_FACTOR_WEIGHTS: Record<FactorName, number> = {
-  time_effort: 1 / 7,
-  prior_knowledge: 1 / 7,
-  exploitability: 1 / 7,
-  window_of_opportunity: 1 / 7,
-  detection_probability: 1 / 7,
-  preparation_effort: 1 / 7,
-  abort_risk: 1 / 7,
+  time_effort: 0.25,
+  prior_knowledge: 0.10,
+  exploitability: 0.20,
+  window_of_opportunity: 0.15,
+  detection_probability: 0.15,
+  preparation_effort: 0.10,
+  abort_risk: 0.05,
 };
 
 // ─── Tree node for UI ───────────────────────────────────────────

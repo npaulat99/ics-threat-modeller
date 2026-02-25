@@ -8,6 +8,7 @@
 //   - AND aggregation:      product of children
 //   - OR aggregation:       max of children
 
+use crate::commands::countermeasures::list_countermeasures_internal;
 use crate::db::models::{AttackPath, FactorContribution, PathStep, StepCalculation};
 use crate::db::Database;
 use rusqlite::params;
@@ -139,11 +140,12 @@ pub fn calculate_attack_paths(
     project_id: String,
     goal_id: String,
     attacker_skill: Option<i32>,
-    _attacker_access: Option<i32>,
+    attacker_access: Option<i32>,
 ) -> Result<Vec<AttackPath>, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let access_probs = get_access_probabilities(&conn, &project_id)?;
-    let _attacker_skill = attacker_skill.unwrap_or(5);
+    let skill = attacker_skill.unwrap_or(5);
+    let access = attacker_access.unwrap_or(5);
 
     // Get goal name.
     let goal_name: String = conn
@@ -161,7 +163,8 @@ pub fn calculate_attack_paths(
         &goal_id,
         &goal_name,
         &access_probs,
-        _attacker_skill,
+        skill,
+        access,
     )?;
 
     Ok(paths)
@@ -182,6 +185,7 @@ fn extract_paths_for_goal(
     goal_name: &str,
     access_probs: &HashMap<i32, f64>,
     attacker_skill: i32,
+    attacker_access: i32,
 ) -> Result<Vec<AttackPath>, String> {
     let steps = get_child_steps(conn, goal_id, "goal")?;
     let categories = get_child_categories(conn, goal_id, "goal")?;
@@ -208,7 +212,9 @@ fn extract_paths_for_goal(
 
         let max_access = path_steps.iter().map(|s| s.access_level).max().unwrap_or(1);
         let max_skill = path_steps.iter().map(|s| s.skill_level).max().unwrap_or(1);
-        let is_realistic = max_skill <= attacker_skill;
+        // A path is realistic if the attacker's skill and access levels are
+        // sufficient (>=) to cover the most demanding step in the path.
+        let is_realistic = attacker_skill >= max_skill && attacker_access >= max_access;
         let access_prob = access_probs.get(&max_access).copied().unwrap_or(0.5);
 
         let mut cost_prob = 1.0;
@@ -216,14 +222,32 @@ fn extract_paths_for_goal(
 
         for ps in path_steps {
             let calc = calculate_step_prob_internal(conn, &ps.id, &ps.entity_type, project_id)?;
-            cost_prob *= calc.cost_probability;
+            let mut step_prob = calc.cost_probability;
+
+            // Apply countermeasure defense: for each assessed countermeasure on this step,
+            // compute its defense probability and reduce the attack probability.
+            // Effective attack prob = step_prob × Π(1 - cm_prob) for each countermeasure.
+            if ps.entity_type == "step" || ps.entity_type == "substep" {
+                let cms = list_countermeasures_internal(conn, &ps.id, &ps.entity_type)
+                    .unwrap_or_default();
+                for cm in &cms {
+                    let cm_calc =
+                        calculate_step_prob_internal(conn, &cm.id, "countermeasure", project_id);
+                    if let Ok(cm_result) = cm_calc {
+                        // Only apply if the countermeasure has been assessed (non-default)
+                        step_prob *= 1.0 - cm_result.cost_probability;
+                    }
+                }
+            }
+
+            cost_prob *= step_prob;
             path_step_results.push(PathStep {
                 entity_id: ps.id.clone(),
                 entity_type: ps.entity_type.clone(),
                 name: ps.name.clone(),
                 access_level: ps.access_level,
                 skill_level: ps.skill_level,
-                cost_probability: calc.cost_probability,
+                cost_probability: step_prob,
             });
         }
 

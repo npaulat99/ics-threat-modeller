@@ -144,7 +144,7 @@
         <h4>Factor Weights</h4>
         {#each Object.entries(factorWeights) as [factor, weight]}
           <div class="weight-row">
-            <span class="weight-label">{factor}</span>
+            <span class="weight-label">{factor.replace(/_/g, " ")}</span>
             {#if editing}
               <input
                 class="input weight-input"
@@ -152,7 +152,14 @@
                 min="0"
                 max="1"
                 step="0.05"
-                bind:value={factorWeights[factor]}
+                value={weight.toFixed(2)}
+                on:change={(e) => {
+                  const val = parseFloat(e.currentTarget.value);
+                  if (!isNaN(val)) {
+                    factorWeights[factor] = Math.round(val * 100) / 100;
+                    factorWeights = factorWeights;
+                  }
+                }}
               />
             {:else}
               <span class="weight-value">{(weight * 100).toFixed(0)}%</span>
