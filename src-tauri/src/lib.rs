@@ -59,6 +59,7 @@ pub fn run() {
             commands::steps::get_step,
             commands::steps::update_step,
             commands::steps::delete_step,
+            commands::steps::delete_step_reparent,
             // Substeps
             commands::substeps::create_substep,
             commands::substeps::list_substeps,

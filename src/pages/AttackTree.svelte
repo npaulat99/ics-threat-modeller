@@ -61,11 +61,8 @@
   let showAddWK = false;
   let newCMName = "";
   let newCMDesc = "";
-  let newCMEffectiveness = 3;
-  let newCMCost = 3;
   let newWKName = "";
   let newWKDesc = "";
-  let newWKSeverity = 3;
   let newWKCve = "";
 
   const skillLabels = SKILL_LABELS;
@@ -145,11 +142,22 @@
       try {
         const subCms = await api.listCountermeasures(sub.id, "substep");
         for (const cm of subCms) {
+          // Attack-Defense Tree: load child steps under substep CMs too
+          const cmChildren: TreeNodeData[] = [];
+          try {
+            const cmSteps = await api.listSteps(cm.id, "countermeasure");
+            for (const cs of cmSteps) {
+              cmChildren.push(await buildStepNode(cs));
+            }
+          } catch (_) {
+            /* ignore */
+          }
           subCmChildren.push({
             id: cm.id,
             name: cm.name,
             type: "countermeasure",
-            children: [],
+            children: cmChildren,
+            expanded: true,
             data: cm,
           });
         }
@@ -168,11 +176,22 @@
     try {
       const cms = await api.listCountermeasures(s.id, "step");
       for (const cm of cms) {
+        // Attack-Defense Tree: load child steps under this countermeasure
+        const cmChildren: TreeNodeData[] = [];
+        try {
+          const cmSteps = await api.listSteps(cm.id, "countermeasure");
+          for (const cs of cmSteps) {
+            cmChildren.push(await buildStepNode(cs));
+          }
+        } catch (_) {
+          /* ignore */
+        }
         children.push({
           id: cm.id,
           name: cm.name,
           type: "countermeasure",
-          children: [],
+          children: cmChildren,
+          expanded: true,
           data: cm,
         });
       }
@@ -324,6 +343,7 @@
     else if (parentNode.type === "category") addType = "step";
     else if (parentNode.type === "step" || parentNode.type === "path")
       addType = "step";
+    else if (parentNode.type === "countermeasure") addType = "step";
     showAddDialog = true;
   }
 
@@ -385,8 +405,6 @@
         parent_type: selectedNode.type,
         name: newCMName,
         description: newCMDesc || undefined,
-        effectiveness: newCMEffectiveness,
-        implementation_cost: newCMCost,
       });
       nodeCountermeasures = await api.listCountermeasures(
         selectedNode.id,
@@ -395,8 +413,6 @@
       showAddCM = false;
       newCMName = "";
       newCMDesc = "";
-      newCMEffectiveness = 3;
-      newCMCost = 3;
       setSuccess("Countermeasure added");
     } catch (e) {
       setError(`Add countermeasure failed: ${e}`);
@@ -425,7 +441,6 @@
         parent_type: selectedNode.type,
         name: newWKName,
         description: newWKDesc || undefined,
-        severity: newWKSeverity,
         cve_id: newWKCve || undefined,
       });
       nodeWeaknesses = await api.listWeaknesses(
@@ -435,7 +450,6 @@
       showAddWK = false;
       newWKName = "";
       newWKDesc = "";
-      newWKSeverity = 3;
       newWKCve = "";
       setSuccess("Weakness added");
     } catch (e) {
@@ -467,6 +481,8 @@
         await api.deleteCategory(deleteTarget.id);
       else if (deleteTarget.type === "substep")
         await api.deleteSubstep(deleteTarget.id);
+      else if (deleteTarget.type === "countermeasure")
+        await api.deleteCountermeasure(deleteTarget.id);
       setSuccess(`Deleted ${deleteTarget.type}: ${deleteTarget.name}`);
       deleteTarget = null;
       selectedNode = null;
@@ -693,13 +709,21 @@
                     editAccessLevel - 1
                   ] ?? ""})</label
                 >
-                <input
-                  type="range"
-                  min="1"
-                  max="5"
-                  bind:value={editAccessLevel}
-                  class="slider"
-                />
+                <div class="level-btns">
+                  {#each [1, 2, 3, 4, 5] as v}
+                    <button
+                      class="lvl-btn"
+                      class:active={editAccessLevel === v}
+                      class:low={v <= 2}
+                      class:mid={v === 3}
+                      class:high={v >= 4}
+                      on:click={() => {
+                        editAccessLevel = v;
+                      }}
+                      title={accessLabels[v - 1]}>{v}</button
+                    >
+                  {/each}
+                </div>
               </div>
               <div class="form-group">
                 <label
@@ -707,13 +731,21 @@
                     editSkillLevel - 1
                   ] ?? ""})</label
                 >
-                <input
-                  type="range"
-                  min="1"
-                  max="5"
-                  bind:value={editSkillLevel}
-                  class="slider"
-                />
+                <div class="level-btns">
+                  {#each [1, 2, 3, 4, 5] as v}
+                    <button
+                      class="lvl-btn"
+                      class:active={editSkillLevel === v}
+                      class:low={v <= 2}
+                      class:mid={v === 3}
+                      class:high={v >= 4}
+                      on:click={() => {
+                        editSkillLevel = v;
+                      }}
+                      title={skillLabels[v - 1]}>{v}</button
+                    >
+                  {/each}
+                </div>
               </div>
             {/if}
             <div class="form-actions">
@@ -788,22 +820,6 @@
                     bind:value={newCMDesc}
                     placeholder="Description"
                   />
-                  <div class="cm-fields">
-                    <label>Effectiveness: {newCMEffectiveness}</label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="5"
-                      bind:value={newCMEffectiveness}
-                    />
-                    <label>Cost: {newCMCost}</label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="5"
-                      bind:value={newCMCost}
-                    />
-                  </div>
                   <button
                     class="btn btn-sm btn-primary"
                     on:click={addCountermeasure}>Save</button
@@ -818,9 +834,6 @@
                       {#if cm.description}<span class="cm-desc"
                           >{cm.description}</span
                         >{/if}
-                      <span class="cm-meta"
-                        >Eff: {cm.effectiveness} | Cost: {cm.implementation_cost}</span
-                      >
                     </div>
                     <button
                       class="btn-del"
@@ -857,15 +870,6 @@
                     bind:value={newWKDesc}
                     placeholder="Description"
                   />
-                  <div class="cm-fields">
-                    <label>Severity: {newWKSeverity}</label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="5"
-                      bind:value={newWKSeverity}
-                    />
-                  </div>
                   <input
                     class="input"
                     bind:value={newWKCve}
@@ -884,11 +888,8 @@
                       {#if wk.description}<span class="cm-desc"
                           >{wk.description}</span
                         >{/if}
-                      <span class="cm-meta"
-                        >Severity: {wk.severity}{wk.cve_id
-                          ? ` | ${wk.cve_id}`
-                          : ""}</span
-                      >
+                      {#if wk.cve_id}<span class="cm-meta">{wk.cve_id}</span
+                        >{/if}
                     </div>
                     <button
                       class="btn-del"
@@ -1052,6 +1053,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0;
   }
 
   .detail-panel {
@@ -1127,8 +1129,45 @@
     flex-direction: column;
     gap: 12px;
   }
-  .slider {
-    width: 100%;
+  .level-btns {
+    display: flex;
+    gap: 3px;
+    margin-top: 4px;
+  }
+  .lvl-btn {
+    width: 32px;
+    height: 32px;
+    border: 2px solid #cbd5e0;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #4a5568;
+    transition: all 0.12s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .lvl-btn:hover {
+    border-color: #a0aec0;
+    background: #edf2f7;
+  }
+  .lvl-btn.active.low {
+    background: #c6f6d5;
+    border-color: #38a169;
+    color: #22543d;
+  }
+  .lvl-btn.active.mid {
+    background: #fefcbf;
+    border-color: #d69e2e;
+    color: #744210;
+  }
+  .lvl-btn.active.high {
+    background: #fed7d7;
+    border-color: #e53e3e;
+    color: #742a2a;
   }
   .form-actions {
     display: flex;

@@ -87,13 +87,9 @@ fn run_migrations(conn: &Connection) -> Result<()> {
     }
 
     // Migration: Add step_type column to steps table.
-    let has_step_type: bool = conn
-        .prepare("SELECT step_type FROM steps LIMIT 0")
-        .is_ok();
+    let has_step_type: bool = conn.prepare("SELECT step_type FROM steps LIMIT 0").is_ok();
     if !has_step_type {
-        conn.execute_batch(
-            "ALTER TABLE steps ADD COLUMN step_type TEXT NOT NULL DEFAULT 'step'",
-        )?;
+        conn.execute_batch("ALTER TABLE steps ADD COLUMN step_type TEXT NOT NULL DEFAULT 'step'")?;
     }
 
     // Migration: Add is_active column to attacker_profiles table.
@@ -103,6 +99,37 @@ fn run_migrations(conn: &Connection) -> Result<()> {
     if !has_is_active {
         conn.execute_batch(
             "ALTER TABLE attacker_profiles ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
+        )?;
+    }
+
+    // Migration: Allow steps to have countermeasures as parents (Attack-Defense Tree).
+    let steps_sql: String = conn.query_row(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='steps'",
+        [],
+        |row| row.get(0),
+    )?;
+    if !steps_sql.contains("'countermeasure'") {
+        conn.execute_batch(
+            "
+            CREATE TABLE steps_new (
+                id                TEXT PRIMARY KEY,
+                parent_id         TEXT NOT NULL,
+                parent_type       TEXT NOT NULL CHECK(parent_type IN ('goal', 'category', 'step', 'countermeasure')),
+                conjunction       TEXT NOT NULL DEFAULT 'OR' CHECK(conjunction IN ('AND', 'OR')),
+                name              TEXT NOT NULL,
+                description       TEXT NOT NULL DEFAULT '',
+                access_level      INTEGER NOT NULL DEFAULT 1 CHECK(access_level BETWEEN 1 AND 5),
+                skill_level       INTEGER NOT NULL DEFAULT 1 CHECK(skill_level BETWEEN 1 AND 5),
+                catalog_source_id TEXT,
+                sort_order        INTEGER NOT NULL DEFAULT 0,
+                created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+                step_type         TEXT NOT NULL DEFAULT 'step'
+            );
+            INSERT INTO steps_new SELECT * FROM steps;
+            DROP TABLE steps;
+            ALTER TABLE steps_new RENAME TO steps;
+            ",
         )?;
     }
 
@@ -156,8 +183,8 @@ CREATE TABLE IF NOT EXISTS categories (
 
 CREATE TABLE IF NOT EXISTS steps (
     id                TEXT PRIMARY KEY,           -- UUID
-    parent_id         TEXT NOT NULL,              -- FK to goals, categories, or steps
-    parent_type       TEXT NOT NULL CHECK(parent_type IN ('goal', 'category', 'step')),
+    parent_id         TEXT NOT NULL,              -- FK to goals, categories, steps or countermeasures
+    parent_type       TEXT NOT NULL CHECK(parent_type IN ('goal', 'category', 'step', 'countermeasure')),
     conjunction       TEXT NOT NULL DEFAULT 'OR' CHECK(conjunction IN ('AND', 'OR')),
     name              TEXT NOT NULL,
     description       TEXT NOT NULL DEFAULT '',

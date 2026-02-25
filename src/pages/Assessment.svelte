@@ -275,6 +275,13 @@
           skillLevel: undefined,
         });
         leafEntities = leafEntities;
+
+        // Attack-Defense Tree: recurse into child steps of this countermeasure.
+        await findAssessableEntities(
+          cm.id,
+          "countermeasure",
+          `${stepLabel} › 🛡️ ${cm.name}`,
+        );
       }
 
       // Add substeps of this step.
@@ -345,6 +352,30 @@
       await recalcPaths();
     } catch (e) {
       setError(`Save failed: ${e}`);
+    }
+  }
+
+  async function updateEntityLevel(
+    field: "access_level" | "skill_level",
+    value: number,
+  ) {
+    if (!selectedEntity) return;
+    try {
+      if (selectedEntity.entityType === "step") {
+        await api.updateStep({ id: selectedEntity.id, [field]: value });
+      } else if (selectedEntity.entityType === "substep") {
+        await api.updateSubstep({ id: selectedEntity.id, [field]: value });
+      }
+      // Update local state
+      if (field === "access_level") {
+        selectedEntity.accessLevel = value;
+      } else {
+        selectedEntity.skillLevel = value;
+      }
+      leafEntities = leafEntities;
+      await recalcPaths();
+    } catch (e) {
+      setError(`Update failed: ${e}`);
     }
   }
 </script>
@@ -505,22 +536,50 @@
           {#if selectedEntity}
             <div class="entity-info-bar">
               <span class="entity-name">{selectedEntity.name}</span>
-              <div class="entity-reqs">
-                {#if selectedEntity.accessLevel}
-                  <span class="tag access"
-                    >🔑 Needed Access: {selectedEntity.accessLevel}/5 ({accessLabels[
-                      selectedEntity.accessLevel - 1
-                    ]})</span
-                  >
-                {/if}
-                {#if selectedEntity.skillLevel}
-                  <span class="tag skill"
-                    >🎓 Needed Skill: {selectedEntity.skillLevel}/5 ({skillLabels[
-                      selectedEntity.skillLevel - 1
-                    ]})</span
-                  >
-                {/if}
-              </div>
+              {#if selectedEntity.entityType !== "countermeasure"}
+                <div class="entity-level-editors">
+                  <div class="level-editor">
+                    <span class="level-label-text">🔑 Needed Access</span>
+                    <div class="level-btns">
+                      {#each [1, 2, 3, 4, 5] as v}
+                        <button
+                          class="lvl-btn"
+                          class:active={selectedEntity.accessLevel === v}
+                          class:low={v <= 2}
+                          class:mid={v === 3}
+                          class:high={v >= 4}
+                          on:click={() => updateEntityLevel("access_level", v)}
+                          title={accessLabels[v - 1]}>{v}</button
+                        >
+                      {/each}
+                    </div>
+                    <span class="level-lbl"
+                      >{accessLabels[
+                        (selectedEntity.accessLevel || 1) - 1
+                      ]}</span
+                    >
+                  </div>
+                  <div class="level-editor">
+                    <span class="level-label-text">🎓 Needed Skill</span>
+                    <div class="level-btns">
+                      {#each [1, 2, 3, 4, 5] as v}
+                        <button
+                          class="lvl-btn"
+                          class:active={selectedEntity.skillLevel === v}
+                          class:low={v <= 2}
+                          class:mid={v === 3}
+                          class:high={v >= 4}
+                          on:click={() => updateEntityLevel("skill_level", v)}
+                          title={skillLabels[v - 1]}>{v}</button
+                        >
+                      {/each}
+                    </div>
+                    <span class="level-lbl"
+                      >{skillLabels[(selectedEntity.skillLevel || 1) - 1]}</span
+                    >
+                  </div>
+                </div>
+              {/if}
             </div>
           {/if}
           <AssessmentForm
@@ -611,16 +670,71 @@
     margin-bottom: 12px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
   }
   .entity-info-bar .entity-name {
     font-weight: 600;
     font-size: 0.9rem;
   }
-  .entity-info-bar .entity-reqs {
+  .entity-level-editors {
     display: flex;
-    gap: 10px;
+    gap: 16px;
     flex-wrap: wrap;
+  }
+  .level-editor {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .level-label-text {
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .level-btns {
+    display: flex;
+    gap: 3px;
+  }
+  .lvl-btn {
+    width: 28px;
+    height: 28px;
+    border: 2px solid #cbd5e0;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: #4a5568;
+    transition: all 0.12s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .lvl-btn:hover {
+    border-color: #a0aec0;
+    background: #edf2f7;
+  }
+  .lvl-btn.active.low {
+    background: #c6f6d5;
+    border-color: #38a169;
+    color: #22543d;
+  }
+  .lvl-btn.active.mid {
+    background: #fefcbf;
+    border-color: #d69e2e;
+    color: #744210;
+  }
+  .lvl-btn.active.high {
+    background: #fed7d7;
+    border-color: #e53e3e;
+    color: #742a2a;
+  }
+  .level-lbl {
+    font-size: 0.72rem;
+    color: #718096;
+    font-style: italic;
+    white-space: nowrap;
   }
 
   .assessment-page {

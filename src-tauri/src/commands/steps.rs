@@ -126,6 +126,69 @@ pub fn delete_step(db: State<'_, Database>, id: String) -> Result<(), String> {
     delete_step_cascade(&conn, &id)
 }
 
+/// Delete a step but re-parent its child steps to the deleted step's parent,
+/// preserving the chain. E.g. A→B→C becomes A→C when B is deleted.
+#[tauri::command]
+pub fn delete_step_reparent(db: State<'_, Database>, id: String) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let step = get_step_by_id(&conn, &id)?;
+
+    // Re-parent child steps to the deleted step's parent
+    conn.execute(
+        "UPDATE steps SET parent_id = ?1, parent_type = ?2 WHERE parent_id = ?3 AND parent_type = 'step'",
+        params![step.parent_id, step.parent_type, id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // Now delete only this step (and its own attachments, but NOT its reparented children)
+    // Delete substeps
+    conn.execute(
+        "DELETE FROM substeps WHERE parent_step_id = ?1",
+        params![id],
+    )
+    .map_err(|e| e.to_string())?;
+    // Delete countermeasures attached to this step
+    conn.execute(
+        "DELETE FROM countermeasures WHERE parent_id = ?1 AND parent_type = 'step'",
+        params![id],
+    )
+    .map_err(|e| e.to_string())?;
+    // Delete weaknesses attached to this step
+    conn.execute(
+        "DELETE FROM weaknesses WHERE parent_id = ?1 AND parent_type = 'step'",
+        params![id],
+    )
+    .map_err(|e| e.to_string())?;
+    // Delete assessments
+    conn.execute("DELETE FROM assessments WHERE entity_id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    // Delete technique mappings and tags
+    conn.execute(
+        "DELETE FROM attack_technique_mappings WHERE entity_id = ?1",
+        params![id],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM tags WHERE entity_id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    // Delete categories under this step
+    let cat_ids: Vec<String> = {
+        let mut stmt = conn
+            .prepare("SELECT id FROM categories WHERE parent_id = ?1 AND parent_type = 'step'")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map(params![id], |row| row.get(0))
+            .map_err(|e| e.to_string())?;
+        rows.filter_map(|r| r.ok()).collect()
+    };
+    for cid in &cat_ids {
+        super::categories::delete_category_cascade(&conn, cid)?;
+    }
+    // Delete the step itself
+    conn.execute("DELETE FROM steps WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Recursively delete a step and all its children.
 pub fn delete_step_cascade(conn: &rusqlite::Connection, step_id: &str) -> Result<(), String> {
     // Delete substeps.

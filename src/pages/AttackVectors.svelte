@@ -14,10 +14,15 @@
     import ConfirmDialog from "$components/ConfirmDialog.svelte";
     import { onMount } from "svelte";
 
+    // ── Enriched CM with child steps (Attack-Defense Tree) ──
+    interface EnrichedCM extends Countermeasure {
+        childSteps: Step[];
+    }
+
     // ── Enriched step node (adds WK/CM to each path-step) ──
     interface EnrichedStep extends PathStep {
         weaknesses: Weakness[];
-        countermeasures: Countermeasure[];
+        countermeasures: EnrichedCM[];
     }
 
     interface EnrichedPath {
@@ -70,13 +75,10 @@
     let addingWKForType = "";
     let newWKName = "";
     let newWKDesc = "";
-    let newWKSeverity = 3;
     let addingCMForId = "";
     let addingCMForType = "";
     let newCMName = "";
     let newCMDesc = "";
-    let newCMEffectiveness = 3;
-    let newCMCost = 3;
 
     // Delete
     let deleteTarget: { id: string; name: string; type: string } | null = null;
@@ -150,11 +152,20 @@
                         () => api.listWeaknesses(s.entity_id, s.entity_type),
                         [],
                     );
-                    const cm = await safe(
+                    const rawCm = await safe(
                         () =>
                             api.listCountermeasures(s.entity_id, s.entity_type),
                         [],
                     );
+                    // Enrich CMs with their child steps (Attack-Defense Tree)
+                    const cm: EnrichedCM[] = [];
+                    for (const c of rawCm) {
+                        const childSteps = await safe(
+                            () => api.listSteps(c.id, "countermeasure"),
+                            [],
+                        );
+                        cm.push({ ...c, childSteps });
+                    }
                     eSteps.push({ ...s, weaknesses: wk, countermeasures: cm });
                 }
                 enriched.push({ ...p, steps: eSteps });
@@ -266,6 +277,9 @@
                 selectedGoal = null;
                 paths = [];
                 await loadGoals();
+            } else if (deleteTarget.type === "step-reparent") {
+                await api.deleteStepReparent(deleteTarget.id);
+                await loadPaths();
             } else if (deleteTarget.type === "step") {
                 await api.deleteStep(deleteTarget.id);
                 await loadPaths();
@@ -279,7 +293,7 @@
                 await api.deleteCountermeasure(deleteTarget.id);
                 await loadPaths();
             }
-            setSuccess(`Deleted ${deleteTarget.type}: ${deleteTarget.name}`);
+            setSuccess(`Deleted: ${deleteTarget.name}`);
         } catch (e) {
             setError(`Delete failed: ${e}`);
         }
@@ -296,13 +310,11 @@
                 parent_type: addingWKForType,
                 name: newWKName,
                 description: newWKDesc || undefined,
-                severity: newWKSeverity,
             });
             setSuccess("Weakness added");
             addingWKForId = "";
             newWKName = "";
             newWKDesc = "";
-            newWKSeverity = 3;
             await loadPaths();
         } catch (e) {
             setError(`Add weakness failed: ${e}`);
@@ -317,15 +329,11 @@
                 parent_type: addingCMForType,
                 name: newCMName,
                 description: newCMDesc || undefined,
-                effectiveness: newCMEffectiveness,
-                implementation_cost: newCMCost,
             });
             setSuccess("Countermeasure added");
             addingCMForId = "";
             newCMName = "";
             newCMDesc = "";
-            newCMEffectiveness = 3;
-            newCMCost = 3;
             await loadPaths();
         } catch (e) {
             setError(`Add countermeasure failed: ${e}`);
@@ -690,9 +698,6 @@
                                             <span class="att-name"
                                                 >⚠️ {wk.name}</span
                                             >
-                                            <span class="att-meta"
-                                                >Sev: {wk.severity}</span
-                                            >
                                             <button
                                                 class="att-del"
                                                 on:click|stopPropagation={() =>
@@ -738,6 +743,17 @@
                                             step.cost_probability,
                                         )}
                                     </div>
+                                    <button
+                                        class="att-del step-del"
+                                        on:click|stopPropagation={() =>
+                                            (deleteTarget = {
+                                                id: step.entity_id,
+                                                name: step.name,
+                                                type: "step-reparent",
+                                            })}
+                                        title="Remove step (keep chain)"
+                                        >✕</button
+                                    >
                                 </div>
 
                                 <!-- Countermeasures BELOW as defense nodes -->
@@ -746,24 +762,61 @@
                                             class="dashed-conn-defense"
                                         ></div>{/if}
                                     {#each step.countermeasures as cm (cm.id)}
-                                        <div class="node-box cm-box">
-                                            <div class="nb-type">DEFENSE</div>
-                                            <div class="nb-name">
-                                                🛡️ {cm.name}
+                                        <div class="cm-tree-group">
+                                            <div class="node-box cm-box">
+                                                <div class="nb-type">
+                                                    DEFENSE
+                                                </div>
+                                                <div class="nb-name">
+                                                    🛡️ {cm.name}
+                                                </div>
+
+                                                <button
+                                                    class="att-del"
+                                                    on:click|stopPropagation={() =>
+                                                        (deleteTarget = {
+                                                            id: cm.id,
+                                                            name: cm.name,
+                                                            type: "countermeasure",
+                                                        })}
+                                                    title="Remove">✕</button
+                                                >
                                             </div>
-                                            <div class="nb-meta">
-                                                Eff: {cm.effectiveness}
-                                            </div>
-                                            <button
-                                                class="att-del"
-                                                on:click|stopPropagation={() =>
-                                                    (deleteTarget = {
-                                                        id: cm.id,
-                                                        name: cm.name,
-                                                        type: "countermeasure",
-                                                    })}
-                                                title="Remove">✕</button
-                                            >
+                                            {#if cm.childSteps.length > 0}
+                                                <div class="cm-children">
+                                                    <div
+                                                        class="dashed-conn-defense"
+                                                    ></div>
+                                                    {#each cm.childSteps as cs (cs.id)}
+                                                        <div
+                                                            class="node-box cm-child-step-box"
+                                                        >
+                                                            <div
+                                                                class="nb-type"
+                                                            >
+                                                                BYPASS
+                                                            </div>
+                                                            <div
+                                                                class="nb-name"
+                                                            >
+                                                                ⚔️ {cs.name}
+                                                            </div>
+                                                            <button
+                                                                class="att-del"
+                                                                on:click|stopPropagation={() =>
+                                                                    (deleteTarget =
+                                                                        {
+                                                                            id: cs.id,
+                                                                            name: cs.name,
+                                                                            type: "step",
+                                                                        })}
+                                                                title="Remove"
+                                                                >✕</button
+                                                            >
+                                                        </div>
+                                                    {/each}
+                                                </div>
+                                            {/if}
                                         </div>
                                     {/each}
                                     <button
@@ -856,24 +909,46 @@
                                     >Access: {editAccess} ({accessLabels[
                                         editAccess - 1
                                     ]})</label
-                                ><input
-                                    type="range"
-                                    min="1"
-                                    max="5"
-                                    bind:value={editAccess}
-                                />
+                                >
+                                <div class="level-btns">
+                                    {#each [1, 2, 3, 4, 5] as v}
+                                        <button
+                                            class="lvl-btn"
+                                            class:active={editAccess === v}
+                                            class:low={v <= 2}
+                                            class:mid={v === 3}
+                                            class:high={v >= 4}
+                                            on:click={() => {
+                                                editAccess = v;
+                                            }}
+                                            title={accessLabels[v - 1]}
+                                            >{v}</button
+                                        >
+                                    {/each}
+                                </div>
                             </div>
                             <div class="fg">
                                 <label
                                     >Skill: {editSkill} ({skillLabels[
                                         editSkill - 1
                                     ]})</label
-                                ><input
-                                    type="range"
-                                    min="1"
-                                    max="5"
-                                    bind:value={editSkill}
-                                />
+                                >
+                                <div class="level-btns">
+                                    {#each [1, 2, 3, 4, 5] as v}
+                                        <button
+                                            class="lvl-btn"
+                                            class:active={editSkill === v}
+                                            class:low={v <= 2}
+                                            class:mid={v === 3}
+                                            class:high={v >= 4}
+                                            on:click={() => {
+                                                editSkill = v;
+                                            }}
+                                            title={skillLabels[v - 1]}
+                                            >{v}</button
+                                        >
+                                    {/each}
+                                </div>
                             </div>
                             <div class="fa">
                                 <button
@@ -1100,14 +1175,6 @@
                     placeholder="Description"
                 />
             </div>
-            <div class="fg">
-                <label>Severity: {newWKSeverity}</label><input
-                    type="range"
-                    min="1"
-                    max="5"
-                    bind:value={newWKSeverity}
-                />
-            </div>
             <div class="da">
                 <button
                     class="btn btn-sec"
@@ -1138,22 +1205,6 @@
                     class="inp"
                     bind:value={newCMDesc}
                     placeholder="Description"
-                />
-            </div>
-            <div class="fg">
-                <label>Effectiveness: {newCMEffectiveness}</label><input
-                    type="range"
-                    min="1"
-                    max="5"
-                    bind:value={newCMEffectiveness}
-                />
-            </div>
-            <div class="fg">
-                <label>Cost: {newCMCost}</label><input
-                    type="range"
-                    min="1"
-                    max="5"
-                    bind:value={newCMCost}
                 />
             </div>
             <div class="da">
@@ -1477,6 +1528,7 @@
     .step-box {
         border-color: #fc8181;
         background: #fff5f5;
+        position: relative;
     }
     .step-box:hover {
         border-color: #e53e3e;
@@ -1511,6 +1563,32 @@
         width: 0;
         border-left: 2px dashed #38a169;
         height: 12px;
+    }
+
+    /* Attack-Defense Tree: CM children */
+    .cm-tree-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .cm-children {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+    }
+    .cm-child-step-box {
+        border: 2px dashed #e53e3e;
+        background: #fff5f5;
+        position: relative;
+        min-width: 90px;
+        max-width: 160px;
+    }
+    .cm-child-step-box:hover {
+        border-color: #c53030;
+    }
+    .cm-child-step-box .nb-type {
+        color: #c53030;
     }
 
     .nb-type {
@@ -1608,6 +1686,13 @@
     .att-del:hover {
         background: #fed7d7;
     }
+    .step-del {
+        top: -6px;
+        right: -6px;
+        width: 16px;
+        height: 16px;
+        font-size: 0.55rem;
+    }
     .dashed-conn {
         width: 0;
         border-left: 2px dashed #1a202c;
@@ -1674,6 +1759,46 @@
         font-size: 0.82rem;
         font-family: inherit;
         box-sizing: border-box;
+    }
+    .level-btns {
+        display: flex;
+        gap: 3px;
+        margin-top: 4px;
+    }
+    .lvl-btn {
+        width: 30px;
+        height: 30px;
+        border: 2px solid #cbd5e0;
+        border-radius: 4px;
+        background: white;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 0.82rem;
+        color: #4a5568;
+        transition: all 0.12s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    }
+    .lvl-btn:hover {
+        border-color: #a0aec0;
+        background: #edf2f7;
+    }
+    .lvl-btn.active.low {
+        background: #c6f6d5;
+        border-color: #38a169;
+        color: #22543d;
+    }
+    .lvl-btn.active.mid {
+        background: #fefcbf;
+        border-color: #d69e2e;
+        color: #744210;
+    }
+    .lvl-btn.active.high {
+        background: #fed7d7;
+        border-color: #e53e3e;
+        color: #742a2a;
     }
     .fa,
     .da {

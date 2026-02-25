@@ -125,6 +125,9 @@ export const updateStep = (data: UpdateStep) =>
 export const deleteStep = (id: string) =>
   invoke<void>('delete_step', { id });
 
+export const deleteStepReparent = (id: string) =>
+  invoke<void>('delete_step_reparent', { id });
+
 // ─── Substeps ───────────────────────────────────────────────────
 export const createSubstep = (data: CreateSubstep) =>
   invoke<Substep>('create_substep', { data });
