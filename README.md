@@ -21,8 +21,10 @@ A desktop application for **attack-tree based threat modelling** of Industrial C
     - [Windows](#windows-1)
     - [Linux](#linux)
   - [Building from Source](#building-from-source)
-    - [Native Build](#native-build)
+    - [Native Build (Linux / macOS)](#native-build-linux--macos)
+    - [Native Build (Windows)](#native-build-windows)
     - [Docker Build](#docker-build)
+    - [Docker on Windows](#docker-on-windows)
   - [Usage](#usage)
     - [Creating a Project](#creating-a-project)
     - [Building Attack Trees](#building-attack-trees)
@@ -88,6 +90,45 @@ A desktop application for **attack-tree based threat modelling** of Industrial C
 | **WebView2**| Latest   | Pre-installed on Windows 10/11; or download from [Microsoft](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) |
 | **Visual Studio Build Tools** | 2019+ | Select "Desktop development with C++" workload |
 
+<details>
+<summary><strong>Step-by-step Windows install instructions</strong></summary>
+
+1. **Visual Studio Build Tools** (required for the Rust/C++ linker):
+   - Download from [visualstudio.microsoft.com](https://visualstudio.microsoft.com/visual-cpp-build-tools/).
+   - In the installer, select the **"Desktop development with C++"** workload.
+   - Alternatively, if you already have Visual Studio 2019/2022 installed with the C++ workload, you can skip this.
+
+2. **Rust** (via `winget` or the installer):
+   ```powershell
+   # Option A: winget (recommended)
+   winget install Rustlang.Rustup
+
+   # Option B: manual installer
+   # Download and run https://win.rustup.rs/x86_64
+   ```
+   After installation, open a **new** terminal and verify:
+   ```powershell
+   rustc --version   # should show 1.88+
+   cargo --version
+   ```
+
+3. **Node.js** (via `winget` or the installer):
+   ```powershell
+   # Option A: winget
+   winget install OpenJS.NodeJS.LTS
+
+   # Option B: download the .msi from https://nodejs.org/
+   ```
+   Verify (in a new terminal):
+   ```powershell
+   node --version   # should show v18+ (v22 recommended)
+   npm --version    # should show 9+
+   ```
+
+4. **WebView2** — Pre-installed on Windows 10 (version 1803+) and Windows 11. If missing, download the Evergreen Runtime from [Microsoft](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
+
+</details>
+
 ### Linux (Debian/Ubuntu)
 
 ```bash
@@ -149,9 +190,15 @@ Download the latest release for your platform from the [Releases](../../releases
 
 ### Windows
 
-1. Download and run the installer.
-2. The application installs to `C:\Program Files\ICS Threat Modeller\`.
+**Option A — Pre-built installer (when available):**
+
+1. Download `ICS-Threat-Modeller_x.y.z_x64-setup.exe` or `.msi` from the [Releases](../../releases) page.
+2. Run the installer — the application installs to `C:\Program Files\ICS Threat Modeller\`.
 3. Launch from the Start Menu or desktop shortcut.
+
+**Option B — Run via Docker Desktop (no build tools required):**
+
+See the [Docker on Windows](#docker-on-windows) section below.
 
 ### Linux
 
@@ -168,7 +215,7 @@ chmod +x ICS-Threat-Modeller_x.y.z_amd64.AppImage
 
 ## Building from Source
 
-### Native Build
+### Native Build (Linux / macOS)
 
 ```bash
 # 1. Clone the repository
@@ -186,6 +233,35 @@ npm run tauri build
 ```
 
 The built application will be in `src-tauri/target/release/bundle/`.
+
+### Native Build (Windows)
+
+Open **PowerShell** (or Windows Terminal) and run:
+
+```powershell
+# 1. Clone the repository
+git clone https://github.com/your-org/ics-threat-modeller.git
+cd ics-threat-modeller
+
+# 2. Install frontend dependencies
+npm install
+
+# 3. Development mode (hot-reload)
+npm run tauri dev
+
+# 4. Production build
+npm run tauri build
+```
+
+The built installer/executable will be in:
+- `src-tauri\target\release\bundle\msi\` — `.msi` installer
+- `src-tauri\target\release\bundle\nsis\` — `.exe` installer
+- `src-tauri\target\release\ics-threat-modeller.exe` — standalone binary
+
+> **Troubleshooting (Windows):**
+> - If `npm run tauri dev` fails with a linker error, ensure Visual Studio Build Tools are installed with the C++ workload.
+> - If you see `error: linker 'link.exe' not found`, open the "x64 Native Tools Command Prompt for VS" instead of a regular terminal.
+> - WebView2-related errors usually mean the runtime is missing — install it from [Microsoft](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
 
 ### Docker Build
 
@@ -243,6 +319,54 @@ docker run --rm -v "$(pwd)/output:/output" ics-build sh -c \
 docker run --rm -p 6080:6080 ics-threat-modeller
 # Then open http://localhost:6080/vnc.html?autoconnect=true
 ```
+
+### Docker on Windows
+
+You can run the application on Windows without installing Rust, Node.js, or any build tools — only **Docker Desktop** is needed.
+
+**1. Install Docker Desktop:**
+
+- Download from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/) and run the installer.
+- During setup, enable the **WSL 2 backend** (recommended) or Hyper-V backend.
+- After installation, open Docker Desktop and wait for the engine to start (the whale icon in the system tray turns steady).
+- Verify in PowerShell:
+  ```powershell
+  docker --version
+  docker compose version
+  ```
+
+**2. Clone and build:**
+
+```powershell
+# Clone the repository
+git clone https://github.com/your-org/ics-threat-modeller.git
+cd ics-threat-modeller
+
+# Build the Docker image
+docker compose build ics-threat-modeller
+```
+
+**3. Run the application:**
+
+```powershell
+docker compose up ics-threat-modeller
+```
+
+Then open your browser at **http://localhost:6080/vnc.html?autoconnect=true**.
+
+The application runs inside the container with a virtual display and is streamed to your browser via noVNC. No additional software is needed.
+
+**4. Stop the application:**
+
+Press `Ctrl+C` in the terminal, or run:
+```powershell
+docker compose down
+```
+
+> **Note:** The Docker container builds and runs a **Linux** binary.
+> It cannot produce a Windows `.exe`. If you need a native Windows
+> installer, use the [Native Build (Windows)](#native-build-windows)
+> instructions instead.
 
 ---
 
