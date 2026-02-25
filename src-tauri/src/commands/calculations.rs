@@ -167,7 +167,14 @@ pub fn calculate_attack_paths(
     Ok(paths)
 }
 
-/// Extract all leaf-to-root paths through the attack tree for a goal.
+/// Maximum number of enumerated paths (safety limit against combinatorial explosion).
+const MAX_PATHS: usize = 500;
+
+/// Extract all viable attack paths through the tree for a goal.
+///
+/// Paths respect AND/OR conjunction semantics:
+/// - OR children produce *separate* alternative paths (fork).
+/// - AND children are *combined* into the same path (sequential).
 fn extract_paths_for_goal(
     conn: &rusqlite::Connection,
     project_id: &str,
@@ -176,28 +183,21 @@ fn extract_paths_for_goal(
     access_probs: &HashMap<i32, f64>,
     attacker_skill: i32,
 ) -> Result<Vec<AttackPath>, String> {
-    // Get all direct children (steps and categories) of this goal.
     let steps = get_child_steps(conn, goal_id, "goal")?;
     let categories = get_child_categories(conn, goal_id, "goal")?;
 
-    let mut all_leaf_paths: Vec<Vec<PathStepInfo>> = Vec::new();
+    // Collect path-sets from each direct child / category.
+    let mut child_path_sets: Vec<Vec<Vec<PathStepInfo>>> = Vec::new();
 
-    // Collect paths from direct steps.
     for step in &steps {
-        let mut current_path = Vec::new();
-        collect_leaf_paths(
-            conn,
-            project_id,
-            step,
-            &mut current_path,
-            &mut all_leaf_paths,
-        )?;
+        child_path_sets.push(enumerate_step_paths(conn, step)?);
+    }
+    for cat in &categories {
+        child_path_sets.push(enumerate_category_paths(conn, &cat.0)?);
     }
 
-    // Collect paths from categories (recursively down to steps).
-    for cat in &categories {
-        collect_category_paths(conn, project_id, &cat.0, &mut all_leaf_paths)?;
-    }
+    // Goal level: always OR – each direct child is an independent attack vector.
+    let all_leaf_paths: Vec<Vec<PathStepInfo>> = child_path_sets.into_iter().flatten().collect();
 
     // Build AttackPath for each extracted path.
     let mut result = Vec::new();
@@ -323,34 +323,33 @@ fn get_child_categories(
     Ok(items)
 }
 
-fn collect_category_paths(
+/// Enumerate all viable paths rooted at categories under a parent.
+fn enumerate_category_paths(
     conn: &rusqlite::Connection,
-    project_id: &str,
     cat_id: &str,
-    all_paths: &mut Vec<Vec<PathStepInfo>>,
-) -> Result<(), String> {
+) -> Result<Vec<Vec<PathStepInfo>>, String> {
     let steps = get_child_steps(conn, cat_id, "category")?;
-    for step in &steps {
-        let mut current_path = Vec::new();
-        collect_leaf_paths(conn, project_id, step, &mut current_path, all_paths)?;
-    }
-
-    // Recurse into subcategories.
     let subcats = get_child_categories(conn, cat_id, "category")?;
-    for (sub_id,) in &subcats {
-        collect_category_paths(conn, project_id, sub_id, all_paths)?;
-    }
 
-    Ok(())
+    let mut all: Vec<Vec<PathStepInfo>> = Vec::new();
+    for step in &steps {
+        all.extend(enumerate_step_paths(conn, step)?);
+    }
+    for (sub_id,) in &subcats {
+        all.extend(enumerate_category_paths(conn, sub_id)?);
+    }
+    Ok(all)
 }
 
-fn collect_leaf_paths(
+/// Return all viable paths that start at `step`, recursing into children.
+///
+/// - OR children produce independent alternative paths.
+/// - AND children are merged via cartesian product so every child appears
+///   in every resulting path.
+fn enumerate_step_paths(
     conn: &rusqlite::Connection,
-    project_id: &str,
     step: &ChildStep,
-    current_path: &mut Vec<PathStepInfo>,
-    all_paths: &mut Vec<Vec<PathStepInfo>>,
-) -> Result<(), String> {
+) -> Result<Vec<Vec<PathStepInfo>>, String> {
     let info = PathStepInfo {
         id: step.id.clone(),
         entity_type: "step".to_string(),
@@ -359,9 +358,8 @@ fn collect_leaf_paths(
         skill_level: step.skill_level,
         conjunction: step.conjunction.clone(),
     };
-    current_path.push(info);
 
-    // Get substeps.
+    // Gather substeps.
     let substeps: Vec<(String, String, i32, i32, String)> = {
         let mut stmt = conn
             .prepare("SELECT id, name, access_level, skill_level, conjunction FROM substeps WHERE parent_step_id = ?1 ORDER BY sort_order")
@@ -381,51 +379,80 @@ fn collect_leaf_paths(
             .map_err(|e| e.to_string())?
     };
 
-    // Get child steps (steps with parent_type='step').
+    // Gather child steps (parent_type = 'step').
     let child_steps = get_child_steps(conn, &step.id, "step")?;
 
-    if substeps.is_empty() && child_steps.is_empty() {
-        // This is a leaf node — record the path.
-        all_paths.push(current_path.clone());
-    } else {
-        // Add substeps to the path.
-        for (ss_id, ss_name, ss_access, ss_skill, ss_conj) in &substeps {
-            let sub_info = PathStepInfo {
-                id: ss_id.clone(),
-                entity_type: "substep".to_string(),
-                name: ss_name.clone(),
-                access_level: *ss_access,
-                skill_level: *ss_skill,
-                conjunction: ss_conj.clone(),
-            };
-            let mut extended = current_path.clone();
-            extended.push(sub_info);
-            all_paths.push(extended);
-        }
+    // Gather categories under this step.
+    let step_cats = get_child_categories(conn, &step.id, "step")?;
 
-        // Recurse into child steps.
-        for child in &child_steps {
-            collect_leaf_paths(conn, project_id, child, current_path, all_paths)?;
-        }
+    // Build child path sets.
+    let mut child_path_sets: Vec<Vec<Vec<PathStepInfo>>> = Vec::new();
 
-        // Recurse into categories under this step.
-        let step_cats = get_child_categories(conn, &step.id, "step")?;
-        for (cat_id,) in &step_cats {
-            collect_category_paths(conn, project_id, cat_id, all_paths)?;
-        }
-
-        // If there were substeps but no child steps, path was already recorded.
-        // If no substeps but child steps exist, recursion handled it.
-        // If both exist, both are recorded.
-        if substeps.is_empty() && !child_steps.is_empty() {
-            // Already handled by recursion.
-        } else if !substeps.is_empty() && child_steps.is_empty() {
-            // Already handled above.
-        }
+    for child in &child_steps {
+        child_path_sets.push(enumerate_step_paths(conn, child)?);
+    }
+    for (cat_id,) in &step_cats {
+        child_path_sets.push(enumerate_category_paths(conn, cat_id)?);
+    }
+    for (ss_id, ss_name, ss_access, ss_skill, ss_conj) in &substeps {
+        let sub_info = PathStepInfo {
+            id: ss_id.clone(),
+            entity_type: "substep".to_string(),
+            name: ss_name.clone(),
+            access_level: *ss_access,
+            skill_level: *ss_skill,
+            conjunction: ss_conj.clone(),
+        };
+        child_path_sets.push(vec![vec![sub_info]]);
     }
 
-    current_path.pop();
-    Ok(())
+    if child_path_sets.is_empty() {
+        // Leaf node – single path containing just this step.
+        return Ok(vec![vec![info]]);
+    }
+
+    // Use THIS step's conjunction to decide how its children combine:
+    // AND = all children required (cartesian product of sub-paths).
+    // OR  = each child is an independent alternative.
+    let sub_paths = match step.conjunction.as_str() {
+        "AND" => cartesian_product_paths(&child_path_sets),
+        _ => child_path_sets.into_iter().flatten().collect(),
+    };
+
+    // Prefix every sub-path with the current step.
+    let result = sub_paths
+        .into_iter()
+        .map(|mut p| {
+            let mut full = vec![info.clone()];
+            full.append(&mut p);
+            full
+        })
+        .collect();
+
+    Ok(result)
+}
+
+/// Compute the cartesian product of multiple path-sets, capping at MAX_PATHS.
+fn cartesian_product_paths(sets: &[Vec<Vec<PathStepInfo>>]) -> Vec<Vec<PathStepInfo>> {
+    let mut combined: Vec<Vec<PathStepInfo>> = vec![vec![]];
+    for set in sets {
+        if set.is_empty() {
+            continue;
+        }
+        let mut next: Vec<Vec<PathStepInfo>> = Vec::new();
+        for existing in &combined {
+            for addition in set {
+                let mut merged = existing.clone();
+                merged.extend(addition.iter().cloned());
+                next.push(merged);
+                if next.len() >= MAX_PATHS {
+                    return next;
+                }
+            }
+        }
+        combined = next;
+    }
+    combined
 }
 
 /// Get the factor weights for a project, with defaults.
