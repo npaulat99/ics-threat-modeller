@@ -386,8 +386,7 @@ jobs:
           docker build --target builder -t ics-build .
           mkdir -p release-staging
           docker run --rm -v "$(pwd)/release-staging:/output" ics-build sh -c \
-            'cp /app/src-tauri/target/release/ics-threat-modeller /output/'
-          chmod +x release-staging/ics-threat-modeller
+            'cp /app/src-tauri/target/release/ics-threat-modeller /output/ && chmod +x /output/ics-threat-modeller'
           ls -lh release-staging/
 
       - name: Smoke-test binary
