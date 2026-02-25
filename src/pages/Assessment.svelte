@@ -168,9 +168,12 @@
 
   async function recalcPaths() {
     if (!selectedGoalId || !$currentProject) return;
+    // Compute profile directly to avoid stale reactive value
+    const activeProfile =
+      profiles.find((p: AttackerProfile) => p.id === selectedProfileId) ?? null;
     try {
-      const skill = selectedProfile?.skill_level;
-      const access = selectedProfile?.access_level;
+      const skill = activeProfile?.skill_level;
+      const access = activeProfile?.access_level;
       attackPaths = await api.calculateAttackPaths(
         $currentProject.id,
         selectedGoalId,
@@ -325,6 +328,9 @@
       setError(`Load assessments failed: ${e}`);
     }
   }
+
+  $: selectedEntity =
+    leafEntities.find((e) => e.id === selectedEntityId) ?? null;
 
   async function handleSaveAssessment(data: CreateAssessment) {
     try {
@@ -496,6 +502,27 @@
 
       <div class="assessment-area">
         {#if selectedEntityId}
+          {#if selectedEntity}
+            <div class="entity-info-bar">
+              <span class="entity-name">{selectedEntity.name}</span>
+              <div class="entity-reqs">
+                {#if selectedEntity.accessLevel}
+                  <span class="tag access"
+                    >🔑 Needed Access: {selectedEntity.accessLevel}/5 ({accessLabels[
+                      selectedEntity.accessLevel - 1
+                    ]})</span
+                  >
+                {/if}
+                {#if selectedEntity.skillLevel}
+                  <span class="tag skill"
+                    >🎓 Needed Skill: {selectedEntity.skillLevel}/5 ({skillLabels[
+                      selectedEntity.skillLevel - 1
+                    ]})</span
+                  >
+                {/if}
+              </div>
+            </div>
+          {/if}
           <AssessmentForm
             entityId={selectedEntityId}
             entityType={selectedEntityType}
@@ -576,6 +603,26 @@
 </div>
 
 <style>
+  .entity-info-bar {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .entity-info-bar .entity-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .entity-info-bar .entity-reqs {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
   .assessment-page {
     max-width: 1100px;
     margin: 0 auto;

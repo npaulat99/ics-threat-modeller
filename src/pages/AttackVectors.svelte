@@ -582,7 +582,8 @@
                         <span class="tag tag-warn">unrealistic</span>
                     {/if}
                     <span class="path-meta">
-                        🔑 max access {path.max_access_level} · 🎓 max skill {path.max_skill_level}
+                        🔑 needed access {path.max_access_level} · 🎓 needed skill
+                        {path.max_skill_level}
                     </span>
                     <button
                         class="btn btn-sm btn-sec"
@@ -675,6 +676,15 @@
                             >
                                 <!-- Weaknesses ABOVE -->
                                 <div class="attachments att-top">
+                                    <button
+                                        class="add-circle add-circle-sm"
+                                        on:click|stopPropagation={() => {
+                                            addingWKForId = step.entity_id;
+                                            addingWKForType = step.entity_type;
+                                            addingCMForId = "";
+                                        }}
+                                        title="Add Weakness">+</button
+                                    >
                                     {#each step.weaknesses as wk (wk.id)}
                                         <div class="att-card att-weakness">
                                             <span class="att-name"
@@ -698,15 +708,6 @@
                                     {#if step.weaknesses.length > 0}<div
                                             class="dashed-conn"
                                         ></div>{/if}
-                                    <button
-                                        class="add-circle add-circle-sm"
-                                        on:click|stopPropagation={() => {
-                                            addingWKForId = step.entity_id;
-                                            addingWKForType = step.entity_type;
-                                            addingCMForId = "";
-                                        }}
-                                        title="Add Weakness">+</button
-                                    >
                                 </div>
 
                                 <!-- Node box -->
@@ -741,17 +742,10 @@
 
                                 <!-- Countermeasures BELOW as defense nodes -->
                                 <div class="attachments att-bottom">
-                                    <button
-                                        class="add-circle add-circle-sm"
-                                        on:click|stopPropagation={() => {
-                                            addingCMForId = step.entity_id;
-                                            addingCMForType = step.entity_type;
-                                            addingWKForId = "";
-                                        }}
-                                        title="Add Countermeasure">+</button
-                                    >
+                                    {#if step.countermeasures.length > 0}<div
+                                            class="dashed-conn-defense"
+                                        ></div>{/if}
                                     {#each step.countermeasures as cm (cm.id)}
-                                        <div class="dashed-conn-defense"></div>
                                         <div class="node-box cm-box">
                                             <div class="nb-type">DEFENSE</div>
                                             <div class="nb-name">
@@ -772,6 +766,15 @@
                                             >
                                         </div>
                                     {/each}
+                                    <button
+                                        class="add-circle add-circle-sm"
+                                        on:click|stopPropagation={() => {
+                                            addingCMForId = step.entity_id;
+                                            addingCMForType = step.entity_type;
+                                            addingWKForId = "";
+                                        }}
+                                        title="Add Countermeasure">+</button
+                                    >
                                 </div>
                             </div>
                         {/each}
@@ -1428,9 +1431,9 @@
 
     /* ── Node column ── */
     .node-column {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+        display: grid;
+        grid-template-rows: 1fr auto 1fr;
+        justify-items: center;
         gap: 3px;
         flex-shrink: 0;
         min-width: 120px;
@@ -1550,7 +1553,10 @@
         min-height: 28px;
     }
     .att-top {
-        flex-direction: column-reverse;
+        align-self: end;
+    }
+    .att-bottom {
+        align-self: start;
     }
     .att-card {
         border: 1px solid #e2e8f0;

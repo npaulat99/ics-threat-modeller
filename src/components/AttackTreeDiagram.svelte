@@ -75,7 +75,10 @@
             <div class="children-row">
               {#each node.children as child (child.id)}
                 <div class="child-branch">
-                  <div class="child-connector-line"></div>
+                  <div
+                    class="child-connector-line"
+                    class:dashed-line={child.type === "countermeasure"}
+                  ></div>
                   <svelte:self nodes={[child]} {onSelect} {selectedId} />
                 </div>
               {/each}
@@ -137,7 +140,7 @@
   }
 
   .tree-node-box.countermeasure-node {
-    border-style: dashed;
+    border-style: solid;
     border-width: 2px;
     background: #f0fff4;
   }
@@ -225,5 +228,10 @@
     width: 2px;
     height: 16px;
     background: #a0aec0;
+  }
+
+  .child-connector-line.dashed-line {
+    background: none;
+    border-left: 2px dashed #38a169;
   }
 </style>

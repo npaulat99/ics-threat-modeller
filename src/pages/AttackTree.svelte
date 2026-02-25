@@ -147,7 +147,7 @@
         for (const cm of subCms) {
           subCmChildren.push({
             id: cm.id,
-            name: `🛡️ ${cm.name}`,
+            name: cm.name,
             type: "countermeasure",
             children: [],
             data: cm,
@@ -170,7 +170,7 @@
       for (const cm of cms) {
         children.push({
           id: cm.id,
-          name: `🛡️ ${cm.name}`,
+          name: cm.name,
           type: "countermeasure",
           children: [],
           data: cm,
@@ -1054,18 +1054,25 @@
     overflow: hidden;
   }
 
+  .detail-panel {
+    overflow-y: auto;
+  }
+
   .diagram-panel {
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     margin-top: 20px;
     overflow: hidden;
+    position: relative;
+    z-index: 0;
   }
 
   .diagram-scroll {
     overflow: auto;
     max-height: 400px;
     padding: 8px;
+    contain: paint;
   }
 
   .panel-header {
