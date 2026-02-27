@@ -1056,6 +1056,7 @@
     flex-direction: column;
     overflow: hidden;
     min-height: 0;
+    max-height: calc(100vh - 240px);
   }
 
   .detail-panel {
