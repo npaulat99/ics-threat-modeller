@@ -1,0 +1,40 @@
+- name: PLC
+  description: Programmable Logic Controller
+- name: RTU
+  description: Remote Terminal Unit
+- name: HMI
+  description: Human-Machine Interface
+- name: SCADA Server
+  description: Supervisory Control and Data Acquisition server
+- name: DCS Controller
+  description: Distributed Control System controller
+- name: Engineering Workstation
+  description: Used for programming and configuring controllers
+- name: Historian
+  description: Data historian / process data archive
+- name: Safety System (SIS)
+  description: Safety Instrumented System
+- name: IED
+  description: Intelligent Electronic Device
+- name: Sensor
+  description: Field sensor / transmitter
+- name: Actuator
+  description: Field actuator (valve, motor, relay)
+- name: Network Switch
+  description: Industrial Ethernet switch
+- name: Firewall
+  description: Network firewall / security appliance
+- name: Data Diode
+  description: Unidirectional security gateway
+- name: Wireless Access Point
+  description: Industrial wireless AP
+- name: Gateway
+  description: Protocol or network gateway
+- name: VFD
+  description: Variable Frequency Drive
+- name: Power Supply
+  description: Redundant / UPS power supply
+- name: I/O Module
+  description: Remote or local I/O module
+- name: Edge Gateway
+  description: Industrial IoT edge gateway

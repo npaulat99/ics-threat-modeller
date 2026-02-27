@@ -88,17 +88,12 @@ pub fn init_catalog_repo() -> Result<(), String> {
     let catalog_dir = repo_dir.join("catalog");
     let tag_dir = repo_dir.join("tag-catalog");
 
-    fs::create_dir_all(&catalog_dir)
-        .map_err(|e| format!("Failed to create catalog dir: {e}"))?;
-    fs::create_dir_all(&tag_dir)
-        .map_err(|e| format!("Failed to create tag-catalog dir: {e}"))?;
+    fs::create_dir_all(&catalog_dir).map_err(|e| format!("Failed to create catalog dir: {e}"))?;
+    fs::create_dir_all(&tag_dir).map_err(|e| format!("Failed to create tag-catalog dir: {e}"))?;
 
     // Check if catalog already has YAML files.
     let has_catalog_files = fs::read_dir(&catalog_dir)
-        .map(|rd| {
-            rd.filter_map(|e| e.ok())
-                .any(|e| is_yaml_file(&e.path()))
-        })
+        .map(|rd| rd.filter_map(|e| e.ok()).any(|e| is_yaml_file(&e.path())))
         .unwrap_or(false);
 
     if has_catalog_files {
@@ -146,15 +141,12 @@ fn write_default_catalog_entries(catalog_dir: &Path) -> Result<(), String> {
 }
 
 fn write_default_tag_catalog(tag_dir: &Path) -> Result<(), String> {
-    let (assets, interfaces, third_party) =
-        crate::commands::tag_catalog::get_default_tag_data();
+    let (assets, interfaces, third_party) = crate::commands::tag_catalog::get_default_tag_data();
 
     // assets.yaml
     let assets_data: Vec<serde_json::Value> = assets
         .iter()
-        .map(|(name, desc)| {
-            serde_json::json!({ "name": name, "description": desc })
-        })
+        .map(|(name, desc)| serde_json::json!({ "name": name, "description": desc }))
         .collect();
     let yaml = serde_yml::to_string(&assets_data).map_err(|e| e.to_string())?;
     fs::write(tag_dir.join("assets.yaml"), yaml)
@@ -163,9 +155,7 @@ fn write_default_tag_catalog(tag_dir: &Path) -> Result<(), String> {
     // interfaces.yaml
     let iface_data: Vec<serde_json::Value> = interfaces
         .iter()
-        .map(|(name, desc)| {
-            serde_json::json!({ "name": name, "description": desc })
-        })
+        .map(|(name, desc)| serde_json::json!({ "name": name, "description": desc }))
         .collect();
     let yaml = serde_yml::to_string(&iface_data).map_err(|e| e.to_string())?;
     fs::write(tag_dir.join("interfaces.yaml"), yaml)
@@ -174,9 +164,7 @@ fn write_default_tag_catalog(tag_dir: &Path) -> Result<(), String> {
     // third-party-software.yaml
     let tp_data: Vec<serde_json::Value> = third_party
         .iter()
-        .map(|(name, desc)| {
-            serde_json::json!({ "name": name, "description": desc })
-        })
+        .map(|(name, desc)| serde_json::json!({ "name": name, "description": desc }))
         .collect();
     let yaml = serde_yml::to_string(&tp_data).map_err(|e| e.to_string())?;
     fs::write(tag_dir.join("third-party-software.yaml"), yaml)
@@ -200,14 +188,20 @@ struct CatalogFileEntry {
 }
 
 /// Load catalog entries from YAML files in catalog-repo/catalog/ and upsert into DB.
+/// Entries in the DB that are not present in the YAML files are deleted.
+/// The catalog-repo is the single source of truth.
 pub fn sync_catalog_entries_from_repo(conn: &rusqlite::Connection) -> Result<usize, String> {
     let catalog_dir = get_catalog_repo_dir().join("catalog");
     if !catalog_dir.is_dir() {
+        // No catalog directory — clear all catalog entries from DB.
+        conn.execute("DELETE FROM catalog_entries", [])
+            .map_err(|e| e.to_string())?;
         return Ok(0);
     }
 
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut count = 0;
+    let mut synced_names: Vec<String> = Vec::new();
 
     let entries = fs::read_dir(&catalog_dir).map_err(|e| e.to_string())?;
 
@@ -223,10 +217,11 @@ pub fn sync_catalog_entries_from_repo(conn: &rusqlite::Connection) -> Result<usi
         let file_entry: CatalogFileEntry = serde_yml::from_str(&content)
             .map_err(|e| format!("Failed to parse {}: {e}", path.display()))?;
 
-        let tree_data_str = serde_json::to_string(&file_entry.tree_data)
-            .map_err(|e| e.to_string())?;
-        let tags_str = serde_json::to_string(&file_entry.tags)
-            .map_err(|e| e.to_string())?;
+        let tree_data_str =
+            serde_json::to_string(&file_entry.tree_data).map_err(|e| e.to_string())?;
+        let tags_str = serde_json::to_string(&file_entry.tags).map_err(|e| e.to_string())?;
+
+        synced_names.push(file_entry.name.clone());
 
         // Upsert by name: if entry with same name exists, update; otherwise insert.
         let existing_id: Option<String> = conn
@@ -278,6 +273,28 @@ pub fn sync_catalog_entries_from_repo(conn: &rusqlite::Connection) -> Result<usi
         count += 1;
     }
 
+    // Delete catalog entries from DB that are no longer present in the YAML files.
+    if synced_names.is_empty() {
+        conn.execute("DELETE FROM catalog_entries", [])
+            .map_err(|e| e.to_string())?;
+    } else {
+        let placeholders: Vec<String> = synced_names
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect();
+        let sql = format!(
+            "DELETE FROM catalog_entries WHERE name NOT IN ({})",
+            placeholders.join(", ")
+        );
+        let params: Vec<&dyn rusqlite::types::ToSql> = synced_names
+            .iter()
+            .map(|s| s as &dyn rusqlite::types::ToSql)
+            .collect();
+        conn.execute(&sql, params.as_slice())
+            .map_err(|e| e.to_string())?;
+    }
+
     Ok(count)
 }
 
@@ -289,14 +306,21 @@ struct TagCatalogFileEntry {
 }
 
 /// Load tag catalog entries from YAML files in catalog-repo/tag-catalog/ and upsert into DB.
+/// Entries in the DB that are not present in the YAML files are deleted.
+/// The catalog-repo is the single source of truth.
 pub fn sync_tag_catalog_from_repo(conn: &rusqlite::Connection) -> Result<usize, String> {
     let tag_dir = get_catalog_repo_dir().join("tag-catalog");
     if !tag_dir.is_dir() {
+        // No tag-catalog directory — clear all tag catalog entries from DB.
+        conn.execute("DELETE FROM tag_catalog", [])
+            .map_err(|e| e.to_string())?;
         return Ok(0);
     }
 
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut count = 0;
+    // Track all (category, name) pairs that were synced so we can delete stale ones.
+    let mut synced_pairs: Vec<(String, String)> = Vec::new();
 
     // Map filenames to categories.
     let category_files: Vec<(&str, &str)> = vec![
@@ -314,13 +338,15 @@ pub fn sync_tag_catalog_from_repo(conn: &rusqlite::Connection) -> Result<usize, 
             continue;
         }
 
-        let content = fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read {filename}: {e}"))?;
+        let content =
+            fs::read_to_string(&path).map_err(|e| format!("Failed to read {filename}: {e}"))?;
 
         let entries: Vec<TagCatalogFileEntry> = serde_yml::from_str(&content)
             .map_err(|e| format!("Failed to parse {filename}: {e}"))?;
 
         for entry in &entries {
+            synced_pairs.push((category.to_string(), entry.name.clone()));
+
             // Upsert by (category, name).
             let existing_id: Option<String> = conn
                 .query_row(
@@ -348,6 +374,34 @@ pub fn sync_tag_catalog_from_repo(conn: &rusqlite::Connection) -> Result<usize, 
 
             count += 1;
         }
+    }
+
+    // Delete tag catalog entries from DB that are no longer present in the YAML files.
+    if synced_pairs.is_empty() {
+        conn.execute("DELETE FROM tag_catalog", [])
+            .map_err(|e| e.to_string())?;
+    } else {
+        // Build a WHERE clause that excludes all synced (category, name) pairs.
+        let conditions: Vec<String> = synced_pairs
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("(category = ?{} AND name = ?{})", i * 2 + 1, i * 2 + 2))
+            .collect();
+        let sql = format!(
+            "DELETE FROM tag_catalog WHERE NOT ({})",
+            conditions.join(" OR ")
+        );
+        let params: Vec<&dyn rusqlite::types::ToSql> = synced_pairs
+            .iter()
+            .flat_map(|(cat, name)| {
+                vec![
+                    cat as &dyn rusqlite::types::ToSql,
+                    name as &dyn rusqlite::types::ToSql,
+                ]
+            })
+            .collect();
+        conn.execute(&sql, params.as_slice())
+            .map_err(|e| e.to_string())?;
     }
 
     Ok(count)
@@ -389,8 +443,7 @@ pub fn save_project_to_directory(
     let slug = slugify(&export.project.name);
     let project_dir = get_projects_dir().join(&slug);
 
-    fs::create_dir_all(&project_dir)
-        .map_err(|e| format!("Failed to create project dir: {e}"))?;
+    fs::create_dir_all(&project_dir).map_err(|e| format!("Failed to create project dir: {e}"))?;
 
     // 1) Write combined project-export.yaml (source of truth for import).
     let combined_yaml = serde_yml::to_string(&export).map_err(|e| e.to_string())?;
@@ -443,10 +496,8 @@ fn write_project_individual_files(export: &ProjectExport, dir: &Path) -> Result<
         let goal_dir = dir.join("goals").join(&goal_export.goal.id);
         fs::create_dir_all(&goal_dir).map_err(|e| e.to_string())?;
 
-        let goal_yaml =
-            serde_yml::to_string(&goal_export.goal).map_err(|e| e.to_string())?;
-        fs::write(goal_dir.join("goal.yaml"), goal_yaml)
-            .map_err(|e| e.to_string())?;
+        let goal_yaml = serde_yml::to_string(&goal_export.goal).map_err(|e| e.to_string())?;
+        fs::write(goal_dir.join("goal.yaml"), goal_yaml).map_err(|e| e.to_string())?;
 
         // Steps under this goal.
         for step_export in &goal_export.steps {
@@ -462,15 +513,13 @@ fn write_project_individual_files(export: &ProjectExport, dir: &Path) -> Result<
     // Catalog sources.
     if !export.catalog_sources.is_empty() {
         let yaml = serde_yml::to_string(&export.catalog_sources).map_err(|e| e.to_string())?;
-        fs::write(dir.join("catalog-sources.yaml"), yaml)
-            .map_err(|e| e.to_string())?;
+        fs::write(dir.join("catalog-sources.yaml"), yaml).map_err(|e| e.to_string())?;
     }
 
     // Change log.
     if !export.change_log.is_empty() {
         let yaml = serde_yml::to_string(&export.change_log).map_err(|e| e.to_string())?;
-        fs::write(dir.join("changelog.yaml"), yaml)
-            .map_err(|e| e.to_string())?;
+        fs::write(dir.join("changelog.yaml"), yaml).map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -507,8 +556,7 @@ fn write_step_files(step_export: &StepExport, parent_dir: &Path) -> Result<(), S
         fs::create_dir_all(&cm_dir).map_err(|e| e.to_string())?;
         for cm in &step_export.countermeasures {
             let yaml = serde_yml::to_string(cm).map_err(|e| e.to_string())?;
-            fs::write(cm_dir.join(format!("{}.yaml", cm.id)), yaml)
-                .map_err(|e| e.to_string())?;
+            fs::write(cm_dir.join(format!("{}.yaml", cm.id)), yaml).map_err(|e| e.to_string())?;
         }
     }
 
@@ -518,8 +566,7 @@ fn write_step_files(step_export: &StepExport, parent_dir: &Path) -> Result<(), S
         fs::create_dir_all(&w_dir).map_err(|e| e.to_string())?;
         for w in &step_export.weaknesses {
             let yaml = serde_yml::to_string(w).map_err(|e| e.to_string())?;
-            fs::write(w_dir.join(format!("{}.yaml", w.id)), yaml)
-                .map_err(|e| e.to_string())?;
+            fs::write(w_dir.join(format!("{}.yaml", w.id)), yaml).map_err(|e| e.to_string())?;
         }
     }
 
@@ -531,8 +578,11 @@ fn write_category_files(cat_export: &CategoryExport, parent_dir: &Path) -> Resul
     fs::create_dir_all(&cat_dir).map_err(|e| e.to_string())?;
 
     let yaml = serde_yml::to_string(&cat_export.category).map_err(|e| e.to_string())?;
-    fs::write(cat_dir.join(format!("{}.yaml", cat_export.category.id)), yaml)
-        .map_err(|e| e.to_string())?;
+    fs::write(
+        cat_dir.join(format!("{}.yaml", cat_export.category.id)),
+        yaml,
+    )
+    .map_err(|e| e.to_string())?;
 
     // Steps in this category.
     for step_export in &cat_export.steps {
@@ -567,8 +617,8 @@ pub fn load_project_from_directory(
     let yaml_str = fs::read_to_string(&export_file)
         .map_err(|e| format!("Failed to read project-export.yaml: {e}"))?;
 
-    let export: ProjectExport = serde_yml::from_str(&yaml_str)
-        .map_err(|e| format!("Invalid project-export.yaml: {e}"))?;
+    let export: ProjectExport =
+        serde_yml::from_str(&yaml_str).map_err(|e| format!("Invalid project-export.yaml: {e}"))?;
 
     super::export_import::import_project_data(&db, export)
 }

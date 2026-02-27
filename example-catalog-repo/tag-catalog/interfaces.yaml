@@ -1,0 +1,56 @@
+- name: Ethernet/IP
+  description: Industrial Ethernet protocol (CIP-based)
+- name: Modbus TCP
+  description: Modbus over TCP/IP
+- name: Modbus RTU
+  description: Modbus over serial RS-485/RS-232
+- name: PROFINET
+  description: Siemens PROFINET industrial Ethernet
+- name: PROFIBUS
+  description: Siemens PROFIBUS fieldbus
+- name: OPC UA
+  description: OPC Unified Architecture
+- name: OPC DA/HDA
+  description: OPC Classic (Data Access / Historical Data Access)
+- name: DNP3
+  description: Distributed Network Protocol 3
+- name: IEC 61850
+  description: Substation communication standard
+- name: IEC 60870-5-104
+  description: Telecontrol protocol (IEC 104)
+- name: BACnet
+  description: Building Automation and Control Networks
+- name: HART
+  description: Highway Addressable Remote Transducer
+- name: Foundation Fieldbus
+  description: Process automation fieldbus
+- name: CANbus
+  description: Controller Area Network bus
+- name: EtherCAT
+  description: Ethernet for Control Automation Technology
+- name: MQTT
+  description: Message Queuing Telemetry Transport
+- name: HTTP/HTTPS
+  description: Web-based management interface
+- name: SSH
+  description: Secure Shell remote access
+- name: Telnet
+  description: Unencrypted remote terminal
+- name: FTP/TFTP
+  description: File transfer protocol
+- name: SNMP
+  description: Simple Network Management Protocol
+- name: JTAG
+  description: Joint Test Action Group debug interface
+- name: UART/Serial
+  description: Universal Async Receiver-Transmitter / RS-232
+- name: USB
+  description: Universal Serial Bus
+- name: Bluetooth/BLE
+  description: Bluetooth / Bluetooth Low Energy
+- name: Wi-Fi
+  description: IEEE 802.11 wireless
+- name: Zigbee
+  description: IEEE 802.15.4-based mesh network
+- name: LoRaWAN
+  description: Long Range Wide Area Network (IoT)

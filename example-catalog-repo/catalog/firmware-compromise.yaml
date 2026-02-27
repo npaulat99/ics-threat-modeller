@@ -1,0 +1,78 @@
+name: Firmware Compromise
+description: Attack tree template for firmware compromise scenarios on embedded ICS devices.
+entry_type: attack_tree
+source_framework: ICS-CERT / MITRE ATT&CK for ICS
+version: "1.0"
+tags: []
+tree_data:
+  goal:
+    name: Compromise Device Firmware
+    description: Attacker modifies or replaces device firmware to gain persistent control.
+    aggregation_type: or
+  steps:
+    - name: Physical Access Firmware Extraction
+      description: Physically extract firmware from device using debug interfaces (JTAG, UART).
+      is_leaf: true
+      assessments:
+        - factor_name: Elapsed Time
+          factor_value: 4
+          rationale: Requires physical proximity and specialized tools.
+        - factor_name: Expertise
+          factor_value: 5
+          rationale: Requires knowledge of embedded hardware debugging.
+        - factor_name: Knowledge of Target
+          factor_value: 5
+          rationale: Needs device-specific debug port information.
+        - factor_name: Window of Opportunity
+          factor_value: 3
+          rationale: Requires physical access window.
+        - factor_name: Equipment
+          factor_value: 5
+          rationale: Specialized debug probes and adapters.
+      countermeasures:
+        - name: Disable Debug Ports
+          description: Fuse-blow or disable JTAG/SWD in production.
+          effectiveness: 4
+        - name: Firmware Encryption
+          description: Encrypt firmware at rest so extraction yields ciphertext.
+          effectiveness: 4
+        - name: Physical Tamper Detection
+          description: Tamper-evident enclosures with alert mechanisms.
+          effectiveness: 3
+      technique_mappings:
+        - technique_id: T0839
+          technique_name: Module Firmware
+          source: MITRE ATT&CK for ICS
+    - name: Remote Firmware Update Hijack
+      description: Intercept or forge firmware update to inject malicious code.
+      is_leaf: true
+      assessments:
+        - factor_name: Elapsed Time
+          factor_value: 5
+          rationale: Requires time to reverse update protocol.
+        - factor_name: Expertise
+          factor_value: 5
+          rationale: Advanced reverse engineering and crypto skills.
+        - factor_name: Knowledge of Target
+          factor_value: 5
+          rationale: Update mechanism must be understood.
+        - factor_name: Window of Opportunity
+          factor_value: 4
+          rationale: Must coincide with firmware update cycle.
+        - factor_name: Equipment
+          factor_value: 4
+          rationale: Network intercept tools and signing bypass.
+      countermeasures:
+        - name: Signed Firmware Updates
+          description: Cryptographically sign all firmware images.
+          effectiveness: 5
+        - name: Secure Boot Chain
+          description: Verify firmware signature before execution.
+          effectiveness: 5
+        - name: Encrypted Update Channel
+          description: TLS/DTLS for firmware delivery.
+          effectiveness: 3
+      technique_mappings:
+        - technique_id: T0857
+          technique_name: System Firmware
+          source: MITRE ATT&CK for ICS

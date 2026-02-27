@@ -278,8 +278,6 @@ export const searchCatalog = (query: string) =>
 export const importCatalogEntry = (catalogId: string, projectId: string) =>
   invoke<string>('import_catalog_entry', { catalogId, projectId });
 
-export const seedCatalog = () =>
-  invoke<void>('seed_catalog_command');
 
 // ─── Tag Catalog ────────────────────────────────────────────────
 export const createTagCatalogEntry = (data: CreateTagCatalogEntry) =>
@@ -294,8 +292,6 @@ export const deleteTagCatalogEntry = (id: string) =>
 export const searchTagCatalog = (query: string, category?: string) =>
   invoke<TagCatalogEntry[]>('search_tag_catalog', { query, category: category ?? null });
 
-export const seedTagCatalog = () =>
-  invoke<void>('seed_tag_catalog_command');
 
 // ─── Export / Import ────────────────────────────────────────────
 export const exportProjectJson = (projectId: string) =>

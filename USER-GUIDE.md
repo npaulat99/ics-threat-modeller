@@ -206,6 +206,31 @@ rm -rf catalog-repo
 git clone git@github.com:<your-org>/ics-catalog.git catalog-repo
 ```
 
+### 5.3 Option C: Vom mitgelieferten Beispiel starten
+
+Im Projekt-Repository liegt ein Ordner `example-catalog-repo/` mit Beispiel-Dateien (3 Attack-Tree-Templates, vollständige Tag-Kataloge). Diesen kannst du als Basis für ein eigenes Catalog-Repo verwenden:
+
+```bash
+# Auf dem Host:
+cp -r example-catalog-repo my-ics-catalog
+cd my-ics-catalog
+git init
+git add .
+git commit -m "Initial catalog from example template"
+git remote add origin git@github.com:<your-org>/ics-catalog.git
+git push -u origin main
+```
+
+Dann im Container:
+
+```bash
+cd /app/data
+rm -rf catalog-repo
+git clone git@github.com:<your-org>/ics-catalog.git catalog-repo
+```
+
+> Siehe `example-catalog-repo/README.md` für die vollständige Referenz der Dateiformate.
+
 ### 5.3 Catalog-Aktualisierung
 
 Wenn jemand den Catalog aktualisiert hat:

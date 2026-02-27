@@ -23,24 +23,17 @@ pub fn run() {
     std::fs::create_dir_all(&projects_dir).ok();
 
     // Sync catalog data from YAML files in catalog-repo/ into the database.
-    // This replaces the old hardcoded seed approach.
+    // The catalog-repo is the single source of truth — no hardcoded fallback.
     {
         let conn = database.conn.lock().unwrap();
-        // Ensure tables exist (seed_catalog creates entries only if empty — still useful as fallback).
         match commands::filesystem::sync_all_from_repo(&conn) {
             Ok((cat, tag)) => {
-                if cat > 0 || tag > 0 {
-                    eprintln!(
-                        "Catalog repo: synced {cat} catalog + {tag} tag entries from YAML files."
-                    );
-                }
+                eprintln!(
+                    "Catalog repo: synced {cat} catalog + {tag} tag entries from YAML files."
+                );
             }
             Err(e) => {
-                eprintln!(
-                    "Warning: catalog-repo sync failed ({e}), falling back to built-in seed data."
-                );
-                commands::catalog::seed_catalog(&conn).ok();
-                commands::tag_catalog::seed_tag_catalog(&conn).ok();
+                eprintln!("Warning: catalog-repo sync failed ({e}). Catalog may be empty.");
             }
         }
     }
@@ -125,13 +118,11 @@ pub fn run() {
             commands::catalog::delete_catalog_entry,
             commands::catalog::search_catalog,
             commands::catalog::import_catalog_entry,
-            commands::catalog::seed_catalog_command,
             // Tag Catalog
             commands::tag_catalog::create_tag_catalog_entry,
             commands::tag_catalog::list_tag_catalog,
             commands::tag_catalog::delete_tag_catalog_entry,
             commands::tag_catalog::search_tag_catalog,
-            commands::tag_catalog::seed_tag_catalog_command,
             // Export / Import
             commands::export_import::export_project_json,
             commands::export_import::export_project_yaml,

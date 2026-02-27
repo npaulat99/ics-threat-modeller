@@ -1,0 +1,40 @@
+- name: Siemens TIA Portal
+  description: Totally Integrated Automation engineering framework
+- name: Siemens WinCC
+  description: SCADA / HMI visualization software
+- name: Siemens STEP 7
+  description: PLC programming environment (classic)
+- name: Rockwell Studio 5000
+  description: Logix Designer for Allen-Bradley PLCs
+- name: Rockwell FactoryTalk
+  description: HMI/SCADA suite for Allen-Bradley
+- name: Schneider Unity Pro / EcoStruxure
+  description: Schneider Electric PLC engineering
+- name: ABB Ability Symphony Plus
+  description: ABB DCS engineering and operation
+- name: Honeywell Experion PKS
+  description: Honeywell process control DCS platform
+- name: Emerson DeltaV
+  description: Emerson DCS platform
+- name: GE iFIX
+  description: GE Digital SCADA/HMI platform
+- name: Yokogawa CENTUM VP
+  description: Yokogawa DCS platform
+- name: Codesys
+  description: IEC 61131-3 PLC runtime and IDE
+- name: Beckhoff TwinCAT
+  description: PC-based control software
+- name: Ignition (Inductive Automation)
+  description: SCADA/MES platform
+- name: OSIsoft PI
+  description: Process data historian
+- name: Wonderware (AVEVA)
+  description: InTouch HMI / System Platform
+- name: KEPServerEX
+  description: OPC connectivity platform
+- name: Nmap
+  description: Network mapping / scanning
+- name: Wireshark
+  description: Network protocol analyzer
+- name: OpenVPN
+  description: VPN for remote access

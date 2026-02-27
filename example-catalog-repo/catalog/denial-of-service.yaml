@@ -1,0 +1,72 @@
+name: Denial of Service
+description: Attack tree template for denial of service attacks against ICS components.
+entry_type: attack_tree
+source_framework: MITRE ATT&CK for ICS
+version: "1.0"
+tags: []
+tree_data:
+  goal:
+    name: Deny ICS Service Availability
+    description: Disrupt the availability of critical ICS services and communications.
+    aggregation_type: or
+  steps:
+    - name: Network Flooding
+      description: Overwhelm ICS network segments with traffic to disrupt communications.
+      is_leaf: true
+      assessments:
+        - factor_name: Elapsed Time
+          factor_value: 1
+          rationale: Immediate impact.
+        - factor_name: Expertise
+          factor_value: 2
+          rationale: Basic networking knowledge.
+        - factor_name: Knowledge of Target
+          factor_value: 3
+          rationale: Network topology awareness.
+        - factor_name: Window of Opportunity
+          factor_value: 4
+          rationale: Network access required.
+        - factor_name: Equipment
+          factor_value: 2
+          rationale: Standard traffic generation tools.
+      countermeasures:
+        - name: Network Segmentation
+          description: Isolate critical ICS traffic on dedicated VLANs.
+          effectiveness: 4
+        - name: Traffic Rate Limiting
+          description: Implement QoS and rate limiting on network switches.
+          effectiveness: 3
+      technique_mappings:
+        - technique_id: T0814
+          technique_name: Denial of Service
+          source: MITRE ATT&CK for ICS
+    - name: Protocol Exploitation
+      description: Exploit vulnerabilities in industrial protocols to crash devices.
+      is_leaf: true
+      assessments:
+        - factor_name: Elapsed Time
+          factor_value: 3
+          rationale: Requires crafting malformed packets.
+        - factor_name: Expertise
+          factor_value: 4
+          rationale: Protocol-specific vulnerability knowledge.
+        - factor_name: Knowledge of Target
+          factor_value: 4
+          rationale: Device and protocol version needed.
+        - factor_name: Window of Opportunity
+          factor_value: 4
+          rationale: Network access to device.
+        - factor_name: Equipment
+          factor_value: 3
+          rationale: Protocol fuzzing tools.
+      countermeasures:
+        - name: Protocol Validation
+          description: Deep packet inspection for industrial protocols.
+          effectiveness: 3
+        - name: Firmware Patching
+          description: Keep device firmware updated.
+          effectiveness: 4
+      technique_mappings:
+        - technique_id: T0814
+          technique_name: Denial of Service
+          source: MITRE ATT&CK for ICS
