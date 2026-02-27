@@ -7,11 +7,13 @@ const app = new App({
 
 // Ensure arrow-key repeat works in inputs/textareas by stopping propagation
 // of keyboard events from these elements to parent listeners (e.g. draggable containers).
-document.addEventListener('keydown', (e) => {
-  const tag = (e.target as HTMLElement)?.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-    e.stopPropagation();
-  }
-}, true); // capture phase
+for (const evt of ['keydown', 'keyup', 'keypress'] as const) {
+  document.addEventListener(evt, (e) => {
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+      e.stopPropagation();
+    }
+  }, true); // capture phase
+}
 
 export default app;

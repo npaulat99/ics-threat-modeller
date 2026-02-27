@@ -102,6 +102,26 @@ fn run_migrations(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    // Migration: Add tag column to attacker_profiles table.
+    let has_tag: bool = conn
+        .prepare("SELECT tag FROM attacker_profiles LIMIT 0")
+        .is_ok();
+    if !has_tag {
+        conn.execute_batch(
+            "ALTER TABLE attacker_profiles ADD COLUMN tag TEXT NOT NULL DEFAULT ''",
+        )?;
+    }
+
+    // Migration: Add third_party_software column to projects table.
+    let has_tps: bool = conn
+        .prepare("SELECT third_party_software FROM projects LIMIT 0")
+        .is_ok();
+    if !has_tps {
+        conn.execute_batch(
+            "ALTER TABLE projects ADD COLUMN third_party_software TEXT NOT NULL DEFAULT '[]'",
+        )?;
+    }
+
     // Migration: Allow steps to have countermeasures as parents (Attack-Defense Tree).
     let steps_sql: String = conn.query_row(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='steps'",
@@ -152,6 +172,7 @@ CREATE TABLE IF NOT EXISTS projects (
     deployment_context TEXT NOT NULL DEFAULT '{}', -- JSON object
     factor_weights  TEXT NOT NULL DEFAULT '{"time_effort":0.25,"exploitability":0.20,"window_of_opportunity":0.15,"detection_probability":0.15,"prior_knowledge":0.10,"preparation_effort":0.10,"abort_risk":0.05}',
     access_probabilities TEXT NOT NULL DEFAULT '{"1":0.9,"2":0.7,"3":0.5,"4":0.3,"5":0.1}',
+    third_party_software TEXT NOT NULL DEFAULT '[]', -- JSON array of third-party software
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -270,6 +291,7 @@ CREATE TABLE IF NOT EXISTS attacker_profiles (
     skill_level INTEGER NOT NULL DEFAULT 1 CHECK(skill_level BETWEEN 1 AND 5),
     access_level INTEGER NOT NULL DEFAULT 1 CHECK(access_level BETWEEN 1 AND 5),
     description TEXT NOT NULL DEFAULT '',
+    tag         TEXT NOT NULL DEFAULT '',
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE

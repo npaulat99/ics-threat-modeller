@@ -1092,7 +1092,7 @@
 
   .tree-container {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: scroll;
     padding: 8px;
   }
 

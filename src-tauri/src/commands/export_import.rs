@@ -57,6 +57,7 @@ pub fn export_project_directory(
             "deployment_context": serde_json::from_str::<serde_json::Value>(&export.project.deployment_context).unwrap_or_default(),
             "factor_weights": serde_json::from_str::<serde_json::Value>(&export.project.factor_weights).unwrap_or_default(),
             "access_probabilities": serde_json::from_str::<serde_json::Value>(&export.project.access_probabilities).unwrap_or_default(),
+            "third_party_software": serde_json::from_str::<serde_json::Value>(&export.project.third_party_software).unwrap_or_default(),
             "created_at": export.project.created_at,
             "updated_at": export.project.updated_at,
         }
@@ -197,7 +198,7 @@ pub fn build_project_export(db: &Database, project_id: &str) -> Result<ProjectEx
     // Project.
     let project: Project = conn
         .query_row(
-            "SELECT id, name, description, device_type, architecture, interfaces, assets, deployment_context, factor_weights, access_probabilities, created_at, updated_at FROM projects WHERE id = ?1",
+            "SELECT id, name, description, device_type, architecture, interfaces, assets, deployment_context, factor_weights, access_probabilities, third_party_software, created_at, updated_at FROM projects WHERE id = ?1",
             params![project_id],
             |row| {
                 Ok(Project {
@@ -205,8 +206,9 @@ pub fn build_project_export(db: &Database, project_id: &str) -> Result<ProjectEx
                     device_type: row.get(3)?, architecture: row.get(4)?,
                     interfaces: row.get(5)?, assets: row.get(6)?,
                     deployment_context: row.get(7)?, factor_weights: row.get(8)?,
-                    access_probabilities: row.get(9)?, created_at: row.get(10)?,
-                    updated_at: row.get(11)?,
+                    access_probabilities: row.get(9)?, third_party_software: row.get(10)?,
+                    created_at: row.get(11)?,
+                    updated_at: row.get(12)?,
                 })
             },
         )
@@ -215,13 +217,13 @@ pub fn build_project_export(db: &Database, project_id: &str) -> Result<ProjectEx
     // Attacker profiles.
     let attacker_profiles = list_entities::<AttackerProfile>(
         &conn,
-        "SELECT id, project_id, name, skill_level, access_level, description, created_at, updated_at, is_active FROM attacker_profiles WHERE project_id = ?1",
+        "SELECT id, project_id, name, skill_level, access_level, description, tag, created_at, updated_at, is_active FROM attacker_profiles WHERE project_id = ?1",
         project_id,
         |row| Ok(AttackerProfile {
             id: row.get(0)?, project_id: row.get(1)?, name: row.get(2)?,
             skill_level: row.get(3)?, access_level: row.get(4)?,
-            description: row.get(5)?, created_at: row.get(6)?, updated_at: row.get(7)?,
-            is_active: row.get::<_, i32>(8).unwrap_or(1) != 0,
+            description: row.get(5)?, tag: row.get(6)?, created_at: row.get(7)?, updated_at: row.get(8)?,
+            is_active: row.get::<_, i32>(9).unwrap_or(1) != 0,
         }),
     )?;
 
@@ -403,13 +405,14 @@ pub fn import_project_data(db: &Database, data: ProjectExport) -> Result<String,
     // Insert the project (use existing ID to preserve references).
     let pid = &data.project.id;
     conn.execute(
-        "INSERT OR REPLACE INTO projects (id, name, description, device_type, architecture, interfaces, assets, deployment_context, factor_weights, access_probabilities, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        "INSERT OR REPLACE INTO projects (id, name, description, device_type, architecture, interfaces, assets, deployment_context, factor_weights, access_probabilities, third_party_software, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         params![
             pid, data.project.name, data.project.description,
             data.project.device_type, data.project.architecture,
             data.project.interfaces, data.project.assets,
             data.project.deployment_context, data.project.factor_weights,
-            data.project.access_probabilities, data.project.created_at, now,
+            data.project.access_probabilities, data.project.third_party_software,
+            data.project.created_at, now,
         ],
     ).map_err(|e| e.to_string())?;
 
@@ -417,8 +420,8 @@ pub fn import_project_data(db: &Database, data: ProjectExport) -> Result<String,
     for ap in &data.attacker_profiles {
         let active_int = if ap.is_active { 1 } else { 0 };
         conn.execute(
-            "INSERT OR REPLACE INTO attacker_profiles (id, project_id, name, skill_level, access_level, description, created_at, updated_at, is_active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            params![ap.id, ap.project_id, ap.name, ap.skill_level, ap.access_level, ap.description, ap.created_at, now, active_int],
+            "INSERT OR REPLACE INTO attacker_profiles (id, project_id, name, skill_level, access_level, description, tag, created_at, updated_at, is_active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![ap.id, ap.project_id, ap.name, ap.skill_level, ap.access_level, ap.description, ap.tag, ap.created_at, now, active_int],
         ).map_err(|e| e.to_string())?;
     }
 

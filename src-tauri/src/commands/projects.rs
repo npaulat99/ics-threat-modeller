@@ -13,8 +13,8 @@ pub fn create_project(db: State<'_, Database>, data: CreateProject) -> Result<Pr
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
-        "INSERT INTO projects (id, name, description, device_type, architecture, interfaces, assets, deployment_context, factor_weights, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        "INSERT INTO projects (id, name, description, device_type, architecture, interfaces, assets, deployment_context, factor_weights, third_party_software, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
             id,
             data.name,
@@ -25,6 +25,7 @@ pub fn create_project(db: State<'_, Database>, data: CreateProject) -> Result<Pr
             data.assets.unwrap_or_else(|| "[]".to_string()),
             data.deployment_context.unwrap_or_else(|| "{}".to_string()),
             data.factor_weights.unwrap_or_else(|| "{\"time_effort\":0.25,\"exploitability\":0.20,\"window_of_opportunity\":0.15,\"detection_probability\":0.15,\"prior_knowledge\":0.10,\"preparation_effort\":0.10,\"abort_risk\":0.05}".to_string()),
+            data.third_party_software.unwrap_or_else(|| "[]".to_string()),
             now,
             now,
         ],
@@ -38,7 +39,7 @@ pub fn create_project(db: State<'_, Database>, data: CreateProject) -> Result<Pr
 pub fn list_projects(db: State<'_, Database>) -> Result<Vec<Project>, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, name, description, device_type, architecture, interfaces, assets, deployment_context, factor_weights, access_probabilities, created_at, updated_at FROM projects ORDER BY updated_at DESC")
+        .prepare("SELECT id, name, description, device_type, architecture, interfaces, assets, deployment_context, factor_weights, access_probabilities, third_party_software, created_at, updated_at FROM projects ORDER BY updated_at DESC")
         .map_err(|e| e.to_string())?;
 
     let projects = stmt
@@ -54,8 +55,9 @@ pub fn list_projects(db: State<'_, Database>) -> Result<Vec<Project>, String> {
                 deployment_context: row.get(7)?,
                 factor_weights: row.get(8)?,
                 access_probabilities: row.get(9)?,
-                created_at: row.get(10)?,
-                updated_at: row.get(11)?,
+                third_party_software: row.get(10)?,
+                created_at: row.get(11)?,
+                updated_at: row.get(12)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -100,6 +102,7 @@ pub fn update_project(db: State<'_, Database>, data: UpdateProject) -> Result<Pr
     add_field!("deployment_context", data.deployment_context);
     add_field!("factor_weights", data.factor_weights);
     add_field!("access_probabilities", data.access_probabilities);
+    add_field!("third_party_software", data.third_party_software);
 
     let sql = format!(
         "UPDATE projects SET {} WHERE id = ?{}",
@@ -127,7 +130,7 @@ pub fn delete_project(db: State<'_, Database>, id: String) -> Result<(), String>
 /// Internal helper to fetch a project by ID.
 fn get_project_by_id(conn: &rusqlite::Connection, id: &str) -> Result<Project, String> {
     conn.query_row(
-        "SELECT id, name, description, device_type, architecture, interfaces, assets, deployment_context, factor_weights, access_probabilities, created_at, updated_at FROM projects WHERE id = ?1",
+        "SELECT id, name, description, device_type, architecture, interfaces, assets, deployment_context, factor_weights, access_probabilities, third_party_software, created_at, updated_at FROM projects WHERE id = ?1",
         params![id],
         |row| {
             Ok(Project {
@@ -141,8 +144,9 @@ fn get_project_by_id(conn: &rusqlite::Connection, id: &str) -> Result<Project, S
                 deployment_context: row.get(7)?,
                 factor_weights: row.get(8)?,
                 access_probabilities: row.get(9)?,
-                created_at: row.get(10)?,
-                updated_at: row.get(11)?,
+                third_party_software: row.get(10)?,
+                created_at: row.get(11)?,
+                updated_at: row.get(12)?,
             })
         },
     )

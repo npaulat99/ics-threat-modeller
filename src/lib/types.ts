@@ -13,6 +13,7 @@ export interface Project {
   deployment_context: string;  // JSON object
   factor_weights: string;      // JSON object
   access_probabilities: string; // JSON object
+  third_party_software: string; // JSON array
   created_at: string;
   updated_at: string;
 }
@@ -26,6 +27,7 @@ export interface CreateProject {
   assets?: string;
   deployment_context?: string;
   factor_weights?: string;
+  third_party_software?: string;
 }
 
 export interface UpdateProject {
@@ -39,6 +41,7 @@ export interface UpdateProject {
   deployment_context?: string;
   factor_weights?: string;
   access_probabilities?: string;
+  third_party_software?: string;
 }
 
 // ─── Attacker Profile ───────────────────────────────────────────
@@ -49,6 +52,7 @@ export interface AttackerProfile {
   skill_level: number;
   access_level: number;
   description: string;
+  tag: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -60,6 +64,7 @@ export interface CreateAttackerProfile {
   skill_level?: number;
   access_level?: number;
   description?: string;
+  tag?: string;
 }
 
 export interface UpdateAttackerProfile {
@@ -69,6 +74,7 @@ export interface UpdateAttackerProfile {
   access_level?: number;
   description?: string;
   is_active?: boolean;
+  tag?: string;
 }
 
 // ─── Goal ───────────────────────────────────────────────────────

@@ -284,6 +284,19 @@
         );
       }
 
+      // Add weaknesses of this step as assessable entities.
+      const wks = await api.listWeaknesses(s.id, "step");
+      for (const wk of wks) {
+        leafEntities.push({
+          id: wk.id,
+          name: `${stepLabel} › ⚠️ ${wk.name}`,
+          entityType: "weakness",
+          accessLevel: undefined,
+          skillLevel: undefined,
+        });
+        leafEntities = leafEntities;
+      }
+
       // Add substeps of this step.
       for (const sub of substeps) {
         leafEntities.push({
@@ -511,7 +524,9 @@
                   ? "🔹"
                   : s.entityType === "countermeasure"
                     ? "🛡️"
-                    : "⚡"}
+                    : s.entityType === "weakness"
+                      ? "⚠️"
+                      : "⚡"}
                 {s.name}</span
               >
               {#if s.accessLevel || s.skillLevel}
@@ -536,7 +551,7 @@
           {#if selectedEntity}
             <div class="entity-info-bar">
               <span class="entity-name">{selectedEntity.name}</span>
-              {#if selectedEntity.entityType !== "countermeasure"}
+              {#if selectedEntity.entityType !== "countermeasure" && selectedEntity.entityType !== "weakness"}
                 <div class="entity-level-editors">
                   <div class="level-editor">
                     <span class="level-label-text">🔑 Needed Access</span>

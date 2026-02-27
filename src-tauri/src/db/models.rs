@@ -17,6 +17,7 @@ pub struct Project {
     pub deployment_context: String,   // JSON object
     pub factor_weights: String,       // JSON object
     pub access_probabilities: String, // JSON object
+    pub third_party_software: String, // JSON array
     pub created_at: String,
     pub updated_at: String,
 }
@@ -31,6 +32,7 @@ pub struct CreateProject {
     pub assets: Option<String>,
     pub deployment_context: Option<String>,
     pub factor_weights: Option<String>,
+    pub third_party_software: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,6 +47,7 @@ pub struct UpdateProject {
     pub deployment_context: Option<String>,
     pub factor_weights: Option<String>,
     pub access_probabilities: Option<String>,
+    pub third_party_software: Option<String>,
 }
 
 // ─── Goal ──────────────────────────────────────────────────────────────────
@@ -103,7 +106,7 @@ pub struct Step {
     pub parent_id: String,
     pub parent_type: String,
     pub conjunction: String,
-    pub step_type: String,  // "step" | "path"
+    pub step_type: String, // "step" | "path"
     pub name: String,
     pub description: String,
     pub access_level: i32,
@@ -119,7 +122,7 @@ pub struct CreateStep {
     pub parent_id: String,
     pub parent_type: String, // "goal" | "category" | "step"
     pub conjunction: Option<String>,
-    pub step_type: Option<String>,  // "step" | "path"
+    pub step_type: Option<String>, // "step" | "path"
     pub name: String,
     pub description: Option<String>,
     pub access_level: Option<i32>,
@@ -131,7 +134,7 @@ pub struct CreateStep {
 pub struct UpdateStep {
     pub id: String,
     pub conjunction: Option<String>,
-    pub step_type: Option<String>,  // "step" | "path"
+    pub step_type: Option<String>, // "step" | "path"
     pub name: Option<String>,
     pub description: Option<String>,
     pub access_level: Option<i32>,
@@ -280,6 +283,7 @@ pub struct AttackerProfile {
     pub skill_level: i32,
     pub access_level: i32,
     pub description: String,
+    pub tag: String,
     pub is_active: bool,
     pub created_at: String,
     pub updated_at: String,
@@ -292,6 +296,7 @@ pub struct CreateAttackerProfile {
     pub skill_level: Option<i32>,
     pub access_level: Option<i32>,
     pub description: Option<String>,
+    pub tag: Option<String>,
 }
 
 // ─── Attack Technique Mapping ──────────────────────────────────────────────

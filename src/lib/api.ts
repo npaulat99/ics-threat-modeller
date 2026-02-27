@@ -55,6 +55,7 @@ export const updateAttackerProfile = (data: UpdateAttackerProfile) =>
     accessLevel: data.access_level,
     description: data.description,
     isActive: data.is_active,
+    tag: data.tag,
   });
 
 export const deleteAttackerProfile = (id: string) =>

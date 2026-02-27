@@ -77,7 +77,8 @@
                 <div class="child-branch">
                   <div
                     class="child-connector-line"
-                    class:dashed-line={child.type === "countermeasure"}
+                    class:dashed-line={child.type === "countermeasure" ||
+                      node.type === "countermeasure"}
                   ></div>
                   <svelte:self nodes={[child]} {onSelect} {selectedId} />
                 </div>

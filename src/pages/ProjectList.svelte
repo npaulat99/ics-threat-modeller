@@ -16,9 +16,16 @@
   let newAssets = "";
   let interfacesList: string[] = [];
   let assetsList: string[] = [];
+  let thirdPartySoftwareList: string[] = [];
   let newInterfaceInput = "";
   let newAssetInput = "";
+  let newThirdPartySoftwareInput = "";
   let deleteTarget: Project | null = null;
+
+  let showImport = false;
+  let importFormat: "json" | "yaml" = "json";
+  let importText = "";
+  let importFile: File | null = null;
 
   onMount(loadProjects);
 
@@ -44,6 +51,10 @@
             ? JSON.stringify(interfacesList)
             : undefined,
         assets: assetsList.length > 0 ? JSON.stringify(assetsList) : undefined,
+        third_party_software:
+          thirdPartySoftwareList.length > 0
+            ? JSON.stringify(thirdPartySoftwareList)
+            : undefined,
         factor_weights: JSON.stringify(DEFAULT_FACTOR_WEIGHTS),
       };
       const project = await api.createProject(data);
@@ -56,8 +67,10 @@
       newAssets = "";
       interfacesList = [];
       assetsList = [];
+      thirdPartySoftwareList = [];
       newInterfaceInput = "";
       newAssetInput = "";
+      newThirdPartySoftwareInput = "";
       showCreate = false;
       await loadProjects();
     } catch (e) {
@@ -81,15 +94,91 @@
       setError(`Delete failed: ${e}`);
     }
   }
+
+  async function handleImport() {
+    let text = importText.trim();
+    if (importFile) {
+      text = await importFile.text();
+    }
+    if (!text) {
+      setError("Please paste or select import data.");
+      return;
+    }
+    try {
+      if (importFormat === "json") {
+        await api.importProjectJson(text);
+      } else {
+        await api.importProjectYaml(text);
+      }
+      setSuccess("Project imported successfully.");
+      importText = "";
+      importFile = null;
+      showImport = false;
+      await loadProjects();
+    } catch (e) {
+      setError(`Import failed: ${e}`);
+    }
+  }
 </script>
 
 <div class="projects-page">
   <div class="page-header">
     <h2>Projects</h2>
-    <button class="btn btn-primary" on:click={() => (showCreate = !showCreate)}>
-      {showCreate ? "Cancel" : "+ New Project"}
-    </button>
+    <div class="header-actions">
+      <button
+        class="btn btn-secondary"
+        on:click={() => {
+          showImport = !showImport;
+          if (showImport) showCreate = false;
+        }}
+      >
+        {showImport ? "Cancel" : "⬇ Import"}
+      </button>
+      <button
+        class="btn btn-primary"
+        on:click={() => {
+          showCreate = !showCreate;
+          if (showCreate) showImport = false;
+        }}
+      >
+        {showCreate ? "Cancel" : "+ New Project"}
+      </button>
+    </div>
   </div>
+
+  {#if showImport}
+    <div class="create-form card">
+      <h3>Import Project</h3>
+      <div class="form-group">
+        <label>Format</label>
+        <select class="input" bind:value={importFormat}>
+          <option value="json">JSON</option>
+          <option value="yaml">YAML</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Paste Data or Select File</label>
+        <textarea
+          class="input"
+          rows="6"
+          bind:value={importText}
+          placeholder="Paste JSON/YAML here…"
+        ></textarea>
+      </div>
+      <div class="form-group">
+        <label>Or upload a file</label>
+        <input
+          type="file"
+          accept=".json,.yaml,.yml"
+          on:change={(e) => {
+            const files = e.currentTarget.files;
+            importFile = files && files.length > 0 ? files[0] : null;
+          }}
+        />
+      </div>
+      <button class="btn btn-primary" on:click={handleImport}>Import</button>
+    </div>
+  {/if}
 
   {#if showCreate}
     <div class="create-form card">
@@ -202,6 +291,41 @@
           />
         </div>
       </div>
+      <div class="form-group">
+        <label for="proj-tps">3rd Party Software</label>
+        <div class="tag-input-container">
+          <div class="tags-list">
+            {#each thirdPartySoftwareList as sw, i}
+              <span class="tag-pill"
+                >{sw}
+                <button
+                  class="tag-remove"
+                  on:click={() => {
+                    thirdPartySoftwareList = thirdPartySoftwareList.filter(
+                      (_, idx) => idx !== i,
+                    );
+                  }}>✕</button
+                ></span
+              >
+            {/each}
+          </div>
+          <input
+            class="input"
+            bind:value={newThirdPartySoftwareInput}
+            placeholder="Type and press Enter…"
+            on:keydown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                const v = newThirdPartySoftwareInput.trim();
+                if (v && !thirdPartySoftwareList.includes(v)) {
+                  thirdPartySoftwareList = [...thirdPartySoftwareList, v];
+                }
+                newThirdPartySoftwareInput = "";
+              }
+            }}
+          />
+        </div>
+      </div>
       <button
         class="btn btn-primary"
         on:click={createProject}
@@ -272,6 +396,11 @@
   .page-header h2 {
     margin: 0;
     font-size: 1.3rem;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
   }
 
   .card {

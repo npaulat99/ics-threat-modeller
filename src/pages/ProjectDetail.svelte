@@ -12,8 +12,10 @@
   let architecture = "";
   let interfacesList: string[] = [];
   let assetsList: string[] = [];
+  let thirdPartySoftwareList: string[] = [];
   let newInterface = "";
   let newAsset = "";
+  let newThirdPartySoftware = "";
   let deploymentContext = "{}";
   let factorWeights: Record<string, number> = {};
   let accessProbabilities = "{}";
@@ -45,8 +47,16 @@
     } catch {
       assetsList = [];
     }
+    try {
+      thirdPartySoftwareList = JSON.parse(
+        $currentProject.third_party_software || "[]",
+      );
+    } catch {
+      thirdPartySoftwareList = [];
+    }
     if (!Array.isArray(interfacesList)) interfacesList = [];
     if (!Array.isArray(assetsList)) assetsList = [];
+    if (!Array.isArray(thirdPartySoftwareList)) thirdPartySoftwareList = [];
   }
 
   function addInterface() {
@@ -73,6 +83,18 @@
     assetsList = assetsList.filter((_, i) => i !== idx);
   }
 
+  function addThirdPartySoftware() {
+    const v = newThirdPartySoftware.trim();
+    if (v && !thirdPartySoftwareList.includes(v)) {
+      thirdPartySoftwareList = [...thirdPartySoftwareList, v];
+    }
+    newThirdPartySoftware = "";
+  }
+
+  function removeThirdPartySoftware(idx: number) {
+    thirdPartySoftwareList = thirdPartySoftwareList.filter((_, i) => i !== idx);
+  }
+
   async function saveProject() {
     if (!$currentProject) return;
     try {
@@ -84,6 +106,7 @@
         architecture,
         interfaces: JSON.stringify(interfacesList),
         assets: JSON.stringify(assetsList),
+        third_party_software: JSON.stringify(thirdPartySoftwareList),
         deployment_context: deploymentContext,
         factor_weights: JSON.stringify(factorWeights),
         access_probabilities: accessProbabilities,
@@ -214,6 +237,46 @@
             <div class="tags-list">
               {#each assetsList as asset}
                 <span class="tag-pill readonly">{asset}</span>
+              {:else}
+                <p class="field-value">—</p>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>3rd Party Software</h3>
+        <div class="form-group">
+          <label>3rd Party Software</label>
+          {#if editing}
+            <div class="tag-input-container">
+              <div class="tags-list">
+                {#each thirdPartySoftwareList as sw, idx}
+                  <span class="tag-pill"
+                    >{sw}<button
+                      class="tag-remove"
+                      on:click={() => removeThirdPartySoftware(idx)}>✕</button
+                    ></span
+                  >
+                {/each}
+              </div>
+              <input
+                class="input"
+                bind:value={newThirdPartySoftware}
+                placeholder="Type and press Enter…"
+                on:keydown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addThirdPartySoftware();
+                  }
+                }}
+              />
+            </div>
+          {:else}
+            <div class="tags-list">
+              {#each thirdPartySoftwareList as sw}
+                <span class="tag-pill readonly">{sw}</span>
               {:else}
                 <p class="field-value">—</p>
               {/each}

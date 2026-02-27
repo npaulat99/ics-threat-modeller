@@ -21,6 +21,7 @@
 
   let formName = "";
   let formDesc = "";
+  let formTag = "";
   let formSkillLevel = 3;
   let formAccessLevel = 3;
 
@@ -39,6 +40,7 @@
   function resetForm() {
     formName = "";
     formDesc = "";
+    formTag = "";
     formSkillLevel = 3;
     formAccessLevel = 3;
     editId = null;
@@ -49,6 +51,7 @@
     editId = p.id;
     formName = p.name;
     formDesc = p.description;
+    formTag = p.tag || "";
     formSkillLevel = p.skill_level;
     formAccessLevel = p.access_level;
     showCreate = true;
@@ -62,6 +65,7 @@
           id: editId,
           name: formName,
           description: formDesc,
+          tag: formTag,
           skill_level: formSkillLevel,
           access_level: formAccessLevel,
         };
@@ -72,6 +76,7 @@
           project_id: $currentProject.id,
           name: formName,
           description: formDesc,
+          tag: formTag,
           skill_level: formSkillLevel,
           access_level: formAccessLevel,
         };
@@ -140,6 +145,14 @@
         <textarea class="input" rows="2" bind:value={formDesc} />
       </div>
       <div class="form-group">
+        <label>Tag</label>
+        <input
+          class="input"
+          bind:value={formTag}
+          placeholder="e.g., External, Insider, APT"
+        />
+      </div>
+      <div class="form-group">
         <label
           >Skill Level: {formSkillLevel} ({skillLabels[formSkillLevel - 1] ??
             ""})</label
@@ -197,6 +210,11 @@
           >
         </div>
         <p class="profile-desc">{p.description || "—"}</p>
+        {#if p.tag}
+          <div class="profile-tag">
+            <span class="tag-badge">🏷️ {p.tag}</span>
+          </div>
+        {/if}
         <div class="profile-meta">
           Access Level: {p.access_level}/5 ({accessLabels[p.access_level - 1] ??
             ""})
@@ -333,6 +351,16 @@
     font-size: 0.75rem;
     color: #a0aec0;
     margin-bottom: 4px;
+  }
+  .profile-tag {
+    margin-bottom: 6px;
+  }
+  .tag-badge {
+    font-size: 0.7rem;
+    background: #ebf4ff;
+    color: #2b6cb0;
+    padding: 2px 8px;
+    border-radius: 10px;
   }
   .profile-actions {
     display: flex;
