@@ -29,6 +29,9 @@
   let accessProbabilities = "{}";
   let lastProjectId = "";
 
+  let savingToDir = false;
+  let savedDirPath = "";
+
   // Autocomplete state
   let showInterfaceSuggestions = false;
   let showAssetSuggestions = false;
@@ -166,6 +169,21 @@
       setSuccess("Project settings saved.");
     } catch (e) {
       setError(`Save failed: ${e}`);
+    }
+  }
+
+  async function saveToDirectory() {
+    if (!$currentProject) return;
+    savingToDir = true;
+    savedDirPath = "";
+    try {
+      const path = await api.saveProjectToDirectory($currentProject.id);
+      savedDirPath = path;
+      setSuccess(`Project saved to directory: ${path}`);
+    } catch (e) {
+      setError(`Save to directory failed: ${e}`);
+    } finally {
+      savingToDir = false;
     }
   }
 
@@ -415,6 +433,25 @@
             </span>
           </label>
         </div>
+      </div>
+
+      <div class="card">
+        <h3>📁 Project Directory</h3>
+        <p class="card-desc">
+          Save this project as YAML files to a directory for Git version
+          control. Manage Git operations (commit, push, pull) yourself in a
+          terminal.
+        </p>
+        <button
+          class="btn btn-secondary"
+          disabled={savingToDir}
+          on:click={saveToDirectory}
+        >
+          {savingToDir ? "⏳ Saving…" : "💾 Save to Directory"}
+        </button>
+        {#if savedDirPath}
+          <p class="saved-path">Saved to: <code>{savedDirPath}</code></p>
+        {/if}
       </div>
 
       <div class="card">
@@ -679,5 +716,26 @@
     background: #edf2f7;
     color: #2d3748;
     border: 1px solid #e2e8f0;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .card-desc {
+    font-size: 0.8rem;
+    color: #718096;
+    margin: 0 0 12px;
+    line-height: 1.5;
+  }
+  .saved-path {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: #2f855a;
+  }
+  .saved-path code {
+    background: #f0fff4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.72rem;
   }
 </style>

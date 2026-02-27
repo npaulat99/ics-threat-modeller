@@ -6,6 +6,7 @@ pub mod catalog;
 pub mod categories;
 pub mod countermeasures;
 pub mod export_import;
+pub mod filesystem;
 pub mod goals;
 pub mod projects;
 pub mod steps;

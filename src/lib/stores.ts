@@ -10,6 +10,8 @@ import type {
   TagCatalogEntry,
   Snapshot,
   TreeNodeData,
+  ProjectDirectoryInfo,
+  CatalogRepoInfo,
 } from './types';
 
 // ─── Current project ───────────────────────────────────────────
@@ -42,6 +44,10 @@ export const tagCatalogByCategory = derived(tagCatalog, ($tc) => {
 
 // ─── Versioning ─────────────────────────────────────────────────
 export const snapshots = writable<Snapshot[]>([]);
+
+// ─── Filesystem / Git ───────────────────────────────────────────
+export const projectDirectories = writable<ProjectDirectoryInfo[]>([]);
+export const catalogRepoInfo = writable<CatalogRepoInfo | null>(null);
 
 // ─── UI state ───────────────────────────────────────────────────
 export const sidebarOpen = writable<boolean>(true);

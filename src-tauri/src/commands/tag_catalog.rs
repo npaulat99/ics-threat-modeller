@@ -118,19 +118,13 @@ pub fn search_tag_catalog(
     }
 }
 
-/// Seed the tag catalog with ICS-relevant default entries.
-pub fn seed_tag_catalog(conn: &rusqlite::Connection) -> Result<(), String> {
-    let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM tag_catalog", [], |row| row.get(0))
-        .map_err(|e| e.to_string())?;
-
-    if count > 0 {
-        return Ok(());
-    }
-
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-
-    // ─── Assets ────────────────────────────────────────────────────
+/// Return the default tag catalog data as three lists of (name, description) tuples.
+/// Used by seed_tag_catalog and by the filesystem module for writing default YAML files.
+pub fn get_default_tag_data() -> (
+    Vec<(&'static str, &'static str)>,
+    Vec<(&'static str, &'static str)>,
+    Vec<(&'static str, &'static str)>,
+) {
     let assets = vec![
         ("PLC", "Programmable Logic Controller"),
         ("RTU", "Remote Terminal Unit"),
@@ -160,7 +154,6 @@ pub fn seed_tag_catalog(conn: &rusqlite::Connection) -> Result<(), String> {
         ("IO Module", "Remote I/O module"),
     ];
 
-    // ─── Interfaces ────────────────────────────────────────────────
     let interfaces = vec![
         ("Ethernet/IP", "Industrial Ethernet protocol (CIP-based)"),
         ("Modbus TCP", "Modbus over TCP/IP"),
@@ -195,7 +188,6 @@ pub fn seed_tag_catalog(conn: &rusqlite::Connection) -> Result<(), String> {
         ("Cellular (4G/5G)", "Cellular network connectivity"),
     ];
 
-    // ─── Third-Party Software ──────────────────────────────────────
     let third_party = vec![
         ("Windows OS", "Microsoft Windows operating system"),
         ("Linux OS", "Linux-based operating system"),
@@ -231,6 +223,23 @@ pub fn seed_tag_catalog(conn: &rusqlite::Connection) -> Result<(), String> {
         ("Node-RED", "Flow-based programming for ICS/IoT"),
         ("CODESYS", "IEC 61131-3 PLC programming platform"),
     ];
+
+    (assets, interfaces, third_party)
+}
+
+/// Seed the tag catalog with ICS-relevant default entries.
+pub fn seed_tag_catalog(conn: &rusqlite::Connection) -> Result<(), String> {
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM tag_catalog", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    if count > 0 {
+        return Ok(());
+    }
+
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    let (assets, interfaces, third_party) = get_default_tag_data();
 
     for (name, desc) in &assets {
         let id = Uuid::new_v4().to_string();

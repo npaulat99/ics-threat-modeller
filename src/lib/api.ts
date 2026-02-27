@@ -20,6 +20,7 @@ import type {
   TagCatalogEntry, CreateTagCatalogEntry,
   Snapshot, CreateSnapshot, DiffResult,
   ChangeLogEntry,
+  ProjectDirectoryInfo, CatalogRepoInfo, DataPaths,
 } from './types';
 
 // ─── Projects ───────────────────────────────────────────────────
@@ -351,3 +352,22 @@ export const logChange = (
 
 export const getChangeLog = (projectId: string) =>
   invoke<ChangeLogEntry[]>('get_change_log', { projectId });
+
+// ─── Filesystem / Git Workflow ──────────────────────────────────
+export const saveProjectToDirectory = (projectId: string) =>
+  invoke<string>('save_project_to_directory', { projectId });
+
+export const loadProjectFromDirectory = (dirName: string) =>
+  invoke<string>('load_project_from_directory', { dirName });
+
+export const listProjectDirectories = () =>
+  invoke<ProjectDirectoryInfo[]>('list_project_directories');
+
+export const getCatalogRepoInfo = () =>
+  invoke<CatalogRepoInfo>('get_catalog_repo_info');
+
+export const syncCatalogFromRepo = () =>
+  invoke<string>('sync_catalog_from_repo');
+
+export const getDataPaths = () =>
+  invoke<DataPaths>('get_data_paths');

@@ -597,3 +597,26 @@ export interface TreeNodeData {
   expanded?: boolean;
   data?: Goal | Category | Step | Substep | Countermeasure;
 }
+
+// ─── Filesystem / Git Workflow ──────────────────────────────────
+export interface ProjectDirectoryInfo {
+  dir_name: string;
+  project_name: string;
+  last_modified: string;
+  has_git: boolean;
+  dir_path: string;
+}
+
+export interface CatalogRepoInfo {
+  path: string;
+  exists: boolean;
+  has_git: boolean;
+  catalog_file_count: number;
+  tag_catalog_file_count: number;
+}
+
+export interface DataPaths {
+  data_dir: string;
+  catalog_repo_dir: string;
+  projects_dir: string;
+}

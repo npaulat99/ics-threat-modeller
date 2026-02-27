@@ -5,23 +5,44 @@ pub mod commands;
 pub mod db;
 
 use db::Database;
-use std::path::Path;
 
 /// Build and configure the Tauri application.
 pub fn run() {
     // Use /app/data/ directory if it exists (Docker volume mount), otherwise current directory.
-    let db_path = if Path::new("/app/data").is_dir() {
-        std::path::PathBuf::from("/app/data/ics_threat_modeller.db")
-    } else {
-        std::path::PathBuf::from("ics_threat_modeller.db")
-    };
+    let data_dir = commands::filesystem::get_data_dir();
+    let db_path = data_dir.join("ics_threat_modeller.db");
     let database = Database::open(&db_path).expect("Failed to open database");
 
-    // Seed catalog on first run.
+    // Initialize catalog-repo directory with default YAML files if empty.
+    if let Err(e) = commands::filesystem::init_catalog_repo() {
+        eprintln!("Warning: Failed to initialize catalog-repo: {e}");
+    }
+
+    // Ensure projects directory exists.
+    let projects_dir = commands::filesystem::get_projects_dir();
+    std::fs::create_dir_all(&projects_dir).ok();
+
+    // Sync catalog data from YAML files in catalog-repo/ into the database.
+    // This replaces the old hardcoded seed approach.
     {
         let conn = database.conn.lock().unwrap();
-        commands::catalog::seed_catalog(&conn).ok();
-        commands::tag_catalog::seed_tag_catalog(&conn).ok();
+        // Ensure tables exist (seed_catalog creates entries only if empty — still useful as fallback).
+        match commands::filesystem::sync_all_from_repo(&conn) {
+            Ok((cat, tag)) => {
+                if cat > 0 || tag > 0 {
+                    eprintln!(
+                        "Catalog repo: synced {cat} catalog + {tag} tag entries from YAML files."
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!(
+                    "Warning: catalog-repo sync failed ({e}), falling back to built-in seed data."
+                );
+                commands::catalog::seed_catalog(&conn).ok();
+                commands::tag_catalog::seed_tag_catalog(&conn).ok();
+            }
+        }
     }
 
     tauri::Builder::default()
@@ -126,6 +147,13 @@ pub fn run() {
             commands::versioning::compare_snapshots,
             commands::versioning::log_change,
             commands::versioning::get_change_log,
+            // Filesystem / Git workflow
+            commands::filesystem::save_project_to_directory,
+            commands::filesystem::load_project_from_directory,
+            commands::filesystem::list_project_directories,
+            commands::filesystem::get_catalog_repo_info,
+            commands::filesystem::sync_catalog_from_repo,
+            commands::filesystem::get_data_paths,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running Tauri application");

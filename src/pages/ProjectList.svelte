@@ -1,8 +1,20 @@
 <script lang="ts">
   import { push } from "svelte-spa-router";
-  import type { Project, CreateProject } from "$lib/types";
+  import type {
+    Project,
+    CreateProject,
+    ProjectDirectoryInfo,
+    CatalogRepoInfo,
+  } from "$lib/types";
   import { DEFAULT_FACTOR_WEIGHTS } from "$lib/types";
-  import { projects, currentProject, setError, setSuccess } from "$lib/stores";
+  import {
+    projects,
+    currentProject,
+    projectDirectories,
+    catalogRepoInfo,
+    setError,
+    setSuccess,
+  } from "$lib/stores";
   import * as api from "$lib/api";
   import ConfirmDialog from "$components/ConfirmDialog.svelte";
   import { onMount } from "svelte";
@@ -27,7 +39,14 @@
   let importText = "";
   let importFile: File | null = null;
 
-  onMount(loadProjects);
+  let loadingDir = "";
+  let syncingCatalog = false;
+
+  onMount(async () => {
+    await loadProjects();
+    await loadDirectories();
+    await loadCatalogInfo();
+  });
 
   async function loadProjects() {
     try {
@@ -117,6 +136,50 @@
       await loadProjects();
     } catch (e) {
       setError(`Import failed: ${e}`);
+    }
+  }
+
+  async function loadDirectories() {
+    try {
+      const dirs = await api.listProjectDirectories();
+      projectDirectories.set(dirs);
+    } catch (e) {
+      console.error("Failed to load project directories:", e);
+    }
+  }
+
+  async function loadCatalogInfo() {
+    try {
+      const info = await api.getCatalogRepoInfo();
+      catalogRepoInfo.set(info);
+    } catch (e) {
+      console.error("Failed to load catalog repo info:", e);
+    }
+  }
+
+  async function loadFromDirectory(dirName: string) {
+    loadingDir = dirName;
+    try {
+      await api.loadProjectFromDirectory(dirName);
+      setSuccess(`Project loaded from directory "${dirName}".`);
+      await loadProjects();
+    } catch (e) {
+      setError(`Failed to load from directory: ${e}`);
+    } finally {
+      loadingDir = "";
+    }
+  }
+
+  async function syncCatalog() {
+    syncingCatalog = true;
+    try {
+      const msg = await api.syncCatalogFromRepo();
+      setSuccess(msg);
+      await loadCatalogInfo();
+    } catch (e) {
+      setError(`Catalog sync failed: ${e}`);
+    } finally {
+      syncingCatalog = false;
     }
   }
 </script>
@@ -368,6 +431,72 @@
       <p class="empty">No projects yet. Create one to get started.</p>
     {/each}
   </div>
+
+  <!-- ─── Project Directories (Git-based) ─────────────────────── -->
+  {#if $projectDirectories.length > 0}
+    <div class="section-divider">
+      <h3>📁 Project Directories</h3>
+      <p class="section-desc">
+        Projects saved to <code
+          >{$catalogRepoInfo?.path?.replace("/catalog-repo", "/projects") ||
+            "/app/data/projects/"}</code
+        > — manage Git in a terminal.
+      </p>
+    </div>
+    <div class="project-list">
+      {#each $projectDirectories as dir}
+        <div class="project-row dir-row">
+          <div class="project-info">
+            <h4>
+              {dir.project_name}
+              {#if dir.has_git}<span class="git-badge" title="Git repository"
+                  >⎇ git</span
+                >{/if}
+            </h4>
+            <p class="dir-path">{dir.dir_name}/</p>
+            <div class="project-meta">
+              <span class="meta-date">Modified: {dir.last_modified}</span>
+            </div>
+          </div>
+          <div class="project-actions">
+            <button
+              class="btn btn-sm btn-secondary"
+              disabled={loadingDir === dir.dir_name}
+              on:click={() => loadFromDirectory(dir.dir_name)}
+            >
+              {loadingDir === dir.dir_name ? "⏳ Loading…" : "⬆ Load into DB"}
+            </button>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
+
+  <!-- ─── Catalog Repo Info ───────────────────────────────────── -->
+  {#if $catalogRepoInfo}
+    <div class="section-divider">
+      <h3>📚 Catalog Repository</h3>
+      <p class="section-desc">
+        <code>{$catalogRepoInfo.path}</code>
+        {#if $catalogRepoInfo.has_git}<span class="git-badge">⎇ git</span>{/if}
+      </p>
+    </div>
+    <div class="catalog-info card">
+      <div class="catalog-stats">
+        <span>📄 {$catalogRepoInfo.catalog_file_count} catalog entries</span>
+        <span
+          >🏷️ {$catalogRepoInfo.tag_catalog_file_count} tag catalog files</span
+        >
+      </div>
+      <button
+        class="btn btn-sm btn-secondary"
+        disabled={syncingCatalog}
+        on:click={syncCatalog}
+      >
+        {syncingCatalog ? "⏳ Syncing…" : "🔄 Re-sync from Files"}
+      </button>
+    </div>
+  {/if}
 </div>
 
 <ConfirmDialog
@@ -555,5 +684,60 @@
   .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  /* ─── Directory / Catalog Repo sections ──────────────────── */
+  .section-divider {
+    margin-top: 28px;
+    margin-bottom: 12px;
+    border-top: 1px solid var(--color-border, #e2e8f0);
+    padding-top: 16px;
+  }
+  .section-divider h3 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+  }
+  .section-desc {
+    margin: 0 0 12px;
+    font-size: 0.78rem;
+    color: var(--color-text-muted, #718096);
+  }
+  .section-desc code {
+    background: #edf2f7;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+  }
+  .dir-row {
+    border-left: 3px solid #4299e1;
+  }
+  .dir-path {
+    font-family: monospace;
+    font-size: 0.75rem !important;
+    color: #4a5568 !important;
+  }
+  .git-badge {
+    display: inline-block;
+    background: #f0fff4;
+    color: #22543d;
+    border: 1px solid #c6f6d5;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    margin-left: 6px;
+    vertical-align: middle;
+    font-weight: 600;
+  }
+  .catalog-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+  }
+  .catalog-stats {
+    display: flex;
+    gap: 20px;
+    font-size: 0.82rem;
+    color: var(--color-text, #2d3748);
   }
 </style>
