@@ -105,6 +105,19 @@
   const skillLabels = SKILL_LABELS;
   const accessLabels = ACCESS_LABELS;
 
+  let filterTag = "";
+
+  // Collect unique tags for filter dropdown
+  $: uniqueTags = [
+    ...new Set(
+      $attackerProfiles.map((p) => p.tag).filter((t) => t && t.trim() !== ""),
+    ),
+  ].sort();
+
+  $: filteredProfiles = filterTag
+    ? $attackerProfiles.filter((p) => p.tag === filterTag)
+    : $attackerProfiles;
+
   async function toggleActive(p: AttackerProfile) {
     try {
       await api.updateAttackerProfile({ id: p.id, is_active: !p.is_active });
@@ -190,8 +203,26 @@
     </div>
   {/if}
 
+  {#if uniqueTags.length > 0}
+    <div class="filter-bar">
+      <label class="filter-label">Filter by Tag:</label>
+      <select class="input filter-select" bind:value={filterTag}>
+        <option value="">All Profiles</option>
+        {#each uniqueTags as tag}
+          <option value={tag}>{tag}</option>
+        {/each}
+      </select>
+      {#if filterTag}
+        <button
+          class="btn btn-sm btn-secondary"
+          on:click={() => (filterTag = "")}>Clear</button
+        >
+      {/if}
+    </div>
+  {/if}
+
   <div class="profiles-list">
-    {#each $attackerProfiles as p (p.id)}
+    {#each filteredProfiles as p (p.id)}
       <div class="profile-card" class:inactive={!p.is_active}>
         <div class="profile-header">
           <div class="profile-title-row">
@@ -300,6 +331,25 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 12px;
+  }
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+  }
+  .filter-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #4a5568;
+    white-space: nowrap;
+  }
+  .filter-select {
+    max-width: 220px;
   }
   .profile-card {
     background: white;

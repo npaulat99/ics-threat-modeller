@@ -18,6 +18,7 @@
     treeData,
     selectedNodeId,
     selectedNodeType,
+    dragDropEnabled,
     setError,
     setSuccess,
   } from "$lib/stores";
@@ -615,6 +616,7 @@
         onDelete={(n) => (deleteTarget = n)}
         onDuplicate={handleDuplicate}
         onReorder={handleReorder}
+        dragEnabled={$dragDropEnabled}
       />
     </div>
   </div>
@@ -1094,6 +1096,39 @@
     flex: 1;
     overflow-y: scroll;
     padding: 8px;
+  }
+
+  /* Custom scrollbar styling for tree panel */
+  .tree-container::-webkit-scrollbar {
+    width: 10px;
+  }
+  .tree-container::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 5px;
+  }
+  .tree-container::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 5px;
+    border: 2px solid #f1f5f9;
+  }
+  .tree-container::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+
+  .detail-panel::-webkit-scrollbar {
+    width: 10px;
+  }
+  .detail-panel::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 5px;
+  }
+  .detail-panel::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 5px;
+    border: 2px solid #f1f5f9;
+  }
+  .detail-panel::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
   }
 
   .detail-card {

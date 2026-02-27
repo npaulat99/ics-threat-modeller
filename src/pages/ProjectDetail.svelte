@@ -1,7 +1,12 @@
 <script lang="ts">
   import type { UpdateProject } from "$lib/types";
   import { DEFAULT_FACTOR_WEIGHTS, type FactorName } from "$lib/types";
-  import { currentProject, setError, setSuccess } from "$lib/stores";
+  import {
+    currentProject,
+    setError,
+    setSuccess,
+    dragDropEnabled,
+  } from "$lib/stores";
   import * as api from "$lib/api";
   import { parseFactorWeights } from "$lib/calculations";
 
@@ -286,6 +291,27 @@
       </div>
 
       <div class="card">
+        <h3>Behavior</h3>
+        <div class="form-group">
+          <label class="checkbox-row">
+            <input
+              type="checkbox"
+              checked={$dragDropEnabled}
+              on:change={(e) => dragDropEnabled.set(e.currentTarget.checked)}
+            />
+            <span class="checkbox-text">
+              <strong>Enable Drag &amp; Drop</strong>
+              <span class="checkbox-desc"
+                >Allow reordering items in the Attack Tree by dragging and
+                dropping nodes. Disable this if drag interactions interfere with
+                your workflow.</span
+              >
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
         <h3>Deployment & Probabilities</h3>
         <div class="form-group">
           <label>Deployment Context (JSON)</label>
@@ -470,6 +496,34 @@
   .save-bar {
     margin-top: 20px;
     text-align: right;
+  }
+
+  .checkbox-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: normal;
+  }
+  .checkbox-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .checkbox-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .checkbox-text strong {
+    font-size: 0.85rem;
+  }
+  .checkbox-desc {
+    font-size: 0.75rem;
+    color: #718096;
+    line-height: 1.4;
   }
 
   .btn {

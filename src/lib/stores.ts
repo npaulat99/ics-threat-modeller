@@ -35,6 +35,7 @@ export const snapshots = writable<Snapshot[]>([]);
 export const sidebarOpen = writable<boolean>(true);
 export const activeTab = writable<string>('tree');
 export const loading = writable<boolean>(false);
+export const dragDropEnabled = writable<boolean>(true);
 export const errorMessage = writable<string | null>(null);
 export const successMessage = writable<string | null>(null);
 

@@ -5,6 +5,7 @@
   export let node: TreeNodeData;
   export let depth = 0;
   export let selectedId: string | null = null;
+  export let dragEnabled = true;
 
   const dispatch = createEventDispatcher<{
     select: TreeNodeData;
@@ -131,11 +132,11 @@
     on:keypress={select}
     role="treeitem"
     tabindex="0"
-    draggable="true"
-    on:dragstart={handleDragStart}
-    on:dragover={handleDragOver}
-    on:dragleave={handleDragLeave}
-    on:drop={handleDrop}
+    draggable={dragEnabled}
+    on:dragstart={dragEnabled ? handleDragStart : undefined}
+    on:dragover={dragEnabled ? handleDragOver : undefined}
+    on:dragleave={dragEnabled ? handleDragLeave : undefined}
+    on:drop={dragEnabled ? handleDrop : undefined}
   >
     <button
       class="toggle-btn"
@@ -177,6 +178,7 @@
           node={child}
           depth={depth + 1}
           {selectedId}
+          {dragEnabled}
           on:select={forwardSelect}
           on:addChild={forwardAddChild}
           on:delete={forwardDelete}

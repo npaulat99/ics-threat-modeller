@@ -8,6 +8,7 @@
   export let onAddChild: ((parentNode: TreeNodeData) => void) | null = null;
   export let onDelete: ((node: TreeNodeData) => void) | null = null;
   export let onDuplicate: ((node: TreeNodeData) => void) | null = null;
+  export let dragEnabled = true;
   export let onReorder:
     | ((detail: {
         draggedId: string;
@@ -37,6 +38,7 @@
         {node}
         depth={0}
         selectedId={$selectedNodeId}
+        {dragEnabled}
         on:select={(e) => handleSelect(e.detail)}
         on:addChild={(e) => onAddChild?.(e.detail)}
         on:delete={(e) => onDelete?.(e.detail)}
