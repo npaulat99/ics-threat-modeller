@@ -1,238 +1,228 @@
 <script lang="ts">
+  import { writable } from "svelte/store";
+  import {
+    SvelteFlow,
+    Controls,
+    Background,
+    MiniMap,
+    type NodeTypes,
+    type EdgeTypes,
+  } from "@xyflow/svelte";
+  import "@xyflow/svelte/dist/style.css";
+
   import type { TreeNodeData } from "$lib/types";
+  import { treeToFlow } from "$lib/treeLayout";
+  import AttackNode from "./flow/AttackNode.svelte";
+  import DefenseEdge from "./flow/DefenseEdge.svelte";
 
   export let nodes: TreeNodeData[] = [];
   export let onSelect: (node: TreeNodeData) => void = () => {};
   export let selectedId: string | null = null;
 
-  const typeColors: Record<string, string> = {
-    goal: "#c53030",
-    category: "#2b6cb0",
-    step: "#c53030",
-    substep: "#e53e3e",
-    path: "#6b46c1",
-    countermeasure: "#22543d",
+  /** Layout direction — TB (top-down) or LR (left-right) */
+  export let direction: "TB" | "LR" = "TB";
+
+  /* Register custom node / edge types */
+  const nodeTypes: NodeTypes = {
+    attackNode: AttackNode as any,
+  };
+  const edgeTypes: EdgeTypes = {
+    defenseEdge: DefenseEdge as any,
   };
 
-  const typeIcons: Record<string, string> = {
-    goal: "🎯",
-    category: "📂",
-    step: "⚡",
-    substep: "🔸",
-    path: "🔀",
-    countermeasure: "🛡️",
+  /* SvelteFlow needs writable stores */
+  const flowNodes = writable<any[]>([]);
+  const flowEdges = writable<any[]>([]);
+
+  /* Minimap color mapping */
+  const minimapColors: Record<string, string> = {
+    goal: "#C53030",
+    category: "#2B6CB0",
+    step: "#DD6B20",
+    substep: "#E53E3E",
+    path: "#805AD5",
+    countermeasure: "#38A169",
   };
 
-  function getConjunctionLabel(node: TreeNodeData): string {
-    // Only show conjunction on nodes that have children
-    if (node.children.length === 0) return "";
-    const data = node.data as any;
-    if (node.type === "goal") {
-      return data?.impact_category === "and" ? "AND" : "OR";
+  function minimapNodeColor(node: any): string {
+    return minimapColors[node?.data?.nodeType] || "#718096";
+  }
+
+  /* Re-layout whenever tree data, selection, or direction changes */
+  $: {
+    const result = treeToFlow(nodes, selectedId, direction);
+    flowNodes.set(result.nodes);
+    flowEdges.set(result.edges);
+  }
+
+  /* Handle node click → forward to parent */
+  function handleNodeClick(event: CustomEvent<{ node: any }>) {
+    const treeNode = event.detail?.node?.data?.treeNode as
+      | TreeNodeData
+      | undefined;
+    if (treeNode) {
+      onSelect(treeNode);
     }
-    if (data?.conjunction) return data.conjunction;
-    return "";
   }
 </script>
 
-<div class="tree-diagram">
-  {#each nodes as node (node.id)}
-    <div class="tree-root">
-      <div class="node-branch">
-        <button
-          class="tree-node-box"
-          class:selected={selectedId === node.id}
-          class:countermeasure-node={node.type === "countermeasure"}
-          class:path-node={node.type === "path"}
-          style="--node-color: {typeColors[node.type] ||
-            '#718096'}; --node-bg: {selectedId === node.id
-            ? typeColors[node.type]
-            : 'white'}"
-          on:click={() => onSelect(node)}
-        >
-          <span class="node-icon">{typeIcons[node.type] || "•"}</span>
-          <span class="node-name">{node.name}</span>
-          {#if getConjunctionLabel(node)}
-            <span
-              class="conjunction-tag {getConjunctionLabel(node).toLowerCase()}"
-              >{getConjunctionLabel(node)}</span
-            >
-          {/if}
-        </button>
-
-        {#if node.children.length > 0}
-          <div class="children-container">
-            <svg class="connector-svg" preserveAspectRatio="none">
-              <line
-                x1="50%"
-                y1="0"
-                x2="50%"
-                y2="100%"
-                stroke="#a0aec0"
-                stroke-width="2"
-              />
-            </svg>
-            <div class="children-row">
-              {#each node.children as child (child.id)}
-                <div class="child-branch">
-                  <div
-                    class="child-connector-line"
-                    class:dashed-line={child.type === "countermeasure" ||
-                      node.type === "countermeasure"}
-                  ></div>
-                  <svelte:self nodes={[child]} {onSelect} {selectedId} />
-                </div>
-              {/each}
-            </div>
-          </div>
-        {/if}
-      </div>
+<div class="diagram-flow-container">
+  <div class="diagram-toolbar">
+    <button
+      class="dir-btn"
+      class:active={direction === "TB"}
+      on:click={() => (direction = "TB")}
+      title="Top to Bottom layout">↓ Top-Down</button
+    >
+    <button
+      class="dir-btn"
+      class:active={direction === "LR"}
+      on:click={() => (direction = "LR")}
+      title="Left to Right layout">→ Left-Right</button
+    >
+    <div class="legend">
+      <span class="legend-item attack">
+        <span class="legend-line solid"></span> Attack
+      </span>
+      <span class="legend-item defense">
+        <span class="legend-line dashed"></span> Defense
+      </span>
     </div>
-  {/each}
+  </div>
+
+  <div class="flow-wrapper">
+    <SvelteFlow
+      nodes={flowNodes}
+      edges={flowEdges}
+      {nodeTypes}
+      {edgeTypes}
+      fitView
+      minZoom={0.1}
+      maxZoom={2.5}
+      nodesDraggable={false}
+      nodesConnectable={false}
+      elementsSelectable={true}
+      panOnDrag={true}
+      zoomOnScroll={true}
+      preventScrolling={true}
+      defaultEdgeOptions={{ type: "defenseEdge" }}
+      on:nodeclick={handleNodeClick}
+    >
+      <Controls position="bottom-right" />
+      <Background gap={20} size={1} />
+      <MiniMap
+        nodeColor={minimapNodeColor}
+        maskColor="rgba(240, 240, 240, 0.7)"
+        position="bottom-left"
+      />
+    </SvelteFlow>
+  </div>
 </div>
 
 <style>
-  .tree-diagram {
+  .diagram-flow-container {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    padding: 20px;
-    min-width: max-content;
+    height: 100%;
+    min-height: 420px;
   }
 
-  .tree-root {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .node-branch {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .tree-node-box {
+  .diagram-toolbar {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 14px;
-    border: 2px solid var(--node-color);
-    border-radius: 6px;
-    background: var(--node-bg, white);
-    cursor: pointer;
-    font-size: 0.8rem;
-    font-family: inherit;
-    white-space: nowrap;
-    transition: all 0.15s;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    position: relative;
+    padding: 6px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f7fafc;
+    flex-shrink: 0;
   }
 
-  .tree-node-box:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    transform: translateY(-1px);
-  }
-
-  .tree-node-box.selected {
-    background: var(--node-color);
-    color: white;
-  }
-
-  .tree-node-box.countermeasure-node {
-    border-style: solid;
-    border-width: 2px;
-    background: #f0fff4;
-  }
-  .tree-node-box.countermeasure-node.selected {
-    background: #22543d;
-  }
-
-  .tree-node-box.path-node {
-    border-style: dotted;
-    border-width: 2px;
-    background: #faf5ff;
-  }
-  .tree-node-box.path-node.selected {
-    background: #6b46c1;
-  }
-
-  .node-icon {
-    font-size: 0.9rem;
-  }
-  .node-name {
+  .dir-btn {
+    padding: 3px 10px;
+    font-size: 0.72rem;
     font-weight: 600;
-    max-width: 180px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    color: #4a5568;
+    transition: all 0.12s;
   }
 
-  .conjunction-tag {
-    font-size: 0.6rem;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 3px;
-    text-transform: uppercase;
+  .dir-btn:hover {
+    background: #edf2f7;
   }
 
-  .conjunction-tag.or {
-    background: #fed7d7;
-    color: #c53030;
+  .dir-btn.active {
+    background: #1a365d;
+    color: white;
+    border-color: #1a365d;
   }
 
-  .conjunction-tag.and {
-    background: #bee3f8;
-    color: #2b6cb0;
-  }
-
-  .tree-node-box.selected .conjunction-tag {
-    background: rgba(255, 255, 255, 0.25);
-    color: inherit;
-  }
-
-  .children-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .connector-svg {
-    width: 2px;
-    height: 20px;
-  }
-
-  .children-row {
+  .legend {
+    margin-left: auto;
     display: flex;
     gap: 12px;
-    position: relative;
-    padding-top: 2px;
+    font-size: 0.7rem;
+    color: #718096;
   }
 
-  .children-row::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 24px;
-    right: 24px;
-    height: 2px;
-    background: #a0aec0;
-  }
-
-  .child-branch {
+  .legend-item {
     display: flex;
-    flex-direction: column;
     align-items: center;
+    gap: 4px;
   }
 
-  .child-connector-line {
-    width: 2px;
-    height: 16px;
-    background: #a0aec0;
+  .legend-line {
+    display: inline-block;
+    width: 20px;
+    height: 0;
   }
 
-  .child-connector-line.dashed-line {
-    background: none;
-    border-left: 2px dashed #38a169;
+  .legend-line.solid {
+    border-top: 2px solid #a0aec0;
+  }
+
+  .legend-line.dashed {
+    border-top: 2px dashed #48bb78;
+  }
+
+  .flow-wrapper {
+    flex: 1;
+    min-height: 380px;
+  }
+
+  /* Override SvelteFlow defaults for our theme */
+  :global(.svelte-flow) {
+    background: #fafbfc !important;
+  }
+
+  :global(.svelte-flow__background) {
+    opacity: 0.5;
+  }
+
+  :global(.svelte-flow__minimap) {
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  :global(.svelte-flow__controls) {
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  :global(.svelte-flow__controls button) {
+    background: white;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  :global(.svelte-flow__controls button:hover) {
+    background: #edf2f7;
+  }
+
+  :global(.svelte-flow__edge-path) {
+    stroke-linecap: round;
   }
 </style>

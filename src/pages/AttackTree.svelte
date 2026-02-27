@@ -1096,16 +1096,11 @@
 
 {#if $treeData.length > 0}
   <div class="diagram-panel">
-    <div class="panel-header">
-      <h3>Tree Visualization</h3>
-    </div>
-    <div class="diagram-scroll">
-      <AttackTreeDiagram
-        nodes={$treeData}
-        onSelect={handleSelect}
-        selectedId={selectedNode?.id ?? null}
-      />
-    </div>
+    <AttackTreeDiagram
+      nodes={$treeData}
+      onSelect={handleSelect}
+      selectedId={selectedNode?.id ?? null}
+    />
   </div>
 {/if}
 
@@ -1250,13 +1245,7 @@
     overflow: hidden;
     position: relative;
     z-index: 0;
-  }
-
-  .diagram-scroll {
-    overflow: auto;
-    max-height: 400px;
-    padding: 8px;
-    contain: paint;
+    height: 520px;
   }
 
   .panel-header {
