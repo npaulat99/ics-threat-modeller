@@ -125,7 +125,9 @@
     try {
       const entries = await api.listTagCatalog();
       tagCatalog.set(entries);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
   loadTagCatalog();
 
@@ -140,8 +142,20 @@
 
   // Project configured tags: assets, interfaces, 3rd party software
   $: projectTags = (() => {
-    if (!$currentProject) return { asset: [] as string[], interface: [] as string[], third_party_software: [] as string[] };
-    const parse = (json: string): string[] => { try { const a = JSON.parse(json || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
+    if (!$currentProject)
+      return {
+        asset: [] as string[],
+        interface: [] as string[],
+        third_party_software: [] as string[],
+      };
+    const parse = (json: string): string[] => {
+      try {
+        const a = JSON.parse(json || "[]");
+        return Array.isArray(a) ? a : [];
+      } catch {
+        return [];
+      }
+    };
     return {
       asset: parse($currentProject.assets),
       interface: parse($currentProject.interfaces),
@@ -153,7 +167,7 @@
     ...projectTags.asset,
     ...projectTags.interface,
     ...projectTags.third_party_software,
-  ].map(t => t.toLowerCase());
+  ].map((t) => t.toLowerCase());
 
   $: {
     // Extract all unique tags from catalog entries.
@@ -178,23 +192,29 @@
 
   // Categorize tags from catalog entries
   $: categorizedTags = (() => {
-    const cats: Record<string, string[]> = { asset: [], interface: [], third_party_software: [], other: [] };
+    const cats: Record<string, string[]> = {
+      asset: [],
+      interface: [],
+      third_party_software: [],
+      other: [],
+    };
     for (const t of allTags) {
-      const cat = tagCategoryMap[t] || 'other';
+      const cat = tagCategoryMap[t] || "other";
       if (!cats[cat]) cats[cat] = [];
       cats[cat].push(t);
     }
     return cats;
   })();
 
-  $: visibleTags = filterCategory === 'all' ? allTags : (categorizedTags[filterCategory] || []);
+  $: visibleTags =
+    filterCategory === "all" ? allTags : categorizedTags[filterCategory] || [];
 
   const categoryLabels: Record<string, string> = {
-    all: 'All',
-    asset: '🏭 Assets',
-    interface: '🔌 Interfaces',
-    third_party_software: '💾 3rd Party Software',
-    other: '📌 Other',
+    all: "All",
+    asset: "🏭 Assets",
+    interface: "🔌 Interfaces",
+    third_party_software: "💾 3rd Party Software",
+    other: "📌 Other",
   };
 
   function toggleTag(tag: string) {
@@ -224,10 +244,13 @@
     // Also search in tree_data for asset/interface references
     const treeStr = (entry.tree_data || "").toLowerCase();
 
-    const matchesTags = !hasTagFilter || selectedTags.some((st) => entryTags.includes(st));
-    const matchesProject = !hasProjectMatch || allProjectTagsLower.some((pt) =>
-      entryTags.includes(pt) || treeStr.includes(pt)
-    );
+    const matchesTags =
+      !hasTagFilter || selectedTags.some((st) => entryTags.includes(st));
+    const matchesProject =
+      !hasProjectMatch ||
+      allProjectTagsLower.some(
+        (pt) => entryTags.includes(pt) || treeStr.includes(pt),
+      );
 
     return matchesTags && matchesProject;
   }
@@ -309,12 +332,12 @@
         <span class="tag-filter-label">Filter by tag:</span>
         <div class="cat-tabs">
           {#each Object.entries(categoryLabels) as [cat, label]}
-            {#if cat === 'all' || (categorizedTags[cat] && categorizedTags[cat].length > 0)}
+            {#if cat === "all" || (categorizedTags[cat] && categorizedTags[cat].length > 0)}
               <button
                 class="cat-tab"
                 class:active={filterCategory === cat}
-                on:click={() => filterCategory = cat}
-              >{label}</button>
+                on:click={() => (filterCategory = cat)}>{label}</button
+              >
             {/if}
           {/each}
         </div>

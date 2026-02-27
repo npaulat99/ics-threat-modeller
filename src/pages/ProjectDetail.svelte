@@ -35,16 +35,30 @@
   let showThirdPartySuggestions = false;
 
   $: interfaceSuggestions = $tagCatalogByCategory.interface
-    .map(e => e.name)
-    .filter(n => !interfacesList.includes(n) && (!newInterface.trim() || n.toLowerCase().includes(newInterface.toLowerCase())));
+    .map((e) => e.name)
+    .filter(
+      (n) =>
+        !interfacesList.includes(n) &&
+        (!newInterface.trim() ||
+          n.toLowerCase().includes(newInterface.toLowerCase())),
+    );
 
   $: assetSuggestions = $tagCatalogByCategory.asset
-    .map(e => e.name)
-    .filter(n => !assetsList.includes(n) && (!newAsset.trim() || n.toLowerCase().includes(newAsset.toLowerCase())));
+    .map((e) => e.name)
+    .filter(
+      (n) =>
+        !assetsList.includes(n) &&
+        (!newAsset.trim() || n.toLowerCase().includes(newAsset.toLowerCase())),
+    );
 
   $: thirdPartySuggestions = $tagCatalogByCategory.third_party_software
-    .map(e => e.name)
-    .filter(n => !thirdPartySoftwareList.includes(n) && (!newThirdPartySoftware.trim() || n.toLowerCase().includes(newThirdPartySoftware.toLowerCase())));
+    .map((e) => e.name)
+    .filter(
+      (n) =>
+        !thirdPartySoftwareList.includes(n) &&
+        (!newThirdPartySoftware.trim() ||
+          n.toLowerCase().includes(newThirdPartySoftware.toLowerCase())),
+    );
 
   onMount(async () => {
     try {
@@ -224,9 +238,10 @@
                   class="input"
                   bind:value={newInterface}
                   placeholder="Type and press Enter…"
-                  on:focus={() => showInterfaceSuggestions = true}
-                  on:blur={() => setTimeout(() => showInterfaceSuggestions = false, 200)}
-                  on:input={() => showInterfaceSuggestions = true}
+                  on:focus={() => (showInterfaceSuggestions = true)}
+                  on:blur={() =>
+                    setTimeout(() => (showInterfaceSuggestions = false), 200)}
+                  on:input={() => (showInterfaceSuggestions = true)}
                   on:keydown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -238,11 +253,14 @@
                 {#if showInterfaceSuggestions && interfaceSuggestions.length > 0}
                   <div class="suggestions-dropdown">
                     {#each interfaceSuggestions.slice(0, 10) as suggestion}
-                      <button class="suggestion-item" on:mousedown|preventDefault={() => {
-                        newInterface = suggestion;
-                        addInterface();
-                        showInterfaceSuggestions = false;
-                      }}>{suggestion}</button>
+                      <button
+                        class="suggestion-item"
+                        on:mousedown|preventDefault={() => {
+                          newInterface = suggestion;
+                          addInterface();
+                          showInterfaceSuggestions = false;
+                        }}>{suggestion}</button
+                      >
                     {/each}
                   </div>
                 {/if}
@@ -277,9 +295,10 @@
                   class="input"
                   bind:value={newAsset}
                   placeholder="Type and press Enter…"
-                  on:focus={() => showAssetSuggestions = true}
-                  on:blur={() => setTimeout(() => showAssetSuggestions = false, 200)}
-                  on:input={() => showAssetSuggestions = true}
+                  on:focus={() => (showAssetSuggestions = true)}
+                  on:blur={() =>
+                    setTimeout(() => (showAssetSuggestions = false), 200)}
+                  on:input={() => (showAssetSuggestions = true)}
                   on:keydown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -291,11 +310,14 @@
                 {#if showAssetSuggestions && assetSuggestions.length > 0}
                   <div class="suggestions-dropdown">
                     {#each assetSuggestions.slice(0, 10) as suggestion}
-                      <button class="suggestion-item" on:mousedown|preventDefault={() => {
-                        newAsset = suggestion;
-                        addAsset();
-                        showAssetSuggestions = false;
-                      }}>{suggestion}</button>
+                      <button
+                        class="suggestion-item"
+                        on:mousedown|preventDefault={() => {
+                          newAsset = suggestion;
+                          addAsset();
+                          showAssetSuggestions = false;
+                        }}>{suggestion}</button
+                      >
                     {/each}
                   </div>
                 {/if}
@@ -334,9 +356,10 @@
                   class="input"
                   bind:value={newThirdPartySoftware}
                   placeholder="Type and press Enter…"
-                  on:focus={() => showThirdPartySuggestions = true}
-                  on:blur={() => setTimeout(() => showThirdPartySuggestions = false, 200)}
-                  on:input={() => showThirdPartySuggestions = true}
+                  on:focus={() => (showThirdPartySuggestions = true)}
+                  on:blur={() =>
+                    setTimeout(() => (showThirdPartySuggestions = false), 200)}
+                  on:input={() => (showThirdPartySuggestions = true)}
                   on:keydown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -348,11 +371,14 @@
                 {#if showThirdPartySuggestions && thirdPartySuggestions.length > 0}
                   <div class="suggestions-dropdown">
                     {#each thirdPartySuggestions.slice(0, 10) as suggestion}
-                      <button class="suggestion-item" on:mousedown|preventDefault={() => {
-                        newThirdPartySoftware = suggestion;
-                        addThirdPartySoftware();
-                        showThirdPartySuggestions = false;
-                      }}>{suggestion}</button>
+                      <button
+                        class="suggestion-item"
+                        on:mousedown|preventDefault={() => {
+                          newThirdPartySoftware = suggestion;
+                          addThirdPartySoftware();
+                          showThirdPartySuggestions = false;
+                        }}>{suggestion}</button
+                      >
                     {/each}
                   </div>
                 {/if}
@@ -584,7 +610,7 @@
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 0 0 6px 6px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     max-height: 200px;
     overflow-y: auto;
     z-index: 50;

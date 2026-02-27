@@ -73,21 +73,32 @@
   // Entity tags (asset / interface / third_party_software)
   let entityTags: Tag[] = [];
   let showAddTag = false;
-  let newTagCategory: 'asset' | 'interface' | 'third_party_software' = 'asset';
+  let newTagCategory: "asset" | "interface" | "third_party_software" = "asset";
   let newTagValue = "";
   let showTagSuggestions = false;
 
   $: tagSuggestions = (() => {
     const catEntries = $tagCatalogByCategory[newTagCategory] || [];
-    const existing = entityTags.filter(t => t.key === newTagCategory).map(t => t.value);
+    const existing = entityTags
+      .filter((t) => t.key === newTagCategory)
+      .map((t) => t.value);
     return catEntries
-      .map(e => e.name)
-      .filter(n => !existing.includes(n) && (!newTagValue.trim() || n.toLowerCase().includes(newTagValue.toLowerCase())));
+      .map((e) => e.name)
+      .filter(
+        (n) =>
+          !existing.includes(n) &&
+          (!newTagValue.trim() ||
+            n.toLowerCase().includes(newTagValue.toLowerCase())),
+      );
   })();
 
   // Group entity tags by category for display
   $: tagsByCategory = (() => {
-    const grouped: Record<string, Tag[]> = { asset: [], interface: [], third_party_software: [] };
+    const grouped: Record<string, Tag[]> = {
+      asset: [],
+      interface: [],
+      third_party_software: [],
+    };
     for (const t of entityTags) {
       if (!grouped[t.key]) grouped[t.key] = [];
       grouped[t.key].push(t);
@@ -96,9 +107,9 @@
   })();
 
   const tagCategoryLabels: Record<string, string> = {
-    asset: '🏭 Assets',
-    interface: '🔌 Interfaces',
-    third_party_software: '💾 3rd Party Software',
+    asset: "🏭 Assets",
+    interface: "🔌 Interfaces",
+    third_party_software: "💾 3rd Party Software",
   };
 
   const skillLabels = SKILL_LABELS;
@@ -107,7 +118,10 @@
   onMount(() => {
     loadTree();
     // Load tag catalog for suggestions
-    api.listTagCatalog().then(entries => tagCatalog.set(entries)).catch(() => {});
+    api
+      .listTagCatalog()
+      .then((entries) => tagCatalog.set(entries))
+      .catch(() => {});
   });
 
   async function loadTree() {
@@ -996,19 +1010,29 @@
             </div>
             {#if showAddTag}
               <div class="tag-assign-form">
-                <select class="input tag-cat-select" bind:value={newTagCategory} on:change={() => { newTagValue = ''; showTagSuggestions = false; }}>
+                <select
+                  class="input tag-cat-select"
+                  bind:value={newTagCategory}
+                  on:change={() => {
+                    newTagValue = "";
+                    showTagSuggestions = false;
+                  }}
+                >
                   <option value="asset">🏭 Asset</option>
                   <option value="interface">🔌 Interface</option>
-                  <option value="third_party_software">💾 3rd Party Software</option>
+                  <option value="third_party_software"
+                    >💾 3rd Party Software</option
+                  >
                 </select>
                 <div class="tag-autocomplete-wrapper">
                   <input
                     class="input"
                     bind:value={newTagValue}
                     placeholder="Select or type tag…"
-                    on:focus={() => showTagSuggestions = true}
-                    on:blur={() => setTimeout(() => showTagSuggestions = false, 200)}
-                    on:input={() => showTagSuggestions = true}
+                    on:focus={() => (showTagSuggestions = true)}
+                    on:blur={() =>
+                      setTimeout(() => (showTagSuggestions = false), 200)}
+                    on:input={() => (showTagSuggestions = true)}
                     on:keydown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -1019,26 +1043,37 @@
                   {#if showTagSuggestions && tagSuggestions.length > 0}
                     <div class="tag-suggestions-dropdown">
                       {#each tagSuggestions.slice(0, 8) as suggestion}
-                        <button class="tag-suggestion-item" on:mousedown|preventDefault={() => {
-                          newTagValue = suggestion;
-                          addEntityTag();
-                        }}>{suggestion}</button>
+                        <button
+                          class="tag-suggestion-item"
+                          on:mousedown|preventDefault={() => {
+                            newTagValue = suggestion;
+                            addEntityTag();
+                          }}>{suggestion}</button
+                        >
                       {/each}
                     </div>
                   {/if}
                 </div>
-                <button class="btn btn-sm btn-primary" on:click={addEntityTag}>Add</button>
+                <button class="btn btn-sm btn-primary" on:click={addEntityTag}
+                  >Add</button
+                >
               </div>
             {/if}
             {#each Object.entries(tagsByCategory) as [cat, tags]}
               {#if tags.length > 0}
                 <div class="tag-cat-group">
-                  <span class="tag-cat-label">{tagCategoryLabels[cat] || cat}</span>
+                  <span class="tag-cat-label"
+                    >{tagCategoryLabels[cat] || cat}</span
+                  >
                   <div class="tag-pills-row">
                     {#each tags as tag (tag.id)}
                       <span class="entity-tag-pill {cat}">
                         {tag.value}
-                        <button class="tag-pill-remove" on:click={() => removeEntityTag(tag.id)} title="Remove">✕</button>
+                        <button
+                          class="tag-pill-remove"
+                          on:click={() => removeEntityTag(tag.id)}
+                          title="Remove">✕</button
+                        >
                       </span>
                     {/each}
                   </div>
@@ -1557,7 +1592,7 @@
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 0 0 6px 6px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
     max-height: 180px;
     overflow-y: auto;
     z-index: 100;
