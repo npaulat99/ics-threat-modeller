@@ -1,11 +1,13 @@
 <script lang="ts">
-  import type { CatalogEntry } from "$lib/types";
+  import type { CatalogEntry, TagCatalogEntry } from "$lib/types";
   import {
     catalogEntries,
     catalogSearchQuery,
     setError,
     setSuccess,
     currentProject,
+    tagCatalog,
+    tagCatalogByCategory,
   } from "$lib/stores";
   import * as api from "$lib/api";
 
@@ -115,6 +117,43 @@
   // Tag filtering
   let selectedTags: string[] = [];
   let allTags: string[] = [];
+  let filterCategory: string = "all"; // "all" | "asset" | "interface" | "third_party_software" | "other"
+  let showProjectMatch = false;
+
+  // Load tag catalog on mount
+  async function loadTagCatalog() {
+    try {
+      const entries = await api.listTagCatalog();
+      tagCatalog.set(entries);
+    } catch { /* ignore */ }
+  }
+  loadTagCatalog();
+
+  // Build tag-to-category mapping from tag catalog + project data
+  $: tagCategoryMap = (() => {
+    const map: Record<string, string> = {};
+    for (const tc of $tagCatalog) {
+      map[tc.name.toLowerCase()] = tc.category;
+    }
+    return map;
+  })();
+
+  // Project configured tags: assets, interfaces, 3rd party software
+  $: projectTags = (() => {
+    if (!$currentProject) return { asset: [] as string[], interface: [] as string[], third_party_software: [] as string[] };
+    const parse = (json: string): string[] => { try { const a = JSON.parse(json || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
+    return {
+      asset: parse($currentProject.assets),
+      interface: parse($currentProject.interfaces),
+      third_party_software: parse($currentProject.third_party_software),
+    };
+  })();
+
+  $: allProjectTagsLower = [
+    ...projectTags.asset,
+    ...projectTags.interface,
+    ...projectTags.third_party_software,
+  ].map(t => t.toLowerCase());
 
   $: {
     // Extract all unique tags from catalog entries.
@@ -137,6 +176,27 @@
     allTags = [...tagSet].sort();
   }
 
+  // Categorize tags from catalog entries
+  $: categorizedTags = (() => {
+    const cats: Record<string, string[]> = { asset: [], interface: [], third_party_software: [], other: [] };
+    for (const t of allTags) {
+      const cat = tagCategoryMap[t] || 'other';
+      if (!cats[cat]) cats[cat] = [];
+      cats[cat].push(t);
+    }
+    return cats;
+  })();
+
+  $: visibleTags = filterCategory === 'all' ? allTags : (categorizedTags[filterCategory] || []);
+
+  const categoryLabels: Record<string, string> = {
+    all: 'All',
+    asset: '🏭 Assets',
+    interface: '🔌 Interfaces',
+    third_party_software: '💾 3rd Party Software',
+    other: '📌 Other',
+  };
+
   function toggleTag(tag: string) {
     if (selectedTags.includes(tag)) {
       selectedTags = selectedTags.filter((t) => t !== tag);
@@ -146,18 +206,30 @@
   }
 
   function entryMatchesTags(entry: CatalogEntry): boolean {
-    if (selectedTags.length === 0) return true;
+    const hasTagFilter = selectedTags.length > 0;
+    const hasProjectMatch = showProjectMatch && allProjectTagsLower.length > 0;
+    if (!hasTagFilter && !hasProjectMatch) return true;
+
+    let entryTags: string[] = [];
     try {
       const parsed = JSON.parse(entry.tags || "[]");
       if (Array.isArray(parsed)) {
-        const entryTags = parsed.map((t: string) => t.trim().toLowerCase());
-        return selectedTags.some((st) => entryTags.includes(st));
+        entryTags = parsed.map((t: string) => t.trim().toLowerCase());
       }
     } catch {
       const entryTag = (entry.tags || "").trim().toLowerCase();
-      return selectedTags.some((st) => entryTag.includes(st));
+      if (entryTag) entryTags = [entryTag];
     }
-    return false;
+
+    // Also search in tree_data for asset/interface references
+    const treeStr = (entry.tree_data || "").toLowerCase();
+
+    const matchesTags = !hasTagFilter || selectedTags.some((st) => entryTags.includes(st));
+    const matchesProject = !hasProjectMatch || allProjectTagsLower.some((pt) =>
+      entryTags.includes(pt) || treeStr.includes(pt)
+    );
+
+    return matchesTags && matchesProject;
   }
 
   $: filteredEntries = $catalogEntries.filter((e) => entryMatchesTags(e));
@@ -233,21 +305,45 @@
 
   {#if allTags.length > 0}
     <div class="tag-filter">
-      <span class="tag-filter-label">Filter by tag:</span>
-      {#each allTags as tag}
-        <button
-          class="tag-chip"
-          class:active={selectedTags.includes(tag)}
-          on:click={() => toggleTag(tag)}
-        >
-          {tag}
-        </button>
-      {/each}
-      {#if selectedTags.length > 0}
-        <button class="tag-clear" on:click={() => (selectedTags = [])}
-          >Clear</button
-        >
-      {/if}
+      <div class="tag-filter-top">
+        <span class="tag-filter-label">Filter by tag:</span>
+        <div class="cat-tabs">
+          {#each Object.entries(categoryLabels) as [cat, label]}
+            {#if cat === 'all' || (categorizedTags[cat] && categorizedTags[cat].length > 0)}
+              <button
+                class="cat-tab"
+                class:active={filterCategory === cat}
+                on:click={() => filterCategory = cat}
+              >{label}</button>
+            {/if}
+          {/each}
+        </div>
+        {#if $currentProject}
+          <label class="project-match-toggle">
+            <input type="checkbox" bind:checked={showProjectMatch} />
+            <span>Match project tags</span>
+          </label>
+        {/if}
+      </div>
+      <div class="tag-chips-row">
+        {#each visibleTags as tag}
+          <button
+            class="tag-chip"
+            class:active={selectedTags.includes(tag)}
+            class:project-tag={allProjectTagsLower.includes(tag)}
+            on:click={() => toggleTag(tag)}
+            title={allProjectTagsLower.includes(tag) ? "Used in project" : ""}
+          >
+            {#if allProjectTagsLower.includes(tag)}★{/if}
+            {tag}
+          </button>
+        {/each}
+        {#if selectedTags.length > 0}
+          <button class="tag-clear" on:click={() => (selectedTags = [])}
+            >Clear</button
+          >
+        {/if}
+      </div>
     </div>
   {/if}
 
@@ -486,19 +582,69 @@
 
   .tag-filter {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-    padding: 8px 12px;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
     background: #f7fafc;
     border: 1px solid #e2e8f0;
     border-radius: 6px;
+  }
+
+  .tag-filter-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
   .tag-filter-label {
     font-size: 0.75rem;
     font-weight: 600;
     color: #4a5568;
+  }
+
+  .cat-tabs {
+    display: flex;
+    gap: 2px;
+  }
+  .cat-tab {
+    border: 1px solid #cbd5e0;
+    background: white;
+    padding: 2px 8px;
+    font-size: 0.68rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.12s;
+  }
+  .cat-tab:hover {
+    background: #edf2f7;
+  }
+  .cat-tab.active {
+    background: #2d3748;
+    color: white;
+    border-color: #2d3748;
+  }
+
+  .project-match-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    color: #4a5568;
+    cursor: pointer;
+    margin-left: auto;
+  }
+  .project-match-toggle input {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+  }
+
+  .tag-chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
   }
 
   .tag-chip {
@@ -518,6 +664,14 @@
     background: #1a365d;
     color: white;
     border-color: #1a365d;
+  }
+  .tag-chip.project-tag {
+    border-color: #38a169;
+    box-shadow: inset 0 0 0 1px #38a16940;
+  }
+  .tag-chip.project-tag.active {
+    background: #276749;
+    border-color: #276749;
   }
 
   .tag-clear {

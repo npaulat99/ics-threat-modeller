@@ -341,6 +341,24 @@ pub struct CreateTag {
     pub value: String,
 }
 
+// ─── Tag Catalog ───────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagCatalogEntry {
+    pub id: String,
+    pub category: String, // "asset" | "interface" | "third_party_software"
+    pub name: String,
+    pub description: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateTagCatalogEntry {
+    pub category: String,
+    pub name: String,
+    pub description: Option<String>,
+}
+
 // ─── Catalog Entry ─────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

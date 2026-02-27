@@ -17,6 +17,7 @@ import type {
   Tag, CreateTag,
   AttackTechniqueMapping, CreateTechniqueMapping,
   CatalogEntry, CreateCatalogEntry,
+  TagCatalogEntry, CreateTagCatalogEntry,
   Snapshot, CreateSnapshot, DiffResult,
   ChangeLogEntry,
 } from './types';
@@ -278,6 +279,22 @@ export const importCatalogEntry = (catalogId: string, projectId: string) =>
 
 export const seedCatalog = () =>
   invoke<void>('seed_catalog_command');
+
+// ─── Tag Catalog ────────────────────────────────────────────────
+export const createTagCatalogEntry = (data: CreateTagCatalogEntry) =>
+  invoke<TagCatalogEntry>('create_tag_catalog_entry', { data });
+
+export const listTagCatalog = (category?: string) =>
+  invoke<TagCatalogEntry[]>('list_tag_catalog', { category: category ?? null });
+
+export const deleteTagCatalogEntry = (id: string) =>
+  invoke<void>('delete_tag_catalog_entry', { id });
+
+export const searchTagCatalog = (query: string, category?: string) =>
+  invoke<TagCatalogEntry[]>('search_tag_catalog', { query, category: category ?? null });
+
+export const seedTagCatalog = () =>
+  invoke<void>('seed_tag_catalog_command');
 
 // ─── Export / Import ────────────────────────────────────────────
 export const exportProjectJson = (projectId: string) =>

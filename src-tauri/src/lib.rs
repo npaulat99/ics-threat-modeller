@@ -21,6 +21,7 @@ pub fn run() {
     {
         let conn = database.conn.lock().unwrap();
         commands::catalog::seed_catalog(&conn).ok();
+        commands::tag_catalog::seed_tag_catalog(&conn).ok();
     }
 
     tauri::Builder::default()
@@ -104,6 +105,12 @@ pub fn run() {
             commands::catalog::search_catalog,
             commands::catalog::import_catalog_entry,
             commands::catalog::seed_catalog_command,
+            // Tag Catalog
+            commands::tag_catalog::create_tag_catalog_entry,
+            commands::tag_catalog::list_tag_catalog,
+            commands::tag_catalog::delete_tag_catalog_entry,
+            commands::tag_catalog::search_tag_catalog,
+            commands::tag_catalog::seed_tag_catalog_command,
             // Export / Import
             commands::export_import::export_project_json,
             commands::export_import::export_project_yaml,

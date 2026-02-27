@@ -7,6 +7,7 @@ import type {
   Step,
   AttackerProfile,
   CatalogEntry,
+  TagCatalogEntry,
   Snapshot,
   TreeNodeData,
 } from './types';
@@ -27,6 +28,17 @@ export const attackerProfiles = writable<AttackerProfile[]>([]);
 // ─── Catalog ────────────────────────────────────────────────────
 export const catalogEntries = writable<CatalogEntry[]>([]);
 export const catalogSearchQuery = writable<string>('');
+
+// ─── Tag Catalog ────────────────────────────────────────────────
+export const tagCatalog = writable<TagCatalogEntry[]>([]);
+export const tagCatalogByCategory = derived(tagCatalog, ($tc) => {
+  const map: Record<string, TagCatalogEntry[]> = { asset: [], interface: [], third_party_software: [] };
+  for (const entry of $tc) {
+    if (!map[entry.category]) map[entry.category] = [];
+    map[entry.category].push(entry);
+  }
+  return map;
+});
 
 // ─── Versioning ─────────────────────────────────────────────────
 export const snapshots = writable<Snapshot[]>([]);

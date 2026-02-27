@@ -381,6 +381,21 @@ export interface CreateTag {
   value: string;
 }
 
+// ─── Tag Catalog ────────────────────────────────────────────────
+export interface TagCatalogEntry {
+  id: string;
+  category: 'asset' | 'interface' | 'third_party_software';
+  name: string;
+  description: string;
+  created_at: string;
+}
+
+export interface CreateTagCatalogEntry {
+  category: 'asset' | 'interface' | 'third_party_software';
+  name: string;
+  description?: string;
+}
+
 export interface AttackTechniqueMapping {
   id: string;
   entity_id: string;

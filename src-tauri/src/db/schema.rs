@@ -153,6 +153,19 @@ fn run_migrations(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    // Migration: Create tag_catalog table if not exists.
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS tag_catalog (
+            id          TEXT PRIMARY KEY,
+            category    TEXT NOT NULL CHECK(category IN ('asset', 'interface', 'third_party_software')),
+            name        TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_tag_catalog_category ON tag_catalog(category);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tag_catalog_unique ON tag_catalog(category, name);",
+    )?;
+
     Ok(())
 }
 
@@ -334,6 +347,18 @@ CREATE TABLE IF NOT EXISTS catalog_entries (
 );
 
 -- ============================================================
+-- TAG CATALOG (Assets / Interfaces / 3rd Party Software)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS tag_catalog (
+    id          TEXT PRIMARY KEY,                 -- UUID
+    category    TEXT NOT NULL CHECK(category IN ('asset', 'interface', 'third_party_software')),
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ============================================================
 -- VERSIONING & CHANGE TRACKING
 -- ============================================================
 
@@ -379,6 +404,8 @@ CREATE INDEX IF NOT EXISTS idx_tags_entity ON tags(entity_id, entity_type);
 CREATE INDEX IF NOT EXISTS idx_snapshots_project ON snapshots(project_id);
 CREATE INDEX IF NOT EXISTS idx_change_log_project ON change_log(project_id);
 CREATE INDEX IF NOT EXISTS idx_change_log_entity ON change_log(entity_id, entity_type);
+CREATE INDEX IF NOT EXISTS idx_tag_catalog_category ON tag_catalog(category);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tag_catalog_unique ON tag_catalog(category, name);
 "#;
 
 #[cfg(test)]
@@ -397,8 +424,8 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        // We expect 14 tables.
-        assert_eq!(count, 14);
+        // We expect 15 tables.
+        assert_eq!(count, 15);
     }
 
     #[test]

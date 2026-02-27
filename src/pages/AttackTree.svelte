@@ -7,6 +7,8 @@
     Substep,
     Countermeasure,
     Weakness,
+    Tag,
+    TagCatalogEntry,
     CreateGoal,
     CreateStep,
     CreateCategory,
@@ -19,6 +21,8 @@
     selectedNodeId,
     selectedNodeType,
     dragDropEnabled,
+    tagCatalog,
+    tagCatalogByCategory,
     setError,
     setSuccess,
   } from "$lib/stores";
@@ -66,10 +70,45 @@
   let newWKDesc = "";
   let newWKCve = "";
 
+  // Entity tags (asset / interface / third_party_software)
+  let entityTags: Tag[] = [];
+  let showAddTag = false;
+  let newTagCategory: 'asset' | 'interface' | 'third_party_software' = 'asset';
+  let newTagValue = "";
+  let showTagSuggestions = false;
+
+  $: tagSuggestions = (() => {
+    const catEntries = $tagCatalogByCategory[newTagCategory] || [];
+    const existing = entityTags.filter(t => t.key === newTagCategory).map(t => t.value);
+    return catEntries
+      .map(e => e.name)
+      .filter(n => !existing.includes(n) && (!newTagValue.trim() || n.toLowerCase().includes(newTagValue.toLowerCase())));
+  })();
+
+  // Group entity tags by category for display
+  $: tagsByCategory = (() => {
+    const grouped: Record<string, Tag[]> = { asset: [], interface: [], third_party_software: [] };
+    for (const t of entityTags) {
+      if (!grouped[t.key]) grouped[t.key] = [];
+      grouped[t.key].push(t);
+    }
+    return grouped;
+  })();
+
+  const tagCategoryLabels: Record<string, string> = {
+    asset: '🏭 Assets',
+    interface: '🔌 Interfaces',
+    third_party_software: '💾 3rd Party Software',
+  };
+
   const skillLabels = SKILL_LABELS;
   const accessLabels = ACCESS_LABELS;
 
-  onMount(loadTree);
+  onMount(() => {
+    loadTree();
+    // Load tag catalog for suggestions
+    api.listTagCatalog().then(entries => tagCatalog.set(entries)).catch(() => {});
+  });
 
   async function loadTree() {
     if (!$currentProject) return;
@@ -218,6 +257,7 @@
     editing = false;
     showAddCM = false;
     showAddWK = false;
+    showAddTag = false;
 
     // Load countermeasures and weaknesses for steps/substeps
     if (node.type === "step" || node.type === "substep") {
@@ -234,6 +274,13 @@
     } else {
       nodeCountermeasures = [];
       nodeWeaknesses = [];
+    }
+
+    // Load entity tags for all node types
+    try {
+      entityTags = await api.listTags(node.id, node.type);
+    } catch {
+      entityTags = [];
     }
   }
 
@@ -469,6 +516,36 @@
       setSuccess("Weakness deleted");
     } catch (e) {
       setError(`Delete weakness failed: ${e}`);
+    }
+  }
+
+  // ─── Entity Tag Management ────────────────────────────────────
+  async function addEntityTag() {
+    if (!selectedNode || !newTagValue.trim()) return;
+    try {
+      await api.createTag({
+        entity_id: selectedNode.id,
+        entity_type: selectedNode.type,
+        key: newTagCategory,
+        value: newTagValue.trim(),
+      });
+      entityTags = await api.listTags(selectedNode.id, selectedNode.type);
+      newTagValue = "";
+      showTagSuggestions = false;
+      setSuccess("Tag added");
+    } catch (e) {
+      setError(`Add tag failed: ${e}`);
+    }
+  }
+
+  async function removeEntityTag(tagId: string) {
+    if (!selectedNode) return;
+    try {
+      await api.deleteTag(tagId);
+      entityTags = await api.listTags(selectedNode.id, selectedNode.type);
+      setSuccess("Tag removed");
+    } catch (e) {
+      setError(`Remove tag failed: ${e}`);
     }
   }
 
@@ -905,6 +982,73 @@
               </div>
             </div>
           {/if}
+
+          <!-- Entity Tags (Assets / Interfaces / 3rd Party Software) -->
+          <div class="cm-section">
+            <div class="cm-header">
+              <h4>🏷️ Tags ({entityTags.length})</h4>
+              <button
+                class="btn btn-xs btn-primary"
+                on:click={() => (showAddTag = !showAddTag)}
+              >
+                {showAddTag ? "✕" : "+ Add"}
+              </button>
+            </div>
+            {#if showAddTag}
+              <div class="tag-assign-form">
+                <select class="input tag-cat-select" bind:value={newTagCategory} on:change={() => { newTagValue = ''; showTagSuggestions = false; }}>
+                  <option value="asset">🏭 Asset</option>
+                  <option value="interface">🔌 Interface</option>
+                  <option value="third_party_software">💾 3rd Party Software</option>
+                </select>
+                <div class="tag-autocomplete-wrapper">
+                  <input
+                    class="input"
+                    bind:value={newTagValue}
+                    placeholder="Select or type tag…"
+                    on:focus={() => showTagSuggestions = true}
+                    on:blur={() => setTimeout(() => showTagSuggestions = false, 200)}
+                    on:input={() => showTagSuggestions = true}
+                    on:keydown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addEntityTag();
+                      }
+                    }}
+                  />
+                  {#if showTagSuggestions && tagSuggestions.length > 0}
+                    <div class="tag-suggestions-dropdown">
+                      {#each tagSuggestions.slice(0, 8) as suggestion}
+                        <button class="tag-suggestion-item" on:mousedown|preventDefault={() => {
+                          newTagValue = suggestion;
+                          addEntityTag();
+                        }}>{suggestion}</button>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+                <button class="btn btn-sm btn-primary" on:click={addEntityTag}>Add</button>
+              </div>
+            {/if}
+            {#each Object.entries(tagsByCategory) as [cat, tags]}
+              {#if tags.length > 0}
+                <div class="tag-cat-group">
+                  <span class="tag-cat-label">{tagCategoryLabels[cat] || cat}</span>
+                  <div class="tag-pills-row">
+                    {#each tags as tag (tag.id)}
+                      <span class="entity-tag-pill {cat}">
+                        {tag.value}
+                        <button class="tag-pill-remove" on:click={() => removeEntityTag(tag.id)} title="Remove">✕</button>
+                      </span>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+            {/each}
+            {#if entityTags.length === 0 && !showAddTag}
+              <p class="muted">No tags assigned</p>
+            {/if}
+          </div>
         {/if}
       </div>
     {:else}
@@ -1386,5 +1530,105 @@
     color: #718096;
     font-size: 0.8rem;
     font-style: italic;
+  }
+
+  /* Entity Tag Assignment */
+  .tag-assign-form {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+  .tag-cat-select {
+    width: auto;
+    min-width: 100px;
+    font-size: 0.78rem;
+    padding: 6px 8px;
+  }
+  .tag-autocomplete-wrapper {
+    position: relative;
+    flex: 1;
+  }
+  .tag-suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    max-height: 180px;
+    overflow-y: auto;
+    z-index: 100;
+  }
+  .tag-suggestion-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 6px 10px;
+    border: none;
+    background: none;
+    font-size: 0.78rem;
+    cursor: pointer;
+    color: #2d3748;
+  }
+  .tag-suggestion-item:hover {
+    background: #edf2f7;
+  }
+  .tag-cat-group {
+    margin-bottom: 6px;
+  }
+  .tag-cat-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #718096;
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .tag-pills-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .entity-tag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    border: 1px solid;
+  }
+  .entity-tag-pill.asset {
+    background: #ebf8ff;
+    border-color: #90cdf4;
+    color: #2b6cb0;
+  }
+  .entity-tag-pill.interface {
+    background: #f0fff4;
+    border-color: #9ae6b4;
+    color: #276749;
+  }
+  .entity-tag-pill.third_party_software {
+    background: #faf5ff;
+    border-color: #d6bcfa;
+    color: #6b46c1;
+  }
+  .tag-pill-remove {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.6rem;
+    color: inherit;
+    opacity: 0.6;
+    padding: 0 1px;
+    line-height: 1;
+  }
+  .tag-pill-remove:hover {
+    opacity: 1;
   }
 </style>

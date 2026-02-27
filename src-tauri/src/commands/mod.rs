@@ -10,6 +10,7 @@ pub mod goals;
 pub mod projects;
 pub mod steps;
 pub mod substeps;
+pub mod tag_catalog;
 pub mod tags;
 pub mod versioning;
 pub mod weaknesses;

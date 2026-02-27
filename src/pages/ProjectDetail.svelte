@@ -1,14 +1,17 @@
 <script lang="ts">
-  import type { UpdateProject } from "$lib/types";
+  import type { UpdateProject, TagCatalogEntry } from "$lib/types";
   import { DEFAULT_FACTOR_WEIGHTS, type FactorName } from "$lib/types";
   import {
     currentProject,
     setError,
     setSuccess,
     dragDropEnabled,
+    tagCatalog,
+    tagCatalogByCategory,
   } from "$lib/stores";
   import * as api from "$lib/api";
   import { parseFactorWeights } from "$lib/calculations";
+  import { onMount } from "svelte";
 
   let editing = false;
   let name = "";
@@ -25,6 +28,32 @@
   let factorWeights: Record<string, number> = {};
   let accessProbabilities = "{}";
   let lastProjectId = "";
+
+  // Autocomplete state
+  let showInterfaceSuggestions = false;
+  let showAssetSuggestions = false;
+  let showThirdPartySuggestions = false;
+
+  $: interfaceSuggestions = $tagCatalogByCategory.interface
+    .map(e => e.name)
+    .filter(n => !interfacesList.includes(n) && (!newInterface.trim() || n.toLowerCase().includes(newInterface.toLowerCase())));
+
+  $: assetSuggestions = $tagCatalogByCategory.asset
+    .map(e => e.name)
+    .filter(n => !assetsList.includes(n) && (!newAsset.trim() || n.toLowerCase().includes(newAsset.toLowerCase())));
+
+  $: thirdPartySuggestions = $tagCatalogByCategory.third_party_software
+    .map(e => e.name)
+    .filter(n => !thirdPartySoftwareList.includes(n) && (!newThirdPartySoftware.trim() || n.toLowerCase().includes(newThirdPartySoftware.toLowerCase())));
+
+  onMount(async () => {
+    try {
+      const entries = await api.listTagCatalog();
+      tagCatalog.set(entries);
+    } catch (e) {
+      // Silently ignore if tag catalog not available yet
+    }
+  });
 
   // Only reset form fields when the project actually changes (different id)
   $: if ($currentProject && $currentProject.id !== lastProjectId) {
@@ -190,17 +219,34 @@
                   >
                 {/each}
               </div>
-              <input
-                class="input"
-                bind:value={newInterface}
-                placeholder="Type and press Enter…"
-                on:keydown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addInterface();
-                  }
-                }}
-              />
+              <div class="autocomplete-wrapper">
+                <input
+                  class="input"
+                  bind:value={newInterface}
+                  placeholder="Type and press Enter…"
+                  on:focus={() => showInterfaceSuggestions = true}
+                  on:blur={() => setTimeout(() => showInterfaceSuggestions = false, 200)}
+                  on:input={() => showInterfaceSuggestions = true}
+                  on:keydown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addInterface();
+                      showInterfaceSuggestions = false;
+                    }
+                  }}
+                />
+                {#if showInterfaceSuggestions && interfaceSuggestions.length > 0}
+                  <div class="suggestions-dropdown">
+                    {#each interfaceSuggestions.slice(0, 10) as suggestion}
+                      <button class="suggestion-item" on:mousedown|preventDefault={() => {
+                        newInterface = suggestion;
+                        addInterface();
+                        showInterfaceSuggestions = false;
+                      }}>{suggestion}</button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
             </div>
           {:else}
             <div class="tags-list">
@@ -226,17 +272,34 @@
                   >
                 {/each}
               </div>
-              <input
-                class="input"
-                bind:value={newAsset}
-                placeholder="Type and press Enter…"
-                on:keydown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addAsset();
-                  }
-                }}
-              />
+              <div class="autocomplete-wrapper">
+                <input
+                  class="input"
+                  bind:value={newAsset}
+                  placeholder="Type and press Enter…"
+                  on:focus={() => showAssetSuggestions = true}
+                  on:blur={() => setTimeout(() => showAssetSuggestions = false, 200)}
+                  on:input={() => showAssetSuggestions = true}
+                  on:keydown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addAsset();
+                      showAssetSuggestions = false;
+                    }
+                  }}
+                />
+                {#if showAssetSuggestions && assetSuggestions.length > 0}
+                  <div class="suggestions-dropdown">
+                    {#each assetSuggestions.slice(0, 10) as suggestion}
+                      <button class="suggestion-item" on:mousedown|preventDefault={() => {
+                        newAsset = suggestion;
+                        addAsset();
+                        showAssetSuggestions = false;
+                      }}>{suggestion}</button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
             </div>
           {:else}
             <div class="tags-list">
@@ -266,17 +329,34 @@
                   >
                 {/each}
               </div>
-              <input
-                class="input"
-                bind:value={newThirdPartySoftware}
-                placeholder="Type and press Enter…"
-                on:keydown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addThirdPartySoftware();
-                  }
-                }}
-              />
+              <div class="autocomplete-wrapper">
+                <input
+                  class="input"
+                  bind:value={newThirdPartySoftware}
+                  placeholder="Type and press Enter…"
+                  on:focus={() => showThirdPartySuggestions = true}
+                  on:blur={() => setTimeout(() => showThirdPartySuggestions = false, 200)}
+                  on:input={() => showThirdPartySuggestions = true}
+                  on:keydown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addThirdPartySoftware();
+                      showThirdPartySuggestions = false;
+                    }
+                  }}
+                />
+                {#if showThirdPartySuggestions && thirdPartySuggestions.length > 0}
+                  <div class="suggestions-dropdown">
+                    {#each thirdPartySuggestions.slice(0, 10) as suggestion}
+                      <button class="suggestion-item" on:mousedown|preventDefault={() => {
+                        newThirdPartySoftware = suggestion;
+                        addThirdPartySoftware();
+                        showThirdPartySuggestions = false;
+                      }}>{suggestion}</button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
             </div>
           {:else}
             <div class="tags-list">
@@ -491,6 +571,37 @@
   }
   .tag-remove:hover {
     color: #e53e3e;
+  }
+
+  .autocomplete-wrapper {
+    position: relative;
+  }
+  .suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 50;
+  }
+  .suggestion-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    font-size: 0.82rem;
+    cursor: pointer;
+    color: #2d3748;
+  }
+  .suggestion-item:hover {
+    background: #edf2f7;
   }
 
   .save-bar {
