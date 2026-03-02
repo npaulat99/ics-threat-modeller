@@ -2,7 +2,7 @@
 
 A desktop application for **attack-tree based threat modelling** of Industrial Control Systems (ICS) and embedded field devices. Built with [Tauri 2](https://v2.tauri.app/) (Rust backend + Svelte frontend) and SQLite.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![License](https://img.shields.io/badge/license-GPLv3-blue.svg)
 
 ---
 
@@ -581,4 +581,4 @@ The SQLite database is created automatically at `ics_threat_modeller.db` in the 
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU GPLv3 — see the [LICENSE](LICENSE) file for details.

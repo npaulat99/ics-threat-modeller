@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Database-backed threat modeling tool for embedded field devices using attack trees",
+  "license": "GPL-3.0-only",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
