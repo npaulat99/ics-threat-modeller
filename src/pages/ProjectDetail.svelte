@@ -1,5 +1,9 @@
 <script lang="ts">
-  import type { UpdateProject, TagCatalogEntry } from "$lib/types";
+  import type {
+    UpdateProject,
+    TagCatalogEntry,
+    ProjectDirectoryInfo,
+  } from "$lib/types";
   import { DEFAULT_FACTOR_WEIGHTS, type FactorName } from "$lib/types";
   import {
     currentProject,
@@ -31,6 +35,9 @@
 
   let savingToDir = false;
   let savedDirPath = "";
+  let targetDirName = "";
+  let availableDirs: ProjectDirectoryInfo[] = [];
+  let customDirName = "";
 
   // Autocomplete state
   let showInterfaceSuggestions = false;
@@ -69,6 +76,11 @@
       tagCatalog.set(entries);
     } catch (e) {
       // Silently ignore if tag catalog not available yet
+    }
+    try {
+      availableDirs = await api.listProjectDirectories();
+    } catch (e) {
+      // Silently ignore
     }
   });
 
@@ -177,9 +189,16 @@
     savingToDir = true;
     savedDirPath = "";
     try {
-      const path = await api.saveProjectToDirectory($currentProject.id);
+      // Use custom name if "__new__" is selected, otherwise the chosen dir
+      const dir =
+        targetDirName === "__new__"
+          ? customDirName.trim() || undefined
+          : targetDirName || undefined;
+      const path = await api.saveProjectToDirectory($currentProject.id, dir);
       savedDirPath = path;
       setSuccess(`Project saved to directory: ${path}`);
+      // Refresh available directories
+      availableDirs = await api.listProjectDirectories();
     } catch (e) {
       setError(`Save to directory failed: ${e}`);
     } finally {
@@ -439,13 +458,39 @@
         <h3>📁 Project Directory</h3>
         <p class="card-desc">
           Save this project as YAML files to a directory for Git version
-          control. Manage Git operations (commit, push, pull) yourself in a
-          terminal.
+          control. Pick an existing directory (e.g. a cloned repo) or enter a
+          new name.
         </p>
+        <div class="dir-picker">
+          <label class="form-label">Target directory</label>
+          <select class="input" bind:value={targetDirName}>
+            <option value="">Auto (from project name)</option>
+            {#each availableDirs as d}
+              <option value={d.dir_name}>
+                {d.dir_name}/
+                {#if d.has_git}
+                  ⎇{/if}
+                {#if d.has_export}
+                  (has data){/if}
+              </option>
+            {/each}
+            <option value="__new__">+ Custom name…</option>
+          </select>
+          {#if targetDirName === "__new__"}
+            <input
+              class="input"
+              type="text"
+              placeholder="e.g. my-project-data"
+              bind:value={customDirName}
+              style="margin-top: 0.5rem"
+            />
+          {/if}
+        </div>
         <button
           class="btn btn-secondary"
           disabled={savingToDir}
           on:click={saveToDirectory}
+          style="margin-top: 0.75rem"
         >
           {savingToDir ? "⏳ Saving…" : "💾 Save to Directory"}
         </button>
@@ -737,5 +782,18 @@
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 0.72rem;
+  }
+  .dir-picker {
+    margin-top: 0.5rem;
+  }
+  .dir-picker .form-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #4a5568;
+  }
+  .dir-picker select {
+    width: 100%;
   }
 </style>

@@ -418,6 +418,7 @@ pub struct ProjectDirectoryInfo {
     pub project_name: String,
     pub last_modified: String,
     pub has_git: bool,
+    pub has_export: bool,
     pub dir_path: String,
 }
 
@@ -431,17 +432,22 @@ pub struct CatalogRepoInfo {
     pub tag_catalog_file_count: usize,
 }
 
-/// Save a project to a directory under /app/data/projects/<slug>/.
+/// Save a project to a directory under /app/data/projects/<dir_name>/.
+/// If `dir_name` is provided, saves into that directory (allowing arbitrary repo names).
+/// Otherwise falls back to a slugified version of the project name.
 /// Writes individual YAML files (for Git readability) and a combined
 /// project-export.yaml (for reliable import).
 #[tauri::command]
 pub fn save_project_to_directory(
     db: State<'_, Database>,
     project_id: String,
+    dir_name: Option<String>,
 ) -> Result<String, String> {
     let export = super::export_import::build_project_export(&db, &project_id)?;
-    let slug = slugify(&export.project.name);
-    let project_dir = get_projects_dir().join(&slug);
+    let target_name = dir_name
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| slugify(&export.project.name));
+    let project_dir = get_projects_dir().join(&target_name);
 
     fs::create_dir_all(&project_dir).map_err(|e| format!("Failed to create project dir: {e}"))?;
 
@@ -638,13 +644,6 @@ pub fn list_project_directories() -> Result<Vec<ProjectDirectoryInfo>, String> {
             continue;
         }
 
-        // Check for meta.yaml or project-export.yaml.
-        let has_meta = path.join("meta.yaml").exists();
-        let has_export = path.join("project-export.yaml").exists();
-        if !has_meta && !has_export {
-            continue;
-        }
-
         let dir_name = path
             .file_name()
             .unwrap_or_default()
@@ -655,6 +654,7 @@ pub fn list_project_directories() -> Result<Vec<ProjectDirectoryInfo>, String> {
         let project_name = read_project_name_from_meta(&path).unwrap_or_else(|| dir_name.clone());
 
         let has_git = path.join(".git").exists();
+        let has_export = path.join("project-export.yaml").exists();
 
         let last_modified = fs::metadata(&path)
             .and_then(|m| m.modified())
@@ -669,6 +669,7 @@ pub fn list_project_directories() -> Result<Vec<ProjectDirectoryInfo>, String> {
             project_name,
             last_modified,
             has_git,
+            has_export,
             dir_path: path.to_string_lossy().to_string(),
         });
     }

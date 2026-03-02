@@ -604,6 +604,7 @@ export interface ProjectDirectoryInfo {
   project_name: string;
   last_modified: string;
   has_git: boolean;
+  has_export: boolean;
   dir_path: string;
 }
 

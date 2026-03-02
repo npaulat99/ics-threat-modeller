@@ -350,8 +350,8 @@ export const getChangeLog = (projectId: string) =>
   invoke<ChangeLogEntry[]>('get_change_log', { projectId });
 
 // ─── Filesystem / Git Workflow ──────────────────────────────────
-export const saveProjectToDirectory = (projectId: string) =>
-  invoke<string>('save_project_to_directory', { projectId });
+export const saveProjectToDirectory = (projectId: string, dirName?: string) =>
+  invoke<string>('save_project_to_directory', { projectId, dirName: dirName ?? null });
 
 export const loadProjectFromDirectory = (dirName: string) =>
   invoke<string>('load_project_from_directory', { dirName });

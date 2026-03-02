@@ -249,44 +249,65 @@ Danach in der App auf der **Projects**-Seite den Button **🔄 Re-sync from File
 
 ## 6. Projekt-Repo einrichten
 
-### 6.1 Neues Projekt erstellen und speichern
+Der Name des Projekt-Verzeichnisses ist **frei wählbar** und muss nicht dem Projektnamen in der App entsprechen. Du kannst ein beliebig benanntes Git-Repo klonen und dort deine Ergebnisse speichern.
 
-1. In der App: **Projects → + New Project** → Name und Metadaten eingeben.
-2. Im Projekt arbeiten: Attack Trees bauen, Assessments durchführen, etc.
-3. Wenn bereit: **Project Settings → 💾 Save to Directory** klicken.
-4. Die App schreibt das Projekt nach `/app/data/projects/<slug>/`.
-
-```bash
-# Im Container: Projekt-Verzeichnis als Git-Repo initialisieren
-cd /app/data/projects/<slug>
-git init
-git add .
-git commit -m "Initial threat model"
-
-# Remote hinzufügen
-git remote add origin git@github.com:<your-org>/project-<name>.git
-git push -u origin main
-```
-
-### 6.2 Bestehendes Projekt-Repo klonen
+### 6.1 Empfohlener Weg: Zuerst das Repo klonen, dann in der App speichern
 
 ```bash
 # Im Container:
 cd /app/data/projects
-git clone git@github.com:<your-org>/project-plc-risk.git plc-risk
+
+# Leeres Repo klonen (oder ein bestehendes mit Daten)
+git clone https://github.com/<your-org>/my-project-data.git my-project-data
 ```
 
-In der App auf der **Projects**-Seite erscheint das Projekt unter **📁 Project Directories**. Klicke **⬆ Load into DB** um es in die Datenbank zu importieren.
+In der App erscheint `my-project-data/` jetzt auf der **Projects**-Seite unter **📁 Project Directories** (mit dem Badge **empty**, falls noch keine Daten drin sind).
+
+So speicherst du dein Projekt in dieses Verzeichnis:
+
+1. In der App: **Projects → + New Project** → Name und Metadaten eingeben.
+2. Im Projekt arbeiten: Attack Trees bauen, Assessments durchführen, etc.
+3. **Project Settings → 📁 Project Directory**: Wähle im Dropdown `my-project-data/` aus.
+4. Klicke **💾 Save to Directory**.
+5. Die App schreibt die YAML-Dateien in `/app/data/projects/my-project-data/`.
+
+```bash
+# Im Container:
+cd /app/data/projects/my-project-data
+git add .
+git commit -m "Initial threat model"
+git push origin main
+```
+
+### 6.2 Alternativer Weg: Zuerst in der App speichern, dann Git initialisieren
+
+Falls du kein vorbereitetes Repo hast:
+
+1. In der App: Projekt erstellen und bearbeiten.
+2. **Project Settings → 📁 Project Directory**: Wähle **+ Custom name…** und gib einen Namen ein (z.B. `drucktransmitter-risk`), oder lasse **Auto** stehen (generiert aus Projektname).
+3. Klicke **💾 Save to Directory**.
+
+```bash
+# Im Container:
+cd /app/data/projects/drucktransmitter-risk
+git init
+git add .
+git commit -m "Initial threat model"
+
+# Remote hinzufügen und pushen
+git remote add origin https://github.com/<your-org>/drucktransmitter-risk.git
+git push -u origin main
+```
 
 ### 6.3 Änderungen speichern und pushen
 
 Nach dem Arbeiten in der App:
 
-1. **Project Settings → 💾 Save to Directory** — schreibt aktuelle Daten als YAML.
+1. **Project Settings → 💾 Save to Directory** — stellt sicher, dass das gleiche Zielverzeichnis im Dropdown ausgewählt ist.
 2. Im Terminal:
 
 ```bash
-cd /app/data/projects/<slug>
+cd /app/data/projects/my-project-data
 git status                   # Zeigt geänderte Dateien
 git diff                     # Review der Änderungen
 git add .
@@ -297,7 +318,7 @@ git push origin main
 ### 6.4 Änderungen von Kollegen holen
 
 ```bash
-cd /app/data/projects/<slug>
+cd /app/data/projects/my-project-data
 git pull origin main
 ```
 
@@ -315,11 +336,11 @@ Dann in der App: **Projects → 📁 Project Directories → ⬆ Load into DB**.
 1. docker compose up -d
 2. Browser → http://localhost:6080/vnc.html?autoconnect=true
 3. In der App arbeiten (Attack Trees, Assessments, etc.)
-4. Project Settings → 💾 Save to Directory
+4. Project Settings → Zielverzeichnis wählen → 💾 Save to Directory
 5. Terminal:
    docker exec -it ics-threat-modeller bash
-   cd /app/data/projects/<slug>
-   git add . && git commit -m "Session: <datum> — <beschreibung>"
+   cd /app/data/projects/my-project-data
+   git add . && git commit -m "Session: 2026-02-27 — firmware compromise assessed"
    git push origin main
 ```
 
@@ -328,10 +349,11 @@ Dann in der App: **Projects → 📁 Project Directories → ⬆ Load into DB**.
 ```
 Assessor A:                              Assessor B:
 ─────────────────────                    ─────────────────────
-1. git clone <project>                   1. git clone <project>
+1. git clone <project-repo>              1. git clone <project-repo>
+   into projects/my-project-data            into projects/my-project-data
 2. In App: Load into DB                  2. In App: Load into DB
 3. Arbeitet an Goal X                    3. Arbeitet an Goal Y
-4. Save to Directory                     4. Save to Directory
+4. Save to Directory (→ my-project-data) 4. Save to Directory (→ my-project-data)
 5. git add . && git commit && git push   5. git pull
                                          6. git add . && git commit && git push
 ```
@@ -345,7 +367,7 @@ Assessor A:                              Assessor B:
 
 ```
 # Feature-Branch für eine neue Bewertung erstellen
-cd /app/data/projects/<slug>
+cd /app/data/projects/my-project-data
 git checkout -b assessment/goal-firmware-compromise
 
 # In der App arbeiten...
@@ -394,7 +416,7 @@ YAML-Diffs auf GitHub/GitLab sind gut lesbar:
 Falls ein Merge-Konflikt in einer YAML-Datei auftritt:
 
 ```bash
-cd /app/data/projects/<slug>
+cd /app/data/projects/my-project-data
 git pull origin main
 # → CONFLICT in goals/<uuid>/steps/<uuid>/step.yaml
 
@@ -659,7 +681,7 @@ Die Datei `project-export.yaml` wird nur durch **💾 Save to Directory** in der
 
 ```bash
 # Prüfe, ob die Datei existiert
-ls /app/data/projects/<slug>/project-export.yaml
+ls /app/data/projects/my-project-data/project-export.yaml
 
 # Falls nicht vorhanden: Projekt muss einmal in der App
 # geöffnet und gespeichert werden (Save to Directory).

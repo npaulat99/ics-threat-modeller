@@ -452,6 +452,10 @@
               {#if dir.has_git}<span class="git-badge" title="Git repository"
                   >⎇ git</span
                 >{/if}
+              {#if !dir.has_export}<span
+                  class="empty-badge"
+                  title="No project data yet">empty</span
+                >{/if}
             </h4>
             <p class="dir-path">{dir.dir_name}/</p>
             <div class="project-meta">
@@ -459,13 +463,19 @@
             </div>
           </div>
           <div class="project-actions">
-            <button
-              class="btn btn-sm btn-secondary"
-              disabled={loadingDir === dir.dir_name}
-              on:click={() => loadFromDirectory(dir.dir_name)}
-            >
-              {loadingDir === dir.dir_name ? "⏳ Loading…" : "⬆ Load into DB"}
-            </button>
+            {#if dir.has_export}
+              <button
+                class="btn btn-sm btn-secondary"
+                disabled={loadingDir === dir.dir_name}
+                on:click={() => loadFromDirectory(dir.dir_name)}
+              >
+                {loadingDir === dir.dir_name
+                  ? "⏳ Loading…"
+                  : "⬆ Load into DB"}
+              </button>
+            {:else}
+              <span class="empty-hint">Save a project here first</span>
+            {/if}
           </div>
         </div>
       {/each}
@@ -727,6 +737,23 @@
     margin-left: 6px;
     vertical-align: middle;
     font-weight: 600;
+  }
+  .empty-badge {
+    display: inline-block;
+    background: #fffaf0;
+    color: #975a16;
+    border: 1px solid #fefcbf;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    margin-left: 6px;
+    vertical-align: middle;
+    font-weight: 600;
+  }
+  .empty-hint {
+    font-size: 0.78rem;
+    color: #a0aec0;
+    font-style: italic;
   }
   .catalog-info {
     display: flex;
