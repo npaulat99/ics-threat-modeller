@@ -1,0 +1,16 @@
+{
+  "device": [],
+  "system": [],
+  "environment": [],
+  "operational": [],
+  "attacker": [
+    {
+      "id": "ATK-1",
+      "name": "Opportunistic attacker",
+      "capability": 2,
+      "access": "local",
+      "motivation": "disruption",
+      "text": ""
+    }
+  ]
+}

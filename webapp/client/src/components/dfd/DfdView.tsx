@@ -1,0 +1,1085 @@
+// The layered Data Flow Diagram — the centrepiece of the application.
+//
+// A "layer" is the set of nodes that share the same parent. Double-clicking (or pressing
+// ArrowDown on) a process drills into its child layer; ArrowUp / the breadcrumb returns to
+// the parent. Left/Right cycle the sibling selection. Every structural change (move, add,
+// connect, delete) is written straight back to 04-dfd/dfd.json via the live-sync store.
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    ReactFlow,
+    Background,
+    BackgroundVariant,
+    Controls,
+    MiniMap,
+    MarkerType,
+    BaseEdge,
+    EdgeLabelRenderer,
+    useNodesState,
+    useEdgesState,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import { useStore, uid } from '../../state/store';
+import { nodeTypes } from './nodes';
+import DfdOverview from './DfdOverview';
+import { riskOf } from '../../lib/risk';
+import { cx, confirmDelete } from '../common';
+import type { Dfd, DfdNode, DfdNodeType } from '../../types';
+
+type Pt = [number, number];
+
+// Liang–Barsky: does the segment (x1,y1)-(x2,y2) cross the interior of rect r?
+function segHitsRect(x1: number, y1: number, x2: number, y2: number, r: { x: number; y: number; w: number; h: number }) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    let t0 = 0;
+    let t1 = 1;
+    const edges = [
+        [-dx, x1 - r.x],
+        [dx, r.x + r.w - x1],
+        [-dy, y1 - r.y],
+        [dy, r.y + r.h - y1],
+    ];
+    for (const [p, q] of edges) {
+        if (p === 0) {
+            if (q < 0) return false;
+        } else {
+            const t = q / p;
+            if (p < 0) {
+                if (t > t1) return false;
+                if (t > t0) t0 = t;
+            } else {
+                if (t < t0) return false;
+                if (t < t1) t1 = t;
+            }
+        }
+    }
+    return t0 < t1;
+}
+
+// Greedy router: bend the S→T segment around any obstacle box it would otherwise cross, so a flow
+// never disappears behind a process / store / entity / interface. Trust boundaries and other edges
+// are NOT obstacles (they are not passed in).
+function routeAround(sx: number, sy: number, tx: number, ty: number, obstacles: { x: number; y: number; w: number; h: number }[], pad: number, depth = 0): Pt[] {
+    if (depth >= 5) return [[sx, sy], [tx, ty]];
+    let best: { x: number; y: number; w: number; h: number } | null = null;
+    let bestD = Infinity;
+    for (const o of obstacles) {
+        const r = { x: o.x - pad, y: o.y - pad, w: o.w + 2 * pad, h: o.h + 2 * pad };
+        // Skip an obstacle that an endpoint already sits inside/touches — you cannot route around it.
+        const inside = (px: number, py: number) => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+        if (inside(sx, sy) || inside(tx, ty)) continue;
+        if (segHitsRect(sx, sy, tx, ty, r)) {
+            const d = (o.x + o.w / 2 - sx) ** 2 + (o.y + o.h / 2 - sy) ** 2;
+            if (d < bestD) {
+                bestD = d;
+                best = o;
+            }
+        }
+    }
+    if (!best) return [[sx, sy], [tx, ty]];
+    const x0 = best.x - pad;
+    const x1 = best.x + best.w + pad;
+    const y0 = best.y - pad;
+    const y1 = best.y + best.h + pad;
+    let wps: Pt[];
+    if (Math.abs(tx - sx) >= Math.abs(ty - sy)) {
+        const midY = (sy + ty) / 2;
+        const wy = Math.abs(y0 - midY) <= Math.abs(y1 - midY) ? y0 : y1;
+        wps = sx <= tx ? [[x0, wy], [x1, wy]] : [[x1, wy], [x0, wy]];
+    } else {
+        const midX = (sx + tx) / 2;
+        const wx = Math.abs(x0 - midX) <= Math.abs(x1 - midX) ? x0 : x1;
+        wps = sy <= ty ? [[wx, y0], [wx, y1]] : [[wx, y1], [wx, y0]];
+    }
+    const rest = obstacles.filter((o) => o !== best);
+    const a = routeAround(sx, sy, wps[0][0], wps[0][1], rest, pad, depth + 1);
+    const b = routeAround(wps[0][0], wps[0][1], wps[1][0], wps[1][1], rest, pad, depth + 1);
+    const c = routeAround(wps[1][0], wps[1][1], tx, ty, rest, pad, depth + 1);
+    return [...a, ...b.slice(1), ...c.slice(1)];
+}
+
+/** SVG path through a polyline with rounded corners. */
+function roundedPath(pts: Pt[], r: number) {
+    if (pts.length <= 2) return `M ${pts[0][0]},${pts[0][1]} L ${pts[1][0]},${pts[1][1]}`;
+    let d = `M ${pts[0][0]},${pts[0][1]}`;
+    for (let i = 1; i < pts.length - 1; i++) {
+        const [px, py] = pts[i - 1];
+        const [cx, cy] = pts[i];
+        const [nx, ny] = pts[i + 1];
+        const l1 = Math.hypot(px - cx, py - cy) || 1;
+        const l2 = Math.hypot(nx - cx, ny - cy) || 1;
+        const rr = Math.min(r, l1 / 2, l2 / 2);
+        const a: Pt = [cx + ((px - cx) / l1) * rr, cy + ((py - cy) / l1) * rr];
+        const b: Pt = [cx + ((nx - cx) / l2) * rr, cy + ((ny - cy) / l2) * rr];
+        d += ` L ${a[0]},${a[1]} Q ${cx},${cy} ${b[0]},${b[1]}`;
+    }
+    const last = pts[pts.length - 1];
+    d += ` L ${last[0]},${last[1]}`;
+    return d;
+}
+
+/** Point at 2/3 along a polyline by arc length — places the flow label closer to the target end. */
+function labelPtOnPolyline(pts: Pt[]): Pt {
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    let dist = total * 2 / 3;
+    for (let i = 1; i < pts.length; i++) {
+        const seg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+        if (dist <= seg) {
+            const r = seg ? dist / seg : 0;
+            return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * r, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * r];
+        }
+        dist -= seg;
+    }
+    return pts[Math.floor(pts.length * 2 / 3)];
+}
+
+// Data-flow edge. It routes around foreground entities so it never hides behind them; when the
+// straight line is already clear it keeps a gentle curve (offset) so bidirectional pairs separate.
+function OffsetEdge({ id, sourceX, sourceY, targetX, targetY, markerEnd, data }: any) {
+    const obstacles = data?.obstacles || [];
+    const route = routeAround(sourceX, sourceY, targetX, targetY, obstacles, 16);
+    const directDist = Math.hypot(targetX - sourceX, targetY - sourceY) || 1;
+    let polyLen = 0;
+    for (let i = 1; i < route.length; i++) polyLen += Math.hypot(route[i][0] - route[i - 1][0], route[i][1] - route[i - 1][1]);
+    let path: string;
+    let midX: number;
+    let midY: number;
+    if (route.length > 2 && polyLen <= 2.4 * directDist) {
+        path = roundedPath(route, 14);
+        [midX, midY] = labelPtOnPolyline(route);
+    } else {
+        const off = data?.offset || 0;
+        const dx = targetX - sourceX;
+        const dy = targetY - sourceY;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len;
+        const ny = dx / len;
+        // Control point for the bezier arc (positive off = right of direction = consistent curvature).
+        const cX = (sourceX + targetX) / 2 + nx * off;
+        const cY = (sourceY + targetY) / 2 + ny * off;
+        path = `M ${sourceX},${sourceY} Q ${cX},${cY} ${targetX},${targetY}`;
+        // Label at t=2/3 on the quadratic bezier: 1/3 from the target end, away from the arrowhead.
+        midX = (1 / 9) * sourceX + (4 / 9) * cX + (4 / 9) * targetX;
+        midY = (1 / 9) * sourceY + (4 / 9) * cY + (4 / 9) * targetY;
+    }
+    return (
+        <>
+            <BaseEdge id={id} path={path} markerEnd={markerEnd} interactionWidth={28} />
+            {data?.label ? (
+                <EdgeLabelRenderer>
+                    <div
+                        className="edgelabel"
+                        style={{ position: 'absolute', transform: `translate(-50%, -50%) translate(${midX}px, ${midY}px)`, pointerEvents: 'all' }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            data.onSelect?.();
+                        }}
+                    >
+                        {data.label}
+                    </div>
+                </EdgeLabelRenderer>
+            ) : null}
+        </>
+    );
+}
+const edgeTypes = { offset: OffsetEdge };
+
+const TYPE_LABEL: Record<DfdNodeType, string> = {
+    'external-entity': 'External entity',
+    process: 'Process',
+    multiprocess: 'Multi-process',
+    store: 'Data store',
+    'trust-boundary': 'Trust boundary',
+};
+const PALETTE: DfdNodeType[] = ['process', 'store', 'external-entity', 'multiprocess', 'trust-boundary'];
+
+const ROW: Record<string, number> = { 'external-entity': 0, process: 1, multiprocess: 1, store: 2, 'trust-boundary': 3 };
+function autoLayout(nodes: DfdNode[]): Record<string, { x: number; y: number }> {
+    const col: Record<number, number> = {};
+    const pos: Record<string, { x: number; y: number }> = {};
+    for (const n of nodes) {
+        const r = ROW[n.type] ?? 1;
+        col[r] = col[r] || 0;
+        pos[n.id] = { x: 90 + col[r] * 240, y: 70 + r * 160 };
+        col[r]++;
+    }
+    return pos;
+}
+
+const NODE_SIZE: Record<string, { w: number; h: number }> = {
+    'external-entity': { w: 150, h: 60 },
+    process: { w: 124, h: 84 },
+    multiprocess: { w: 124, h: 84 },
+    store: { w: 140, h: 60 },
+};
+const sizeOf = (t: string) => NODE_SIZE[t] || { w: 150, h: 90 };
+function bboxOf(items: { x: number; y: number; w: number; h: number }[]) {
+    const minX = Math.min(...items.map((i) => i.x));
+    const minY = Math.min(...items.map((i) => i.y));
+    const maxX = Math.max(...items.map((i) => i.x + i.w));
+    const maxY = Math.max(...items.map((i) => i.y + i.h));
+    return { minX, minY, maxX, maxY };
+}
+
+type Box = { x: number; y: number; w: number; h: number };
+/** Which side (t/r/b/l) of `from` faces `to` — used to auto-route a flow to the nearest handles. */
+function sideToward(from: Box, to: Box): 'l' | 'r' | 't' | 'b' {
+    const dx = to.x + to.w / 2 - (from.x + from.w / 2);
+    const dy = to.y + to.h / 2 - (from.y + from.h / 2);
+    if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'r' : 'l';
+    return dy >= 0 ? 'b' : 't';
+}
+
+/** Push overlapping boxes apart (axis-aligned separation) so nodes never sit on top of each
+ * other. Returns new positions; iterative and gentle so the overall arrangement is preserved. */
+function separateOverlaps(items: { id: string; x: number; y: number; w: number; h: number }[], margin = 26, iterations = 80) {
+    const pos = items.map((i) => ({ ...i }));
+    for (let it = 0; it < iterations; it++) {
+        let moved = false;
+        for (let a = 0; a < pos.length; a++) {
+            for (let b = a + 1; b < pos.length; b++) {
+                const A = pos[a];
+                const B = pos[b];
+                const ox = Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x) + margin;
+                const oy = Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y) + margin;
+                if (ox > 0 && oy > 0) {
+                    moved = true;
+                    if (ox < oy) {
+                        const s = ox / 2;
+                        if (A.x <= B.x) {
+                            A.x -= s;
+                            B.x += s;
+                        } else {
+                            A.x += s;
+                            B.x -= s;
+                        }
+                    } else {
+                        const s = oy / 2;
+                        if (A.y <= B.y) {
+                            A.y -= s;
+                            B.y += s;
+                        } else {
+                            A.y += s;
+                            B.y -= s;
+                        }
+                    }
+                }
+            }
+        }
+        if (!moved) break;
+    }
+    return pos.map((p) => ({ ...p, x: Math.round(p.x), y: Math.round(p.y) }));
+}
+
+function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: boolean; setConnMode: (v: boolean) => void; overview: boolean; setOverview: (v: boolean) => void }) {
+    const data = useStore((s) => s.data)!;
+    const scheme = useStore((s) => s.scheme);
+    const dfdPath = useStore((s) => s.dfdPath);
+    const setDfdPath = useStore((s) => s.setDfdPath);
+    const selectedNodeId = useStore((s) => s.selectedNodeId);
+    const selectNode = useStore((s) => s.selectNode);
+    const selectedEdgeId = useStore((s) => s.selectedEdgeId);
+    const selectEdge = useStore((s) => s.selectEdge);
+    const save = useStore((s) => s.save);
+
+    const dfd = data.dfd;
+    const currentParent = dfdPath.length ? dfdPath[dfdPath.length - 1] : null;
+    const layer = dfdPath.length + 1;
+    const threats = data.threats.threats || [];
+    const cms = data.countermeasures.countermeasures || [];
+
+    const visible = useMemo(() => dfd.nodes.filter((n) => (n.parent ?? null) === currentParent), [dfd.nodes, currentParent]);
+    const realNodes = useMemo(() => visible.filter((n) => n.type !== 'trust-boundary'), [visible]);
+    const tbNodes = useMemo(() => visible.filter((n) => n.type === 'trust-boundary'), [visible]);
+    const visibleIds = useMemo(() => new Set(visible.map((n) => n.id)), [visible]);
+
+    const [rfNodes, setRfNodes, onNodesChange] = useNodesState<any>([]);
+    const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<any>([]);
+    const dragging = useRef(false);
+    const canvasRef = useRef<HTMLDivElement>(null);
+    const didAutoTidy = useRef(false);
+    const layoutRef = useRef<{ boxes: Record<string, Box>; portEndpointIds: Set<string>; ifacePortIds: Set<string> }>({ boxes: {}, portEndpointIds: new Set(), ifacePortIds: new Set() });
+
+    const compById = useMemo(() => new Map((data.system.components || []).map((c) => [c.id, c])), [data.system.components]);
+    const compName = (ref?: string) => (ref ? compById.get(ref)?.name || '' : '');
+    const riskFor = (node: DfdNode) => {
+        if (!node.componentRef) return null;
+        const rel = threats.filter((t) => (t.components || []).includes(node.componentRef!));
+        if (!rel.length) return null;
+        let worst = { score: 0, color: '#888' };
+        for (const t of rel) {
+            const r = riskOf(t, cms, scheme);
+            if (r.residual >= worst.score) worst = { score: r.residual, color: r.residualBand.color };
+        }
+        return { count: rel.length, color: worst.color, title: `${rel.length} threat(s) · worst residual ${worst.score}` };
+    };
+
+    // Resolve which visible node an interface attaches to on this layer: the node whose
+    // componentRef is the interface's component, or its nearest visible ancestor component.
+    // This is what makes an interface "refine" as you zoom in (e.g. JTAG -> device at L1,
+    // JTAG -> MCU at L2).
+    const targetForComponent = (compId?: string): string | null => {
+        let c: string | null | undefined = compId;
+        const seen = new Set<string>();
+        while (c && !seen.has(c)) {
+            seen.add(c);
+            const node = realNodes.find((n) => n.componentRef === c);
+            if (node) return node.id;
+            c = compById.get(c)?.parent ?? null;
+        }
+        return null;
+    };
+
+    const placedReal = () => realNodes.map((n) => ({ id: n.id, x: n.x ?? 0, y: n.y ?? 0, ...sizeOf(n.type) }));
+
+    const buildNodes = () => {
+        const out: any[] = [];
+        const real = placedReal();
+        const contentBox = real.length ? bboxOf(real) : { minX: 0, minY: 0, maxX: 320, maxY: 200 };
+        const ifaces = data.system.interfaces || [];
+        const boxes: Record<string, Box> = {};
+        real.forEach((p) => (boxes[p.id] = { x: p.x, y: p.y, w: p.w, h: p.h }));
+        const portChips: { rfid: string; name: string; dir: string; detail: string; box: Box }[] = [];
+        const portEndpointIds = new Set<string>();
+        const ifacePortIds = new Set<string>();
+
+        // Interfaces only appear on a layer if their (nearest ancestor) component resolves to a
+        // node on THIS layer — this is what makes them refine as you drill in and stops orphan
+        // chips floating over deeper layers.
+        const CHIP_W = 176;
+        const CHIP_H = 44;
+        const GAP = 26;
+        const CHIP_MEMBER_GAP = 74; // vertical breathing room between the chip row and the members
+        const TB_PAD = 34; // side / bottom padding around members
+        const TB_LABEL_H = 24; // reserved header strip for the boundary name
+        const TB_GAP = 10; // gaps between label / chips / members
+        const targetOf = ifaces.map((itf) => targetForComponent(itf.component));
+        const ifaceVisible = ifaces.map((_itf, i) => targetOf[i] != null);
+
+        // Group the visible interfaces by the trust boundary that contains their target (or by the
+        // bare target node when it is not inside a boundary on this layer).
+        const memberTb = (tid: string | null) => (tid ? tbNodes.find((tb) => (tb.members || []).includes(tid) && real.some((p) => (tb.members || []).includes(p.id))) : undefined);
+        const groupKey = (i: number) => {
+            const tb = memberTb(targetOf[i]);
+            return tb ? `tb:${tb.id}` : targetOf[i] ? `node:${targetOf[i]}` : 'none';
+        };
+        const groups: Record<string, number[]> = {};
+        ifaces.forEach((_, i) => {
+            if (!ifaceVisible[i]) return;
+            (groups[groupKey(i)] = groups[groupKey(i)] || []).push(i);
+        });
+
+        // Size each trust-boundary box to enclose its members AND host a header (name) plus a row
+        // of interface chips at the top, so nothing overlaps and the boundary name stays readable.
+        const tbBoxes: Record<string, Box> = {};
+        tbNodes.forEach((tb) => {
+            const members = real.filter((p) => (tb.members || []).includes(p.id));
+            if (!members.length) return;
+            const b = bboxOf(members);
+            const chips = groups[`tb:${tb.id}`] || [];
+            const chipRowW = chips.length ? chips.length * CHIP_W + (chips.length - 1) * GAP : 0;
+            const innerW = Math.max(b.maxX - b.minX, chipRowW);
+            const w = innerW + TB_PAD * 2;
+            const topOffset = TB_LABEL_H + TB_GAP + (chips.length ? CHIP_H + CHIP_MEMBER_GAP : 0);
+            const cx = (b.minX + b.maxX) / 2;
+            tbBoxes[tb.id] = { x: Math.round(cx - w / 2), y: Math.round(b.minY - topOffset), w: Math.round(w), h: Math.round(b.maxY - b.minY + topOffset + TB_PAD) };
+        });
+
+        // Place the interface chips: a centred row inside the boundary's header area, or (for a
+        // target not in a boundary) just above the target node.
+        const chipPos: { x: number; y: number }[] = [];
+        ifaces.forEach((_itf, i) => {
+            if (!ifaceVisible[i]) {
+                chipPos[i] = { x: 0, y: 0 };
+                return;
+            }
+            const members = groups[groupKey(i)];
+            const idx = members.indexOf(i);
+            const n = members.length;
+            const tb = memberTb(targetOf[i]);
+            const rowW = n * CHIP_W + (n - 1) * GAP;
+            let startX: number;
+            let chipY: number;
+            if (tb && tbBoxes[tb.id]) {
+                const box = tbBoxes[tb.id];
+                startX = box.x + box.w / 2 - rowW / 2;
+                chipY = box.y + TB_LABEL_H + TB_GAP;
+            } else {
+                const nb = real.find((p) => p.id === targetOf[i]);
+                const cx = nb ? nb.x + nb.w / 2 : contentBox.minX + 120;
+                startX = cx - rowW / 2;
+                chipY = (nb ? nb.y : contentBox.minY) - CHIP_H - CHIP_MEMBER_GAP;
+            }
+            const rawPos = { x: Math.round(startX + idx * (CHIP_W + GAP)), y: Math.round(chipY) };
+            const posKey = `${currentParent ?? 'root'}:${ifaces[i].id}`;
+            chipPos[i] = dfd.ifacePos?.[posKey] ?? rawPos;
+            boxes[`iface:${ifaces[i].id}`] = { x: chipPos[i].x, y: chipPos[i].y, w: CHIP_W, h: CHIP_H };
+        });
+
+        // Ports: on a non-root layer, show the modelled component's external touch-points — its own
+        // interfaces plus the endpoints it exchanges data with on its PARENT layer — as connectable
+        // chips, WITHOUT modelling those sibling components here. This keeps the external interfaces
+        // visible in every layer and gives the modelled component ingress/egress points.
+        if (currentParent) {
+            const P = dfd.nodes.find((n) => n.id === currentParent);
+            const Pcomp = P?.componentRef;
+            const parentOfP = P?.parent ?? null;
+            const sibIds = new Set(dfd.nodes.filter((n) => (n.parent ?? null) === parentOfP && n.id !== currentParent && n.type !== 'trust-boundary').map((n) => n.id));
+            const ifaceIdSet = new Set(ifaces.map((it) => it.id));
+            const visibleIfaceHere = new Set(ifaces.filter((it) => targetForComponent(it.component)).map((it) => it.id));
+            const nodeById = new Map(dfd.nodes.map((n) => [n.id, n]));
+            const internalHas = (id: string) => real.some((r) => r.id === id);
+            const isAncestorComp = (compId?: string) => {
+                if (!Pcomp || !compId) return false;
+                let c: string | undefined = Pcomp;
+                const seen = new Set<string>();
+                while (c && !seen.has(c)) {
+                    seen.add(c);
+                    if (c === compId) return true;
+                    c = compById.get(c)?.parent;
+                }
+                return false;
+            };
+            const portMap = new Map<string, { in: boolean; out: boolean; labels: string[] }>();
+            const addPort = (ep: string, dir: 'in' | 'out', label?: string) => {
+                if (visibleIfaceHere.has(ep) || internalHas(ep)) return; // already shown on this layer
+                const e = portMap.get(ep) || { in: false, out: false, labels: [] };
+                e[dir] = true;
+                if (label) e.labels.push(label);
+                portMap.set(ep, e);
+            };
+            for (const f of dfd.flows) {
+                const other = f.from === currentParent ? f.to : f.to === currentParent ? f.from : null;
+                if (other && (sibIds.has(other) || ifaceIdSet.has(other))) addPort(other, f.from === currentParent ? 'out' : 'in', f.label);
+                // Flows the user has already drawn from an internal node to an external endpoint.
+                if (internalHas(f.from) && (sibIds.has(f.to) || ifaceIdSet.has(f.to))) addPort(f.to, 'out', f.label);
+                if (internalHas(f.to) && (sibIds.has(f.from) || ifaceIdSet.has(f.from))) addPort(f.from, 'in', f.label);
+            }
+            for (const itf of ifaces) if (isAncestorComp(itf.component) && !portMap.has(itf.id)) addPort(itf.id, 'in', itf.protocol || undefined);
+
+            const portList = [...portMap.entries()];
+            const PW = 150;
+            const PH = 42;
+            const PGAP = 14;
+            const rowW = portList.length * PW + (portList.length - 1) * PGAP;
+            const cx0 = (contentBox.minX + contentBox.maxX) / 2;
+            const startX = cx0 - rowW / 2;
+            const portY = contentBox.minY - PH - 64;
+            portList.forEach(([ep, info], i) => {
+                const isIface = ifaceIdSet.has(ep);
+                const rfid = isIface ? `iface:${ep}` : ep;
+                const name = isIface ? ifaces.find((x) => x.id === ep)?.name || ep : nodeById.get(ep)?.label || ep;
+                const dir = info.in && info.out ? '⇄' : info.out ? '→' : '←';
+                const box = { x: Math.round(startX + i * (PW + PGAP)), y: Math.round(portY), w: PW, h: PH };
+                boxes[rfid] = box;
+                portEndpointIds.add(ep);
+                if (isIface) ifacePortIds.add(ep);
+                portChips.push({ rfid, name, dir, detail: [...new Set(info.labels)].join(', '), box });
+            });
+        }
+        layoutRef.current = { boxes, portEndpointIds, ifacePortIds };
+
+        const chipBoxes: Box[] = [];
+        ifaces.forEach((_itf, i) => {
+            if (ifaceVisible[i]) chipBoxes.push({ x: chipPos[i].x, y: chipPos[i].y, w: CHIP_W, h: CHIP_H });
+        });
+        const tbBoxList = Object.values(tbBoxes);
+        const portBoxes = portChips.map((p) => p.box);
+        const allForBounds = [...real, ...chipBoxes, ...tbBoxList, ...portBoxes];
+        const overall = bboxOf(allForBounds.length ? allForBounds : [{ x: contentBox.minX, y: contentBox.minY, w: 320, h: 200 }]);
+
+        // In connections mode we hide the decorative boundaries / context frames so only the
+        // entities and their connections remain — making the edges far easier to grab and edit.
+        if (!connMode) {
+            // Ancestor trust boundaries you have zoomed inside -> faint nested context frames.
+            // Order them by depth (how early their member appears on the drill path) so the
+            // OUTERMOST boundary gets the LARGEST frame and inner ones nest inside it correctly.
+            const ancestors = dfd.nodes
+                .filter((n) => n.type === 'trust-boundary' && (n.members || []).some((m) => dfdPath.includes(m)))
+                .map((tb) => ({
+                    tb,
+                    depth: Math.min(...(tb.members || []).filter((m) => dfdPath.includes(m)).map((m) => dfdPath.indexOf(m))),
+                }))
+                .sort((a, b) => a.depth - b.depth);
+            const nAnc = ancestors.length;
+            ancestors.forEach(({ tb }, i) => {
+                const pad = 46 + (nAnc - 1 - i) * 30; // outermost (i=0) -> largest pad
+                out.push({
+                    id: `ctx:${tb.id}`,
+                    type: 'context',
+                    position: { x: overall.minX - pad, y: overall.minY - pad - 26 },
+                    data: { label: tb.label },
+                    draggable: false,
+                    selectable: false,
+                    connectable: false,
+                    deletable: false,
+                    width: overall.maxX - overall.minX + pad * 2,
+                    height: overall.maxY - overall.minY + pad * 2 + 26,
+                });
+            });
+
+            // Current-layer trust boundaries, sized to enclose their members + header + chips.
+            tbNodes.forEach((tb) => {
+                if (tbBoxes[tb.id]) {
+                    const box = tbBoxes[tb.id];
+                    out.push({
+                        id: tb.id,
+                        type: 'boundary',
+                        position: { x: box.x, y: box.y },
+                        selected: tb.id === selectedNodeId,
+                        data: { label: tb.label, warn: false },
+                        draggable: false,
+                        selectable: true,
+                        connectable: false,
+                        width: box.w,
+                        height: box.h,
+                    });
+                } else {
+                    out.push({
+                        id: tb.id,
+                        type: 'boundary',
+                        position: { x: contentBox.minX, y: contentBox.maxY + 48 },
+                        selected: tb.id === selectedNodeId,
+                        data: { label: `${tb.label} — no members on this layer`, warn: true },
+                        draggable: false,
+                        selectable: true,
+                        connectable: false,
+                        width: 260,
+                        height: 80,
+                    });
+                }
+            });
+        }
+
+        // External interface chips: selectable + connectable so external entities can wire into
+        // them and they can be edited from the inspector. Only rendered when visible on this layer.
+        ifaces.forEach((itf, i) => {
+            if (!ifaceVisible[i]) return;
+            out.push({
+                id: `iface:${itf.id}`,
+                type: 'iface',
+                position: chipPos[i],
+                width: CHIP_W,
+                height: CHIP_H,
+                selected: selectedNodeId === `iface:${itf.id}`,
+                data: {
+                    label: itf.name,
+                    protocol: itf.protocol,
+                    exposure: itf.exposure,
+                    category: itf.category,
+                    connMode,
+                    rotation: dfd.ifaceRot?.[`${currentParent ?? 'root'}:${itf.id}`] || 0,
+                    title: `${itf.name} · ${itf.protocol || ''} · ${itf.exposure}`,
+                },
+                draggable: !connMode,
+                selectable: true,
+                connectable: true,
+                deletable: false,
+            });
+        });
+
+        // Ingress / egress port chips (the modelled component's external touch-points).
+        portChips.forEach((p) => {
+            out.push({
+                id: p.rfid,
+                type: 'port',
+                position: { x: p.box.x, y: p.box.y },
+                width: p.box.w,
+                height: p.box.h,
+                selected: selectedNodeId === p.rfid,
+                data: { name: p.name, dir: p.dir, detail: p.detail, connMode, title: `${p.name}${p.detail ? ' · ' + p.detail : ''}` },
+                draggable: false,
+                selectable: true,
+                connectable: true,
+                deletable: false,
+            });
+        });
+
+        // Real DeMarco nodes.
+        real.forEach((p) => {
+            const n = realNodes.find((x) => x.id === p.id)!;
+            const sz = sizeOf(n.type);
+            const hasChildren = dfd.nodes.some((x) => (x.parent ?? null) === n.id);
+            out.push({
+                id: n.id,
+                type: 'dfd',
+                position: { x: n.x ?? 0, y: n.y ?? 0 },
+                width: sz.w,
+                height: sz.h,
+                selected: n.id === selectedNodeId,
+                draggable: !connMode,
+                connectable: true,
+                data: { label: n.label, dtype: n.type, sub: compName(n.componentRef), risk: riskFor(n), hasChildren, connMode },
+            });
+        });
+        return out;
+    };
+
+    const buildEdges = () => {
+        const out: any[] = [];
+        const { boxes, portEndpointIds, ifacePortIds } = layoutRef.current;
+        const ifaces = data.system.interfaces || [];
+        const visIface = new Set(ifaces.filter((itf) => targetForComponent(itf.component)).map((itf) => itf.id));
+        const endpointVisible = (ep: string) => visibleIds.has(ep) || visIface.has(ep) || portEndpointIds.has(ep);
+        const rfId = (ep: string) => (visIface.has(ep) || ifacePortIds.has(ep) ? `iface:${ep}` : ep);
+        // Obstacle boxes for edge routing = every entity box on this layer (nodes, interface chips,
+        // ports) — NOT trust boundaries. Each edge routes around all of them except its own ends.
+        const boxList = Object.entries(boxes).map(([bid, b]) => ({ id: bid, x: b.x, y: b.y, w: b.w, h: b.h }));
+        const obstaclesFor = (aId: string, bId: string) => boxList.filter((o) => o.id !== aId && o.id !== bId).map(({ x, y, w, h }) => ({ x, y, w, h }));
+        const flows = dfd.flows.filter((f) => endpointVisible(f.from) && endpointVisible(f.to));
+        // All flows curve to the right of their direction (positive offset = right-of-direction
+        // normal). Bidirectional pairs each receive the same positive offset value; the reversed
+        // direction vector on the return flow causes it to bow the other way, creating an eye shape.
+        // Same-direction multiple flows spread outward around the base curve.
+        const CURVE = 20; // baseline rightward curve (single flow or bidirectional pair)
+        const LANE_STEP = 28; // extra step per same-direction flow within a pair
+        const offsetOf = (f: (typeof flows)[number]) => {
+            const sameDir = flows.filter((x) => x.from === f.from && x.to === f.to);
+            sameDir.sort((a, b) => (a.id < b.id ? -1 : 1));
+            const i = sameDir.findIndex((x) => x.id === f.id);
+            const n = sameDir.length;
+            return CURVE + (i - (n - 1) / 2) * LANE_STEP;
+        };
+        flows.forEach((f) => {
+            const sId = rfId(f.from);
+            const tId = rfId(f.to);
+            const sBox = boxes[sId];
+            const tBox = boxes[tId];
+            const sh = f.sourceHandle || `s-${sBox && tBox ? sideToward(sBox, tBox) : 'r'}`;
+            const th = f.targetHandle || `t-${sBox && tBox ? sideToward(tBox, sBox) : 'l'}`;
+            out.push({
+                id: f.id,
+                source: sId,
+                target: tId,
+                sourceHandle: sh,
+                targetHandle: th,
+                type: 'offset',
+                reconnectable: true,
+                data: { offset: offsetOf(f), label: f.label, obstacles: obstaclesFor(sId, tId), onSelect: () => selectEdge(f.id) },
+                markerEnd: { type: MarkerType.ArrowClosed },
+                className: cx(isEdgeSelected(f.id) && 'edge-sel'),
+            });
+        });
+
+        // Interface connectors (derived iface -> device component). They are reconnectable so the
+        // user can manually move the connector endpoints/handles (blue edge dots), while the
+        // logical interface->component pairing itself remains fixed.
+        const perTarget: Record<string, number> = {};
+        const targetCount: Record<string, number> = {};
+        ifaces.forEach((itf) => {
+            const t = targetForComponent(itf.component);
+            if (t) targetCount[t] = (targetCount[t] || 0) + 1;
+        });
+        ifaces.forEach((itf) => {
+            const target = targetForComponent(itf.component);
+            if (!target) return;
+            const linkKey = `${currentParent ?? 'root'}:${itf.id}`;
+            const manual = dfd.ifaceLink?.[linkKey];
+            const sId = `iface:${itf.id}`;
+            const sBox = boxes[sId];
+            const tBox = boxes[target];
+            const sh = manual?.sourceHandle || `s-${sBox && tBox ? sideToward(sBox, tBox) : 'b'}`;
+            const th = manual?.targetHandle || `t-${sBox && tBox ? sideToward(tBox, sBox) : 't'}`;
+            const idx = (perTarget[target] = perTarget[target] || 0);
+            perTarget[target]++;
+            const grp = targetCount[target] || 1;
+            // Always curve to the right: base curve + spread for multiple connectors on same target.
+            const spread = CURVE + (idx - (grp - 1) / 2) * 20;
+            out.push({
+                id: `if:${itf.id}`,
+                source: sId,
+                target,
+                sourceHandle: sh,
+                targetHandle: th,
+                type: 'offset',
+                data: { offset: spread, obstacles: [] },
+                className: cx('edge-iface', isEdgeSelected(`if:${itf.id}`) && 'edge-sel'),
+                deletable: false,
+                selectable: true,
+                reconnectable: true,
+                markerEnd: { type: MarkerType.ArrowClosed },
+            });
+        });
+        return out;
+    };
+
+    // Re-derive the canvas from the store whenever the persisted model changes
+    // (own saves, external file edits, selection) — but never mid-drag.
+    const signature = JSON.stringify({
+        v: realNodes.map((n) => [n.id, n.type, n.label, n.x, n.y, n.componentRef]),
+        tb: tbNodes.map((n) => [n.id, n.label, n.members]),
+        f: dfd.flows.map((f) => [f.id, f.from, f.to, f.label, f.crossesBoundary, f.sourceHandle, f.targetHandle]),
+        itf: (data.system.interfaces || []).map((i) => [i.id, i.name, i.component, i.protocol, i.exposure]),
+        cp: (data.system.components || []).map((c) => [c.id, c.parent]),
+        anc: dfdPath,
+        th: threats.map((t) => [t.id, t.components, t.likelihood, t.impact]),
+        cm: cms.map((c) => [c.id, (c.addresses || []).map((a) => [a.threat, a.residualLikelihood, a.residualImpact])]),
+        selN: selectedNodeId,
+        selE: selectedEdgeId,
+        conn: connMode,
+        sc: !!scheme,
+        ip: dfd.ifacePos || null,
+        ir: dfd.ifaceRot || null,
+        il: dfd.ifaceLink || null,
+    });
+    useEffect(() => {
+        if (dragging.current) return;
+        const missing = realNodes.filter((n) => n.x == null || n.y == null);
+        if (missing.length) {
+            const pos = autoLayout(realNodes);
+            const nodes2 = dfd.nodes.map((n) => (missing.find((m) => m.id === n.id) ? { ...n, x: pos[n.id].x, y: pos[n.id].y } : n));
+            save('dfd', { ...dfd, nodes: nodes2 });
+            return;
+        }
+        // Once per layer, nudge any overlapping nodes apart so the diagram is readable.
+        if (!didAutoTidy.current) {
+            didAutoTidy.current = true;
+            const placed = placedReal();
+            if (placed.length > 1) {
+                const sep = separateOverlaps(placed);
+                if (sep.some((s, i) => s.x !== placed[i].x || s.y !== placed[i].y)) {
+                    const byId = new Map(sep.map((s) => [s.id, s]));
+                    save('dfd', { ...dfd, nodes: dfd.nodes.map((n) => (byId.has(n.id) ? { ...n, x: byId.get(n.id)!.x, y: byId.get(n.id)!.y } : n)) });
+                    return;
+                }
+            }
+        }
+        setRfNodes(buildNodes());
+        setRfEdges(buildEdges());
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [signature]);
+
+    const persist = (next: Partial<Dfd>) => save('dfd', { ...dfd, ...next });
+
+    const onNodeDragStart = useCallback(() => {
+        dragging.current = true;
+    }, []);
+    const onNodeDragStop = useCallback(
+        (_e: any, node: any) => {
+            dragging.current = false;
+            if (node.id.startsWith('iface:')) {
+                // Persist the interface chip's new position keyed by layer so each layer remembers
+                // independently where the user placed it.
+                const ifaceId = node.id.slice(6);
+                const posKey = `${currentParent ?? 'root'}:${ifaceId}`;
+                persist({ ifacePos: { ...(dfd.ifacePos || {}), [posKey]: { x: Math.round(node.position.x), y: Math.round(node.position.y) } } });
+            } else {
+                persist({ nodes: dfd.nodes.map((n) => (n.id === node.id ? { ...n, x: Math.round(node.position.x), y: Math.round(node.position.y) } : n)) });
+            }
+        },
+        [dfd, currentParent],
+    );
+    const onConnect = useCallback(
+        (c: any) => {
+            if (!c.source || !c.target) return;
+            const strip = (x: string) => (x.startsWith('iface:') ? x.slice(6) : x);
+            const from = strip(c.source);
+            const to = strip(c.target);
+            if (from === to) return;
+            const label = window.prompt('Label this data flow — what data or command does it carry? (required)', '');
+            if (!label || !label.trim()) return;
+            const id = uid('F', dfd.flows.map((f) => f.id));
+            persist({ flows: [...dfd.flows, { id, from, to, label: label.trim(), sourceHandle: c.sourceHandle || undefined, targetHandle: c.targetHandle || undefined }] });
+        },
+        [dfd],
+    );
+    const onReconnect = useCallback(
+        (oldEdge: any, conn: any) => {
+            if (String(oldEdge.id).startsWith('if:')) {
+                if (!conn.source || !conn.target) return;
+                const ifaceId = String(oldEdge.id).slice(3);
+                const linkKey = `${currentParent ?? 'root'}:${ifaceId}`;
+                const ifaceEndpoint = `iface:${ifaceId}`;
+                // Keep topology fixed (interface <-> associated component), only store moved handles.
+                if (conn.source !== ifaceEndpoint || conn.target !== oldEdge.target) return;
+                persist({
+                    ifaceLink: {
+                        ...(dfd.ifaceLink || {}),
+                        [linkKey]: {
+                            sourceHandle: conn.sourceHandle || null,
+                            targetHandle: conn.targetHandle || null,
+                        },
+                    },
+                });
+                return;
+            }
+            if (!conn.source || !conn.target) return;
+            const strip = (x: string) => (x.startsWith('iface:') ? x.slice(6) : x);
+            persist({
+                flows: dfd.flows.map((f) =>
+                    f.id === oldEdge.id ? { ...f, from: strip(conn.source), to: strip(conn.target), sourceHandle: conn.sourceHandle || undefined, targetHandle: conn.targetHandle || undefined } : f,
+                ),
+            });
+        },
+        [dfd],
+    );
+    const onNodesDelete = useCallback(
+        (deleted: any[]) => {
+            const ids = new Set(deleted.map((d) => d.id));
+            if (!confirmDelete(deleted.length > 1 ? `${deleted.length} nodes and their flows` : `node ${deleted[0]?.id}`)) {
+                setRfNodes(buildNodes());
+                setRfEdges(buildEdges());
+                return;
+            }
+            persist({ nodes: dfd.nodes.filter((n) => !ids.has(n.id)), flows: dfd.flows.filter((f) => !ids.has(f.from) && !ids.has(f.to)) });
+            if (selectedNodeId && ids.has(selectedNodeId)) selectNode(null);
+        },
+        [dfd, selectedNodeId],
+    );
+    const onEdgesDelete = useCallback(
+        (deleted: any[]) => {
+            const ids = new Set(deleted.map((d) => d.id));
+            persist({ flows: dfd.flows.filter((f) => !ids.has(f.id)) });
+        },
+        [dfd],
+    );
+
+    const drillInto = (id: string) => {
+        const node = dfd.nodes.find((n) => n.id === id);
+        if (!node || node.type === 'trust-boundary') return;
+        // Enter the component's internal layer; if empty, the user models the internals there.
+        setDfdPath([...dfdPath, id]);
+    };
+
+    const addNode = (type: DfdNodeType) => {
+        const id = uid('N', dfd.nodes.map((n) => n.id));
+        const x = 120 + (visible.length % 4) * 230;
+        const y = 110 + Math.floor(visible.length / 4) * 170;
+        const node: DfdNode = {
+            id,
+            label: `New ${TYPE_LABEL[type].toLowerCase()}`,
+            type,
+            layer,
+            parent: currentParent,
+            x,
+            y,
+            ...(type === 'trust-boundary' ? { members: [] } : {}),
+        };
+        save('dfd', { ...dfd, nodes: [...dfd.nodes, node] });
+        selectNode(id);
+    };
+
+    const tidy = () => {
+        const placed = placedReal();
+        if (placed.length < 2) return;
+        const sep = separateOverlaps(placed);
+        const byId = new Map(sep.map((s) => [s.id, s]));
+        save('dfd', { ...dfd, nodes: dfd.nodes.map((n) => (byId.has(n.id) ? { ...n, x: byId.get(n.id)!.x, y: byId.get(n.id)!.y } : n)) });
+    };
+
+    // Keyboard navigation via a document-level listener, so it works even on an empty layer where
+    // the canvas has nothing to focus — Up always jumps to the parent layer.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            const tag = (e.target as HTMLElement)?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            const sibs = visible.filter((n) => n.type !== 'trust-boundary');
+            if (e.key === 'ArrowUp') {
+                if (dfdPath.length) {
+                    setDfdPath(dfdPath.slice(0, -1));
+                    e.preventDefault();
+                }
+            } else if (e.key === 'ArrowDown') {
+                const t = selectedNodeId || sibs[0]?.id;
+                if (t) {
+                    drillInto(t);
+                    e.preventDefault();
+                }
+            } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                if (!sibs.length) return;
+                const idx = sibs.findIndex((n) => n.id === selectedNodeId);
+                const nx = e.key === 'ArrowRight' ? (idx + 1) % sibs.length : (idx - 1 + sibs.length) % sibs.length;
+                selectNode(sibs[nx < 0 ? 0 : nx].id);
+                e.preventDefault();
+            }
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visible, dfdPath, selectedNodeId]);
+
+    const nodeName = (id: string | null) => (id ? dfd.nodes.find((n) => n.id === id)?.label || id : '');
+
+    const selectedIfaceIds = new Set(
+        (data.system.interfaces || [])
+            .filter((itf) => selectedNodeId && !selectedNodeId.startsWith('iface:') && targetForComponent(itf.component) === selectedNodeId)
+            .map((itf) => itf.id),
+    );
+    const isEdgeSelected = (edgeId: string) => {
+        if (selectedEdgeId === edgeId) return true;
+        if (!selectedNodeId) return false;
+        const f = dfd.flows.find((x) => x.id === edgeId);
+        if (f) return f.from === selectedNodeId || f.to === selectedNodeId;
+        if (edgeId.startsWith('if:')) {
+            const ifaceId = edgeId.slice(3);
+            return selectedNodeId === `iface:${ifaceId}` || selectedIfaceIds.has(ifaceId);
+        }
+        return false;
+    };
+
+    // Open a node picked in the overview: leave overview mode, drill to its layer and select it.
+    const openFromOverview = (nodeId: string, path: string[]) => {
+        setOverview(false);
+        setDfdPath(path);
+        selectNode(nodeId);
+    };
+
+    return (
+        <div className="dfd-wrap">
+            <div className="dfd-bar">
+                <div className="crumbs">
+                    <button onClick={() => setDfdPath([])} className={dfdPath.length ? '' : 'here'}>
+                        {data.project.device?.name || 'Device'} <span className="muted">L1</span>
+                    </button>
+                    {dfdPath.map((id, i) => (
+                        <span key={id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                            <span className="sep">/</span>
+                            <button onClick={() => setDfdPath(dfdPath.slice(0, i + 1))} className={i === dfdPath.length - 1 ? 'here' : ''}>
+                                {nodeName(id)} <span className="muted">L{i + 2}</span>
+                            </button>
+                        </span>
+                    ))}
+                </div>
+                {!overview && (
+                    <div className="dfd-nav">
+                        {dfdPath.length > 0 && (
+                            <button className="btn sm" onClick={() => setDfdPath(dfdPath.slice(0, -1))} title="Go to the parent layer">
+                                ▲ Up
+                            </button>
+                        )}
+                        <select
+                            className="inp navsel"
+                            value={selectedNodeId || ''}
+                            title="Select a node to inspect"
+                            onChange={(e) => selectNode(e.target.value || null)}
+                        >
+                            <option value="">Select node…</option>
+                            {visible.map((n) => (
+                                <option key={n.id} value={n.id}>
+                                    {n.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                <div className="right palette">
+                    <button
+                        className={cx('btn sm', overview && 'primary')}
+                        onClick={() => setOverview(!overview)}
+                        title="Overview: show every layer and entity as a single tree (a navigation aid; not used in the report)"
+                    >
+                        {overview ? '✓ Overview' : '☰ Overview'}
+                    </button>
+                    {!overview && (
+                        <>
+                            <button
+                                className={cx('btn sm', connMode && 'primary')}
+                                onClick={() => setConnMode(!connMode)}
+                                title="Connections mode: locks the nodes and shows only entities + connections, so links are easy to grab, move and reconnect"
+                            >
+                                {connMode ? '✓ Connections' : '🔗 Connections'}
+                            </button>
+                            {!connMode && (
+                                <button className="btn sm" onClick={tidy} title="Space overlapping nodes apart for readability">
+                                    ⤢ Tidy
+                                </button>
+                            )}
+                            {!connMode &&
+                                PALETTE.map((t) => (
+                                    <button key={t} className="btn sm" onClick={() => addNode(t)} title={`Add ${TYPE_LABEL[t]}`}>
+                                        + {TYPE_LABEL[t]}
+                                    </button>
+                                ))}
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {overview ? (
+                <DfdOverview onOpen={openFromOverview} />
+            ) : (
+                <div className={cx('dfd-canvas', connMode && 'connmode')} tabIndex={0} ref={canvasRef}>
+                    <ReactFlow
+                        nodeTypes={nodeTypes}
+                        edgeTypes={edgeTypes}
+                        nodes={rfNodes}
+                        edges={rfEdges}
+                        onNodesChange={onNodesChange}
+                        onEdgesChange={onEdgesChange}
+                        onNodeDragStart={onNodeDragStart}
+                        onNodeDragStop={onNodeDragStop}
+                        onConnect={onConnect}
+                        onReconnect={onReconnect}
+                        onNodesDelete={onNodesDelete}
+                        onEdgesDelete={onEdgesDelete}
+                        onNodeClick={(_e, n) => {
+                            if (n.type === 'dfd' || n.type === 'boundary' || n.type === 'iface' || n.type === 'port') selectNode(n.id);
+                        }}
+                        onNodeDoubleClick={(_e, n) => {
+                            if (n.type === 'dfd') drillInto(n.id);
+                        }}
+                        onEdgeClick={(_e, ed) => {
+                            selectEdge(ed.id);
+                        }}
+                        onPaneClick={() => {
+                            selectNode(null);
+                            selectEdge(null);
+                        }}
+                        reconnectRadius={26}
+                        nodesDraggable={!connMode}
+                        elevateEdgesOnSelect
+                        deleteKeyCode={['Delete']}
+                        disableKeyboardA11y
+                        zoomOnDoubleClick={false}
+                        fitView
+                        fitViewOptions={{ padding: 0.25 }}
+                        proOptions={{ hideAttribution: true }}
+                    >
+                        <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="#dfe3ea" />
+                        <MiniMap
+                            pannable
+                            zoomable
+                            nodeColor={(n) =>
+                                n.type === 'boundary' ? '#0f9d8f55' : n.type === 'context' ? '#0f9d8f22' : n.type === 'iface' ? '#8a93a2' : '#c7ccff'
+                            }
+                        />
+                        <Controls showInteractive={false} />
+                    </ReactFlow>
+                </div>
+            )}
+
+            <div className="dfd-bar" style={{ borderTop: '1px solid var(--border)', borderBottom: 'none' }}>
+                <span className="keyhint">
+                    {overview ? (
+                        <>
+                            <b>Overview</b> — every layer and entity in one tree. Click any node to open it in the diagram. This is a
+                            navigation aid only and is not included in the report.
+                        </>
+                    ) : connMode ? (
+                        <>
+                            <b>Connections mode</b> — nodes are locked; drag between any handle to connect, and drag an edge end
+                            onto another handle to move it. Toggle off to move nodes again.
+                        </>
+                    ) : (
+                        <>
+                            Click a node to inspect it; <b>double-click</b> to open its (internal) sub-diagram. Drag from any
+                            connector to link nodes (either side works); drag an edge end onto another connector to move it.
+                            Use <b>Connections</b> mode for easy link editing and <b>Tidy</b> to space nodes out. <kbd>←</kbd>{' '}
+                            <kbd>→</kbd> siblings, <kbd>↑</kbd> parent layer, <kbd>↓</kbd> drill in.
+                        </>
+                    )}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+export default function DfdView() {
+    const dfdPath = useStore((s) => s.dfdPath);
+    const currentParent = dfdPath.length ? dfdPath[dfdPath.length - 1] : 'root';
+    const [connMode, setConnMode] = useState(false);
+    const [overview, setOverview] = useState(false);
+    // Re-mount per layer so the view auto-fits and resets cleanly.
+    return <Canvas key={`layer-${currentParent}`} connMode={connMode} setConnMode={setConnMode} overview={overview} setOverview={setOverview} />;
+}

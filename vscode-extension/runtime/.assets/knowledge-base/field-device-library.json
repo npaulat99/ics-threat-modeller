@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "description": "Reusable, OT-specific threat/countermeasure library for embedded field devices. Importable into projects. Extend per device class.",
+  "threats": [
+    { "key": "hart-spoof", "title": "HART/4-20mA command injection or value spoofing", "stride": ["T", "S"], "appliesTo": ["interface:HART"], "typicalImpact": 4 },
+    { "key": "bt-default-cred", "title": "Bluetooth default/weak commissioning credential", "stride": ["S", "E"], "appliesTo": ["interface:BLE"], "typicalImpact": 3 },
+    { "key": "fw-downgrade", "title": "Unauthenticated firmware update or rollback", "stride": ["T", "E"], "appliesTo": ["component:firmware", "component:bootloader"], "typicalImpact": 4 },
+    { "key": "debug-port", "title": "Exposed debug port (JTAG/SWD/UART)", "stride": ["I", "E"], "appliesTo": ["interface:debug"], "typicalImpact": 4 },
+    { "key": "level-falsify", "title": "Measurement falsification defeating overfill protection", "stride": ["T"], "appliesTo": ["asset:physical-process"], "typicalImpact": 5 }
+  ],
+  "countermeasures": [
+    { "key": "cmd-lock", "title": "Write protection / command lock in run mode", "for": ["hart-spoof"] },
+    { "key": "force-passcode", "title": "Force credential change at commissioning + lockout", "for": ["bt-default-cred"] },
+    { "key": "signed-update", "title": "Signed-only updates + anti-rollback", "for": ["fw-downgrade"] },
+    { "key": "disable-debug", "title": "Disable/lock debug ports in production", "for": ["debug-port"] }
+  ]
+}

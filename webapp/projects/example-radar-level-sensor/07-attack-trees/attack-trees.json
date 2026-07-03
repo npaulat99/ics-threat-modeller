@@ -1,0 +1,122 @@
+{
+  "trees": [
+    {
+      "id": "AT1",
+      "title": "Falsify the reported level value",
+      "threatRef": "T1",
+      "description": "How an attacker could make the RL-100 report a wrong level, defeating overfill protection.",
+      "root": {
+        "id": "g1",
+        "kind": "goal",
+        "label": "Falsify the reported level value",
+        "gate": "OR",
+        "children": [
+          {
+            "id": "s1",
+            "kind": "step",
+            "label": "Inject a spoofed HART command on the loop",
+            "gate": "SAND",
+            "access": 4,
+            "skill": 2,
+            "cost": {
+              "time": 2,
+              "exploitability": 2,
+              "window": 2,
+              "detection": 2,
+              "prep": 2
+            },
+            "children": [
+              {
+                "id": "ss1",
+                "kind": "substep",
+                "label": "Gain physical access to the 4-20 mA wiring",
+                "access": 4,
+                "skill": 1,
+                "cost": {
+                  "time": 2,
+                  "window": 2
+                },
+                "children": []
+              },
+              {
+                "id": "ss2",
+                "kind": "substep",
+                "label": "Send a crafted HART write command",
+                "access": 5,
+                "skill": 2,
+                "cost": {
+                  "exploitability": 3,
+                  "notoriety": 3,
+                  "time": 2,
+                  "window": 3,
+                  "detection": 3,
+                  "abort": 3,
+                  "prep": 4
+                },
+                "children": []
+              },
+              {
+                "id": "cm1",
+                "kind": "countermeasure",
+                "label": "HART command lock / write protection in run mode",
+                "countermeasureRef": "CM1",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "kind": "step",
+            "label": "Reconfigure the device over Bluetooth",
+            "gate": "AND",
+            "access": 3,
+            "skill": 2,
+            "cost": {
+              "time": 1,
+              "exploitability": 2,
+              "detection": 1
+            },
+            "children": [
+              {
+                "id": "ss3",
+                "kind": "substep",
+                "label": "Approach within Bluetooth range during maintenance",
+                "access": 3,
+                "skill": 1,
+                "cost": {
+                  "window": 3
+                },
+                "children": []
+              },
+              {
+                "id": "v1",
+                "kind": "vulnerability",
+                "label": "Commissioning passcode left at default",
+                "children": []
+              },
+              {
+                "id": "cm2",
+                "kind": "countermeasure",
+                "label": "Force passcode change at commissioning; lock after 3 failures",
+                "countermeasureRef": "CM2",
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "AT2",
+      "title": "New attack tree",
+      "threatRef": "T1",
+      "root": {
+        "id": "nmr3m92pe0",
+        "kind": "goal",
+        "label": "Attacker goal",
+        "gate": "OR",
+        "children": []
+      }
+    }
+  ]
+}

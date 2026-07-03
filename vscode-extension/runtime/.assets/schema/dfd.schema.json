@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://thesis.local/tra/schema/dfd.schema.json",
+  "title": "Data Flow Diagram",
+  "description": "Layered DeMarco-style DFD. Nodes carry a layer and optional parent so the diagram can be navigated recursively (device -> components -> internals).",
+  "type": "object",
+  "required": ["nodes", "flows"],
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "type", "layer"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "type": { "type": "string", "enum": ["external-entity", "process", "multiprocess", "store", "trust-boundary"] },
+          "layer": { "type": "integer", "minimum": 1 },
+          "parent": { "type": ["string", "null"], "description": "Node id of the parent (the node whose internals this node belongs to)." },
+          "componentRef": { "type": "string", "description": "Linked component id in system.json." },
+          "members": { "type": "array", "items": { "type": "string" }, "description": "For trust-boundary nodes: the node ids enclosed by the boundary." },
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "width": { "type": "number" },
+          "height": { "type": "number" }
+        }
+      }
+    },
+    "flows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "from", "to"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "crossesBoundary": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

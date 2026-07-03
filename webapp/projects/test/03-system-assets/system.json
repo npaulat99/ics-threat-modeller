@@ -1,0 +1,30 @@
+{
+  "components": [
+    {
+      "id": "C-DEV",
+      "name": "test",
+      "kind": "device",
+      "layer": 1,
+      "parent": null,
+      "trustZone": "device"
+    }
+  ],
+  "interfaces": [],
+  "trustBoundaries": [],
+  "assets": [
+    {
+      "id": "AS-1",
+      "name": "Primary function",
+      "type": "function",
+      "components": [
+        "C-DEV"
+      ],
+      "objectives": {
+        "confidentiality": 1,
+        "integrity": 3,
+        "availability": 3,
+        "safety": 1
+      }
+    }
+  ]
+}

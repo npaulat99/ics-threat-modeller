@@ -1,0 +1,238 @@
+{
+  "threats": [
+    {
+      "id": "T1",
+      "title": "HART command injection falsifies level value",
+      "stride": [
+        "T",
+        "S"
+      ],
+      "components": [
+        "C-HART",
+        "C-MCU"
+      ],
+      "assets": [
+        "AS-MEAS"
+      ],
+      "attackerRef": "ATK-2",
+      "likelihood": 4,
+      "impact": 5,
+      "likelihoodRationale": "HART fieldbus is reachable on the plant floor; public HART tooling and no command authentication make exploitation trivial once on the loop.",
+      "impactRationale": "Falsified level can defeat overfill protection (safety 5).",
+      "countermeasures": [
+        "CM1"
+      ],
+      "status": "mitigated",
+      "impactDimensions": {
+        "confidentiality": 1,
+        "integrity": 5,
+        "availability": 3,
+        "safety": 5
+      },
+      "likelihoodFactors": {
+        "exposure": 3,
+        "exploitability": 5
+      },
+      "cvss": {
+        "baseScore": 7.1,
+        "vector": "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:L"
+      },
+      "interfaceRef": "I-HART",
+      "ratedBy": "example",
+      "ratedAt": "2026-07-02"
+    },
+    {
+      "id": "T2",
+      "title": "Bluetooth default passcode allows reconfiguration",
+      "stride": [
+        "S",
+        "E",
+        "T"
+      ],
+      "components": [
+        "C-BT",
+        "C-CFG"
+      ],
+      "assets": [
+        "AS-CRED",
+        "AS-MEAS"
+      ],
+      "attackerRef": "ATK-1",
+      "likelihood": 4,
+      "impact": 3,
+      "likelihoodRationale": "Defaults left in place; attacker within ~10 m Bluetooth range; public commissioning app.",
+      "impactRationale": "Reconfiguration can disturb measurement, not directly safety.",
+      "countermeasures": [
+        "CM2"
+      ],
+      "status": "mitigated",
+      "impactDimensions": {
+        "confidentiality": 2,
+        "integrity": 3,
+        "availability": 3,
+        "safety": 2
+      },
+      "likelihoodFactors": {
+        "exposure": 3,
+        "exploitability": 5
+      },
+      "interfaceRef": "I-BT",
+      "ratedBy": "example",
+      "ratedAt": "2026-06-30"
+    },
+    {
+      "id": "T3",
+      "title": "Unauthenticated firmware downgrade via JTAG",
+      "stride": [
+        "T",
+        "E"
+      ],
+      "components": [
+        "C-MCU",
+        "C-BOOT"
+      ],
+      "assets": [
+        "AS-FW"
+      ],
+      "attackerRef": "ATK-2",
+      "likelihood": 3,
+      "impact": 4,
+      "likelihoodRationale": "Requires opening the enclosure and setting the JTAG jumper (physical exposure); a signed bootloader further limits it.",
+      "impactRationale": "Downgrade reintroduces vulnerabilities; fleet risk.",
+      "countermeasures": [
+        "CM3"
+      ],
+      "status": "mitigated",
+      "impactDimensions": {
+        "confidentiality": 2,
+        "integrity": 4,
+        "availability": 3,
+        "safety": 4
+      },
+      "likelihoodFactors": {
+        "exposure": 2,
+        "exploitability": 4
+      },
+      "interfaceRef": "I-JTAG",
+      "ratedBy": "example",
+      "ratedAt": "2026-07-01",
+      "cvss": {
+        "version": "4.0",
+        "vector": "CVSS:4.0/AV:P/AC:H/AT:N/PR:N/UI:N/VC:N/VI:H/VA:L/SC:N/SI:N/SA:N",
+        "baseScore": 5.4
+      }
+    },
+    {
+      "id": "T4",
+      "title": "DoS of level reporting via HART flooding",
+      "stride": [
+        "D"
+      ],
+      "components": [
+        "C-HART"
+      ],
+      "assets": [
+        "AS-MEAS"
+      ],
+      "attackerRef": "ATK-2",
+      "likelihood": 4,
+      "impact": 3,
+      "likelihoodRationale": "Reachable on the HART fieldbus; flooding requires only moderate skill.",
+      "impactRationale": "Loss of view; the loop fails safe to the alarm band.",
+      "countermeasures": [],
+      "status": "accepted",
+      "impactDimensions": {
+        "confidentiality": 1,
+        "integrity": 2,
+        "availability": 3,
+        "safety": 3
+      },
+      "likelihoodFactors": {
+        "exposure": 3,
+        "exploitability": 5
+      },
+      "interfaceRef": "I-HART",
+      "ratedBy": "example",
+      "ratedAt": "2026-06-30",
+      "acceptedBy": "Product Security Officer",
+      "acceptanceRationale": "Loss of view drives the 4-20 mA loop to the fail-safe alarm band; residual availability risk accepted for the SL2 target.",
+      "reviewDate": "2027-01-01"
+    },
+    {
+      "id": "T5",
+      "title": "Remote exploit if Ethernet-APL fitted and routable",
+      "stride": [
+        "E",
+        "T"
+      ],
+      "components": [
+        "C-MCU"
+      ],
+      "assets": [
+        "AS-MEAS",
+        "AS-FW"
+      ],
+      "attackerRef": "ATK-3",
+      "likelihood": 4,
+      "impact": 5,
+      "likelihoodRationale": "Only when the Ethernet-APL option is fitted and the segment is routable; then the surface is remotely reachable.",
+      "impactRationale": "Full device control, safety impact.",
+      "countermeasures": [
+        "CM4"
+      ],
+      "status": "mitigated",
+      "impactDimensions": {
+        "confidentiality": 3,
+        "integrity": 5,
+        "availability": 4,
+        "safety": 5
+      },
+      "likelihoodFactors": {
+        "exposure": 5,
+        "exploitability": 3
+      },
+      "ratedBy": "example",
+      "ratedAt": "2026-06-30"
+    },
+    {
+      "id": "T6",
+      "title": "Radar signal spoofing falsifies the measured level",
+      "stride": [
+        "S",
+        "T"
+      ],
+      "components": [
+        "C-RADAR",
+        "C-MCU"
+      ],
+      "assets": [
+        "AS-MEAS"
+      ],
+      "attackerRef": "ATK-2",
+      "likelihood": 2,
+      "impact": 5,
+      "likelihoodRationale": "Requires specialist RF equipment placed close to the antenna in the vessel headspace.",
+      "impactRationale": "A spoofed echo yields a plausible but wrong level, defeating overfill protection (safety 5).",
+      "countermeasures": [
+        "CM5"
+      ],
+      "status": "mitigated",
+      "impactDimensions": {
+        "confidentiality": 1,
+        "integrity": 5,
+        "availability": 2,
+        "safety": 5
+      },
+      "likelihoodFactors": {
+        "exposure": 2,
+        "exploitability": 2
+      },
+      "ratedBy": "example",
+      "ratedAt": "2026-06-30",
+      "cvss": {
+        "vector": "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:L",
+        "version": "3.1"
+      }
+    }
+  ]
+}

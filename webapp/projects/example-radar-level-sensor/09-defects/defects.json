@@ -1,0 +1,24 @@
+{
+    "defects": [
+        {
+            "id": "D1",
+            "title": "Heap overflow in the bundled Bluetooth LE stack (advisory)",
+            "cve": "CVE-2024-0001",
+            "component": "C-BT",
+            "severity": "high",
+            "status": "triaged",
+            "discovered": "2026-05-12",
+            "fixedIn": "FW 2.5",
+            "note": "Third-party BLE stack advisory; patch scheduled. Re-assess T2 after the fix ships."
+        },
+        {
+            "id": "D2",
+            "title": "Information disclosure via verbose diagnostic log on the MCU",
+            "component": "C-MCU",
+            "severity": "low",
+            "status": "open",
+            "discovered": "2026-06-20",
+            "note": "Diagnostic build flag left enabled; low impact, no credentials exposed."
+        }
+    ]
+}

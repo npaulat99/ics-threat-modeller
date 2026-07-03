@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0",
+  "title": "TRA Risk Scheme",
+  "description": "Practical impact/likelihood scheme combining a Bug Bar impact rubric, an attacker-grounded likelihood rubric (1-5), and a 5x5 matrix. Inspired by Fockel/Phoenix Contact (Bug Bar + CVSS), Loepz 5x5 matrix, and CRA/IEC 62443 expectations.",
+  "likelihood": {
+    "scale": [
+      { "score": 1, "label": "Very Low", "desc": "Physical access plus rare expertise needed; mature controls; no known path." },
+      { "score": 2, "label": "Low", "desc": "Local access and specialist skill; controls present; limited public knowledge." },
+      { "score": 3, "label": "Medium", "desc": "Adjacent/local access, moderate skill; partial controls; known technique." },
+      { "score": 4, "label": "High", "desc": "Remote or easy local access, common skill; weak controls; public exploit/tooling." },
+      { "score": 5, "label": "Very High", "desc": "Remote, low skill, scalable; no effective control; trivial or automated." }
+    ],
+    "factors": ["attacker capability", "required access", "exploitability", "existing control maturity"]
+  },
+  "impact": {
+    "scale": [
+      { "score": 1, "label": "Negligible", "desc": "No safety effect; minor data exposure; self-recovering." },
+      { "score": 2, "label": "Minor", "desc": "Local CIA loss; nuisance; bounded process disturbance." },
+      { "score": 3, "label": "Moderate", "desc": "Process value falsification or downtime; reputational; no safety harm." },
+      { "score": 4, "label": "Major", "desc": "Loss of control/view of overfill protection; potential SIL demotion; multi-site." },
+      { "score": 5, "label": "Severe", "desc": "Safety hazard (overfill, spill); environmental/human harm; fleet-wide." }
+    ],
+    "bugBarDimensions": ["confidentiality", "integrity", "availability", "safety"],
+    "rule": "Impact = max(C, I, A, Safety) for the worst plausible asset, defaulting to the binding safety case (PR-04)."
+  },
+  "matrix": {
+    "axes": "risk = likelihood x impact",
+    "bands": [
+      { "name": "Low", "min": 1, "max": 5, "color": "#2e7d32" },
+      { "name": "Medium", "min": 6, "max": 11, "color": "#f9a825" },
+      { "name": "High", "min": 12, "max": 19, "color": "#ef6c00" },
+      { "name": "Critical", "min": 20, "max": 25, "color": "#c62828" }
+    ]
+  }
+}

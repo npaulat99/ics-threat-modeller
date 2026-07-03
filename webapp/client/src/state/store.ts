@@ -1,0 +1,365 @@
+// Global application state (zustand) plus the live-sync transport.
+//
+// Sync model:
+//   - Every edit calls `save(step, value)`. The store updates local state optimistically
+//     and (debounced) pushes the new artifact over the WebSocket. The backend writes the
+//     JSON file and relays the change to *other* connected clients.
+//   - When a JSON file is edited externally, the backend pushes an {type:'artifact'}
+//     message which `applyArtifact` merges back into state — so the UI tracks the files live.
+import { create } from 'zustand';
+import type { ProjectData, ProjectSummary, RiskScheme, StepKey, ViewKey } from '../types';
+
+const wsUrl = () => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+
+async function getJSON<T>(url: string): Promise<T> {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`${url} -> ${r.status}`);
+    return r.json();
+}
+async function postJSON<T>(url: string, body?: unknown): Promise<T> {
+    const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body || {}),
+    });
+    return r.json();
+}
+
+let socket: WebSocket | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+const saveTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+// ---- Undo / redo history --------------------------------------------------
+// A stack of whole-project snapshots. Every edit (save / renameId) records the pre-edit state;
+// rapid edits to the same step within a short window coalesce into one undo step so typing or
+// dragging does not produce dozens of tiny steps. undo()/redo() restore a snapshot and push the
+// changed artifacts to the backend.
+const STEP_KEYS: StepKey[] = ['project', 'assumptions', 'system', 'dfd', 'threats', 'requirements', 'countermeasures', 'attackTrees', 'defects'];
+let undoStack: ProjectData[] = [];
+let redoStack: ProjectData[] = [];
+let histStep = '';
+let histTime = 0;
+let histSuppress = false;
+const cloneData = (d: ProjectData): ProjectData => JSON.parse(JSON.stringify(d));
+
+function pushHistory(prev: ProjectData, step: string) {
+    const now = Date.now();
+    if (undoStack.length && step === histStep && now - histTime < 700) {
+        histTime = now;
+        return;
+    }
+    undoStack.push(cloneData(prev));
+    if (undoStack.length > 100) undoStack.shift();
+    redoStack = [];
+    histStep = step;
+    histTime = now;
+    useStore.setState({ undoDepth: undoStack.length, redoDepth: 0 });
+}
+
+function restoreSnapshot(target: ProjectData, current: ProjectData) {
+    useStore.setState({ data: target, selectedNodeId: null, selectedEdgeId: null });
+    const id = useStore.getState().activeId;
+    if (!id) return;
+    useStore.setState({ saveState: 'saving' });
+    for (const step of STEP_KEYS) {
+        if (JSON.stringify((target as any)[step]) !== JSON.stringify((current as any)[step])) sendSave(id, step, (target as any)[step]);
+    }
+}
+
+function clearHistory() {
+    undoStack = [];
+    redoStack = [];
+    histStep = '';
+    histTime = 0;
+    useStore.setState({ undoDepth: 0, redoDepth: 0 });
+}
+
+const applyTheme = (t: 'light' | 'dark') => {
+    document.documentElement.dataset.theme = t;
+};
+
+interface Store {
+    connected: boolean;
+    projects: ProjectSummary[];
+    activeId: string | null;
+    data: ProjectData | null;
+    scheme: RiskScheme | null;
+    kb: any | null;
+    bugBar: any | null;
+    theme: 'light' | 'dark';
+    activeView: ViewKey | 'dashboard' | 'kb' | 'assistant';
+    dfdPath: string[];
+    selectedNodeId: string | null;
+    selectedEdgeId: string | null;
+    focus: { view: string; id: string } | null;
+    lastSavedAt: number;
+    saveState: 'idle' | 'saving' | 'saved' | 'offline';
+
+    init(): Promise<void>;
+    refreshProjects(): Promise<void>;
+    refreshKb(): Promise<void>;
+    selectProject(id: string): Promise<void>;
+    newProject(name: string): Promise<void>;
+    setView(v: ViewKey | 'dashboard' | 'kb' | 'assistant'): void;
+    goto(view: string, id?: string): void;
+    setTheme(t: 'light' | 'dark'): void;
+    setDfdPath(path: string[]): void;
+    selectNode(id: string | null): void;
+    selectEdge(id: string | null): void;
+    drillInto(id: string): void;
+    save(step: StepKey, value: any): void;
+    renameId(oldId: string, newId: string): void;
+    applyArtifact(step: StepKey, value: any): void;
+    undo(): void;
+    redo(): void;
+    undoDepth: number;
+    redoDepth: number;
+    report(): Promise<{ html: string; issues: string[] } | null>;
+}
+
+export const useStore = create<Store>((set, get) => ({
+    connected: false,
+    projects: [],
+    activeId: null,
+    data: null,
+    scheme: null,
+    kb: null,
+    bugBar: null,
+    theme: 'light',
+    activeView: 'dfd',
+    dfdPath: [],
+    selectedNodeId: null,
+    selectedEdgeId: null,
+    focus: null,
+    lastSavedAt: 0,
+    saveState: 'idle',
+    undoDepth: 0,
+    redoDepth: 0,
+
+    async init() {
+        const saved = (localStorage.getItem('tra-theme') as 'light' | 'dark') || 'light';
+        applyTheme(saved);
+        window.addEventListener('beforeunload', (e) => {
+            const s = useStore.getState().saveState;
+            if (s === 'saving' || s === 'offline') {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+        const [scheme, kb, bugBar, projects] = await Promise.all([
+            getJSON<RiskScheme>('/api/risk-scheme').catch(() => null),
+            getJSON<any>('/api/kb').catch(() => null),
+            getJSON<any>('/api/bug-bar').catch(() => null),
+            getJSON<ProjectSummary[]>('/api/projects').catch(() => []),
+        ]);
+        set({ scheme, kb, bugBar, theme: saved, projects });
+        connect();
+        if (projects.length) await get().selectProject(projects[0].id);
+    },
+
+    async refreshProjects() {
+        const projects = await getJSON<ProjectSummary[]>('/api/projects').catch(() => []);
+        set({ projects });
+    },
+
+    async refreshKb() {
+        const kb = await getJSON<any>('/api/kb').catch(() => null);
+        if (kb) set({ kb });
+    },
+
+    async selectProject(id) {
+        const data = await getJSON<ProjectData>(`/api/projects/${id}`);
+        set({ activeId: id, data, dfdPath: [], selectedNodeId: null, selectedEdgeId: null });
+        clearHistory();
+        subscribe(id);
+    },
+
+    async newProject(name) {
+        const { id } = await postJSON<{ id: string }>('/api/projects', { name });
+        await get().refreshProjects();
+        await get().selectProject(id);
+        set({ activeView: 'project' });
+    },
+
+    setView(v) {
+        set({ activeView: v, focus: null });
+    },
+    goto(view, id) {
+        set({ activeView: view as any, focus: id ? { view, id } : null, selectedNodeId: null, selectedEdgeId: null });
+    },
+    setTheme(t) {
+        applyTheme(t);
+        try {
+            localStorage.setItem('tra-theme', t);
+        } catch {
+            /* ignore */
+        }
+        set({ theme: t });
+    },
+    setDfdPath(path) {
+        set({ dfdPath: path, selectedNodeId: null, selectedEdgeId: null });
+    },
+    selectNode(id) {
+        set({ selectedNodeId: id, selectedEdgeId: null });
+    },
+    selectEdge(id) {
+        set({ selectedEdgeId: id, selectedNodeId: null });
+    },
+    drillInto(id) {
+        const { data, dfdPath } = get();
+        if (!data) return;
+        const node = (data.dfd.nodes || []).find((n: any) => n.id === id);
+        if (!node || node.type === 'trust-boundary') return;
+        // Enter the component's internal layer. If it has no children yet the layer is simply
+        // empty, ready for the user to model the internals — we never inject a placeholder.
+        set({ dfdPath: [...dfdPath, id], selectedNodeId: null, selectedEdgeId: null });
+    },
+
+    save(step, value) {
+        const data = get().data;
+        if (!data) return;
+        if (!histSuppress) pushHistory(data, step);
+        set({ data: { ...data, [step]: value } });
+        const id = get().activeId;
+        if (!id) return;
+        clearTimeout(saveTimers[step]);
+        set({ saveState: 'saving' });
+        saveTimers[step] = setTimeout(() => {
+            const latest = get().data;
+            if (latest) sendSave(id, step, (latest as any)[step]);
+        }, 160);
+    },
+
+    renameId(oldId, newId) {
+        const data = get().data;
+        if (!data || !oldId || !newId || oldId === newId) return;
+        pushHistory(data, 'rename');
+        histSuppress = true;
+        const m = (id: any) => (id === oldId ? newId : id);
+        const arr = (a?: any[]) => (Array.isArray(a) ? a.map(m) : a);
+        const mapNode = (n: any): any => ({ ...n, countermeasureRef: n.countermeasureRef === oldId ? newId : n.countermeasureRef, children: (n.children || []).map(mapNode) });
+        const next: Record<string, any> = {
+            system: {
+                ...data.system,
+                components: (data.system.components || []).map((c) => ({ ...c, id: m(c.id), parent: c.parent === oldId ? newId : c.parent })),
+                interfaces: (data.system.interfaces || []).map((i) => ({ ...i, id: m(i.id), component: i.component === oldId ? newId : i.component })),
+                trustBoundaries: (data.system.trustBoundaries || []).map((b) => ({ ...b, id: m(b.id), members: arr(b.members) })),
+                assets: (data.system.assets || []).map((a) => ({ ...a, id: m(a.id), components: arr(a.components) })),
+            },
+            threats: {
+                threats: (data.threats.threats || []).map((t) => ({ ...t, id: m(t.id), components: arr(t.components), assets: arr(t.assets), attackerRef: t.attackerRef === oldId ? newId : t.attackerRef, interfaceRef: t.interfaceRef === oldId ? newId : t.interfaceRef, countermeasures: arr(t.countermeasures) })),
+            },
+            requirements: {
+                requirements: (data.requirements?.requirements || []).map((r) => ({ ...r, id: m(r.id), derivedFromThreat: arr(r.derivedFromThreat), satisfiedByCM: arr(r.satisfiedByCM) })),
+            },
+            countermeasures: {
+                countermeasures: (data.countermeasures.countermeasures || []).map((c) => ({ ...c, id: m(c.id), components: arr(c.components), addresses: (c.addresses || []).map((a) => ({ ...a, threat: a.threat === oldId ? newId : a.threat })) })),
+            },
+            attackTrees: { trees: (data.attackTrees?.trees || []).map((t) => ({ ...t, id: m(t.id), threatRef: t.threatRef === oldId ? newId : t.threatRef, root: mapNode(t.root) })) },
+            defects: { defects: (data.defects?.defects || []).map((d) => ({ ...d, id: m(d.id), component: d.component === oldId ? newId : d.component })) },
+            assumptions: { ...data.assumptions, attacker: (data.assumptions.attacker || []).map((a) => ({ ...a, id: m(a.id) })) },
+            dfd: {
+                nodes: (data.dfd.nodes || []).map((n) => ({ ...n, id: m(n.id), parent: n.parent === oldId ? newId : n.parent, componentRef: n.componentRef === oldId ? newId : n.componentRef, members: arr(n.members) })),
+                flows: (data.dfd.flows || []).map((f) => ({ ...f, from: m(f.from), to: m(f.to) })),
+            },
+        };
+        for (const step of ['system', 'threats', 'requirements', 'countermeasures', 'attackTrees', 'defects', 'assumptions', 'dfd'] as StepKey[]) {
+            if (JSON.stringify((data as any)[step]) !== JSON.stringify(next[step])) get().save(step, next[step]);
+        }
+        histSuppress = false;
+        set({ dfdPath: get().dfdPath.map(m), selectedNodeId: get().selectedNodeId === oldId ? newId : get().selectedNodeId === `iface:${oldId}` ? `iface:${newId}` : get().selectedNodeId });
+    },
+
+    undo() {
+        if (!undoStack.length) return;
+        const cur = get().data;
+        if (!cur) return;
+        const prev = undoStack.pop()!;
+        redoStack.push(cloneData(cur));
+        histStep = '';
+        histTime = 0;
+        restoreSnapshot(prev, cur);
+        set({ undoDepth: undoStack.length, redoDepth: redoStack.length });
+    },
+    redo() {
+        if (!redoStack.length) return;
+        const cur = get().data;
+        if (!cur) return;
+        const nextSnap = redoStack.pop()!;
+        undoStack.push(cloneData(cur));
+        histStep = '';
+        histTime = 0;
+        restoreSnapshot(nextSnap, cur);
+        set({ undoDepth: undoStack.length, redoDepth: redoStack.length });
+    },
+
+    applyArtifact(step, value) {
+        const data = get().data;
+        if (!data) return;
+        if (JSON.stringify((data as any)[step]) === JSON.stringify(value)) return;
+        set({ data: { ...data, [step]: value } });
+    },
+
+    async report() {
+        const id = get().activeId;
+        if (!id) return null;
+        return postJSON<{ html: string; issues: string[] }>(`/api/projects/${id}/report`, {});
+    },
+}));
+
+function connect() {
+    socket = new WebSocket(wsUrl());
+    socket.onopen = () => {
+        useStore.setState({ connected: true });
+        const id = useStore.getState().activeId;
+        if (id) subscribe(id);
+    };
+    socket.onclose = () => {
+        const s = useStore.getState();
+        useStore.setState({ connected: false, saveState: s.saveState === 'saving' ? 'offline' : s.saveState });
+        clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(connect, 1500);
+    };
+    socket.onerror = () => socket?.close();
+    socket.onmessage = (ev) => {
+        let msg: any;
+        try {
+            msg = JSON.parse(ev.data);
+        } catch {
+            return;
+        }
+        const st = useStore.getState();
+        if (msg.type === 'artifact' && msg.id === st.activeId) st.applyArtifact(msg.step, msg.data);
+        else if (msg.type === 'saved' && msg.id === st.activeId) useStore.setState({ saveState: 'saved', lastSavedAt: Date.now() });
+        else if (msg.type === 'projects-changed') st.refreshProjects();
+    };
+}
+
+function subscribe(id: string) {
+    if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'subscribe', id }));
+}
+
+function sendSave(id: string, step: string, data: unknown) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'save', id, step, data }));
+        // The server replies with a 'saved' ack, which flips saveState to 'saved'.
+    } else {
+        // Fallback to REST if the socket is momentarily down.
+        fetch(`/api/projects/${id}/${step}`, {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(data),
+        })
+            .then((r) => useStore.setState(r.ok ? { saveState: 'saved', lastSavedAt: Date.now() } : { saveState: 'offline' }))
+            .catch(() => useStore.setState({ saveState: 'offline' }));
+    }
+}
+
+// Small id helper used across panels.
+export const uid = (prefix: string, existing: string[]) => {
+    let n = existing.length + 1;
+    let id = `${prefix}${n}`;
+    const set = new Set(existing);
+    while (set.has(id)) id = `${prefix}${++n}`;
+    return id;
+};

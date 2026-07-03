@@ -1,0 +1,183 @@
+// Attack-Defense Tree helpers: deterministic bottom-up evaluation and immutable tree edits.
+// Grounded in notes/topics/attack-trees.typ and bewertung.typ (cost factor weights,
+// access/skill aggregation) and Kordy et al. (AND/OR) + Jhawar et al. (SAND).
+import type { AdCost, AdGate, AdKind, AdNode } from '../types';
+
+export const COST_FACTORS: { k: keyof AdCost; label: string; weight: number }[] = [
+    { k: 'time', label: 'Time', weight: 0.25 },
+    { k: 'exploitability', label: 'Exploitability', weight: 0.2 },
+    { k: 'window', label: 'Window of opportunity', weight: 0.15 },
+    { k: 'detection', label: 'Detection likelihood', weight: 0.15 },
+    { k: 'notoriety', label: 'Notoriety / prior knowledge', weight: 0.1 },
+    { k: 'prep', label: 'Preparation effort', weight: 0.1 },
+    { k: 'abort', label: 'Abort risk', weight: 0.05 },
+];
+
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+/**
+ * Per-step attacker success probability (0..1) from the cost factors. Each factor c (1-5, higher =
+ * harder) contributes ((6-c)/5) — i.e. harder factors lower the success probability — raised to its
+ * relative weight, giving a weighted geometric mean per step (after bewertung.typ's ∏P_cost model).
+ */
+export function stepProb(cost?: AdCost): number {
+    if (!cost) return 1;
+    let p = 1;
+    for (const { k, weight } of COST_FACTORS) {
+        const v = cost[k];
+        if (typeof v === 'number') p *= Math.pow((6 - v) / 5, weight);
+    }
+    return clamp01(p);
+}
+
+export interface AdMetrics {
+    skillReq: number;
+    accessReq: number;
+    prob: number; // 0..1 attacker success probability of the cheapest feasible path
+    defenses: number;
+    vulns: number;
+}
+
+/**
+ * Bottom-up evaluation returning the attacker's success probability of the *cheapest* path
+ * (Kordy et al. attack–defense trees; Jhawar et al. SAND). Semantics:
+ *   OR  — the attacker takes the single easiest child: probability = MAX child, and required
+ *         access/skill are reported from *that* child (never a mix of independently-minimised axes).
+ *   AND — every sub-step is required: probability = PRODUCT of children (multiplicative, so longer
+ *         chains are correctly less likely); required access/skill = MAX.
+ *   SAND— quantitatively identical to AND (all steps required); the fixed order is descriptive
+ *         (it constrains sequencing, not the success probability of the conjunction).
+ * Each defence child lowers the local success probability by a factor that depends on the linked
+ * countermeasure's *status* (a verified control reduces more than a merely proposed one); each
+ * vulnerability child raises it.
+ */
+const DEF_FACTOR: Record<string, number> = { proposed: 0.85, planned: 0.7, implemented: 0.5, verified: 0.35 };
+
+export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>): AdMetrics {
+    const kids = (node.children || []).filter((c) => c.kind !== 'countermeasure' && c.kind !== 'vulnerability');
+    const defChildren = (node.children || []).filter((c) => c.kind === 'countermeasure');
+    const ownDef = defChildren.length;
+    const ownVuln = (node.children || []).filter((c) => c.kind === 'vulnerability').length;
+    const selfProb = stepProb(node.cost);
+    const selfSkill = node.skill || 0;
+    const selfAccess = node.access || 0;
+
+    let skillReq: number;
+    let accessReq: number;
+    let prob: number;
+    let defenses = ownDef;
+    let vulns = ownVuln;
+
+    if (!kids.length) {
+        skillReq = selfSkill;
+        accessReq = selfAccess;
+        prob = selfProb;
+    } else {
+        const childM = kids.map((k) => evaluate(k, cmById));
+        defenses += childM.reduce((s, c) => s + c.defenses, 0);
+        vulns += childM.reduce((s, c) => s + c.vulns, 0);
+        if (node.gate === 'OR') {
+            const best = childM.reduce((a, b) => (b.prob > a.prob ? b : a));
+            skillReq = Math.max(best.skillReq, selfSkill);
+            accessReq = Math.max(best.accessReq, selfAccess);
+            prob = best.prob * selfProb;
+        } else {
+            skillReq = Math.max(selfSkill, ...childM.map((c) => c.skillReq));
+            accessReq = Math.max(selfAccess, ...childM.map((c) => c.accessReq));
+            prob = childM.reduce((p, c) => p * c.prob, 1) * selfProb;
+        }
+    }
+    const defMult = defChildren.reduce((m, c) => m * (DEF_FACTOR[(c.countermeasureRef ? cmById?.get(c.countermeasureRef)?.status : '') ?? ''] ?? 0.6), 1);
+    prob = clamp01(prob * defMult * Math.pow(1.6, ownVuln));
+    return { skillReq, accessReq, prob, defenses, vulns };
+}
+
+/** Suggested threat likelihood (1-5) from a tree's root success probability. */
+export function likelihoodFromProb(prob: number): number {
+    return Math.min(5, Math.max(1, Math.round(prob * 5)));
+}
+
+// ---- immutable tree editing -------------------------------------------------
+let counter = 0;
+export const adId = () => `n${Date.now().toString(36)}${(counter++).toString(36)}`;
+
+export function updateNode(root: AdNode, id: string, patch: Partial<AdNode>): AdNode {
+    const rec = (n: AdNode): AdNode => ({
+        ...(n.id === id ? { ...n, ...patch } : n),
+        children: (n.children || []).map(rec),
+    });
+    return rec(root);
+}
+
+export function addChild(root: AdNode, parentId: string, child: AdNode): AdNode {
+    const rec = (n: AdNode): AdNode =>
+        n.id === parentId
+            ? { ...n, children: [...(n.children || []), child] }
+            : { ...n, children: (n.children || []).map(rec) };
+    return rec(root);
+}
+
+export function removeNode(root: AdNode, id: string): AdNode {
+    const rec = (n: AdNode): AdNode => ({ ...n, children: (n.children || []).filter((c) => c.id !== id).map(rec) });
+    return rec(root);
+}
+
+export const KIND_LABEL: Record<string, string> = {
+    goal: 'Goal',
+    step: 'Step',
+    substep: 'Sub-step',
+    category: 'Category',
+    countermeasure: 'Defence',
+    vulnerability: 'Vulnerability',
+};
+
+// ---- Shared presentational option maps (used by both the list and the diagram editors) -------
+export const GATES: AdGate[] = ['AND', 'OR', 'SAND'];
+export const ADD_KINDS: AdKind[] = ['step', 'substep', 'category', 'countermeasure', 'vulnerability'];
+export const ACCESS_OPTS: [number, string][] = [
+    [1, 'Remote (unauth.)'],
+    [2, 'Remote (auth.)'],
+    [3, 'Adjacent / fieldbus'],
+    [4, 'Local (on site)'],
+    [5, 'Physical (open enclosure)'],
+];
+export const SKILL_OPTS: [number, string][] = [
+    [1, 'Script kiddie'],
+    [2, 'Experienced hacker'],
+    [3, 'Security engineer'],
+    [4, 'Expert team'],
+    [5, 'Nation-state'],
+];
+export const accessLabel = (n: number) => ACCESS_OPTS.find(([v]) => v === Math.round(n))?.[1] || '–';
+export const skillLabel = (n: number) => SKILL_OPTS.find(([v]) => v === Math.round(n))?.[1] || '–';
+
+/** A fresh node of the given kind, with sensible defaults (steps get access/skill/cost; structural
+ *  nodes get a default gate). Attack and defence nodes are created the same way. */
+export function newNode(kind: AdKind): AdNode {
+    return {
+        id: adId(),
+        kind,
+        label: KIND_LABEL[kind],
+        ...(kind === 'step' || kind === 'substep' ? { access: 3, skill: 2, cost: {} } : {}),
+        ...(['goal', 'step', 'substep', 'category'].includes(kind) ? { gate: 'AND' as AdGate } : {}),
+        children: [],
+    };
+}
+
+/** Move a node one position left (-1) or right (+1) among its siblings — preserving SAND order
+ *  semantics (left-to-right = execution sequence). No-op at the ends. Immutable. */
+export function moveChild(root: AdNode, id: string, dir: -1 | 1): AdNode {
+    const rec = (n: AdNode): AdNode => {
+        const children = n.children || [];
+        const idx = children.findIndex((c) => c.id === id);
+        if (idx !== -1) {
+            const j = idx + dir;
+            if (j < 0 || j >= children.length) return n;
+            const next = [...children];
+            [next[idx], next[j]] = [next[j], next[idx]];
+            return { ...n, children: next };
+        }
+        return { ...n, children: children.map(rec) };
+    };
+    return rec(root);
+}

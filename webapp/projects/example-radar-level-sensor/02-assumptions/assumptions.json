@@ -1,0 +1,21 @@
+{
+  "device": [
+    { "id": "A-D1", "text": "Bootloader and firmware are cryptographically signed; secure boot is enabled.", "confidence": "high" },
+    { "id": "A-D2", "text": "JTAG/SWD debug ports are present but require an internal jumper to enable.", "confidence": "medium" }
+  ],
+  "system": [
+    { "id": "A-S1", "text": "The sensor reports level over 4-20 mA/HART to a plant DCS; it is not the sole overfill safety device but contributes to it." }
+  ],
+  "environment": [
+    { "id": "A-E1", "text": "Installed on a tank in a fenced process area; physical access is restricted but not eliminated." },
+    { "id": "A-E2", "text": "Bluetooth commissioning is reachable within ~10 m during maintenance." }
+  ],
+  "operational": [
+    { "id": "A-O1", "text": "Commissioning passwords are often left at default; firmware is updated rarely (15-20 year lifetime)." }
+  ],
+  "attacker": [
+    { "id": "ATK-1", "name": "Opportunistic proximity attacker", "capability": 2, "access": "local", "motivation": "disruption / curiosity", "resources": "consumer hardware", "text": "Within Bluetooth range during maintenance; uses public tooling." },
+    { "id": "ATK-2", "name": "Malicious insider", "capability": 4, "access": "physical", "motivation": "sabotage", "resources": "tools, time, device knowledge", "text": "Has physical access to the enclosure and wiring." },
+    { "id": "ATK-3", "name": "Remote network adversary", "capability": 4, "access": "remote", "motivation": "process manipulation", "resources": "exploit tooling", "text": "Reaches the device only if Ethernet-APL is fitted and routable." }
+  ]
+}
