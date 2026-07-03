@@ -1,0 +1,57 @@
+{
+  "traVersion": "1.0",
+  "projectId": "rl-100",
+  "title": "TRA: RadarLevel RL-100 80 GHz radar level sensor",
+  "device": {
+    "name": "RadarLevel RL-100",
+    "type": "radar level sensor",
+    "modelReference": "comparable in class to VEGAPULS 6X (illustrative only)",
+    "purdueLevel": "0-1",
+    "version": "FW 2.4 / HW B"
+  },
+  "scope": {
+    "mode": "graybox",
+    "boundary": "The physical sensor enclosure and all its interfaces (4-20 mA/HART, Bluetooth, optional Ethernet-APL, display, firmware/bootloader). The plant DCS and engineering laptop are external entities.",
+    "inScope": [
+      "sensor MCU",
+      "radar front-end",
+      "HART modem",
+      "Bluetooth stack",
+      "firmware/bootloader",
+      "local display",
+      "config store"
+    ],
+    "outOfScope": [
+      "plant control network",
+      "DCS",
+      "asset-owner IT"
+    ]
+  },
+  "slTarget": "SL2",
+  "intendedUse": "Continuous, non-contact level measurement of liquids and bulk solids in industrial process vessels. The device reports a 4-20 mA/HART process value to a plant DCS and is commissioned locally over Bluetooth by trained maintenance staff. It is intended for installation inside a protected plant network at Purdue level 0-1.",
+  "foreseeableUse": [
+    "Deployment on a routable / internet-exposed network when the optional Ethernet-APL interface is fitted, instead of an isolated process segment.",
+    "Leaving the Bluetooth commissioning interface enabled with the factory default passcode after commissioning.",
+    "Using the level reading as a safety-instrumented function input without an independent overfill protection layer.",
+    "Connecting a maintenance laptop that is also used for general office/internet tasks to the JTAG/SWD debug port."
+  ],
+  "repo": {
+    "projectBranchUrl": "",
+    "kbUrl": ""
+  },
+  "steps": {
+    "01-project-description": "01-project-description/project.json",
+    "02-assumptions": "02-assumptions/assumptions.json",
+    "03-system-assets": "03-system-assets/system.json",
+    "04-dfd": "04-dfd/dfd.json",
+    "06-threats": "06-threats/threats.json",
+    "07-attack-trees": "07-attack-trees/attack-trees.json",
+    "08-countermeasures": "08-countermeasures/countermeasures.json"
+  },
+  "status": "in-progress",
+  "rigorousMode": false,
+  "sbom": {
+    "mode": "external",
+    "format": "spdx"
+  }
+}

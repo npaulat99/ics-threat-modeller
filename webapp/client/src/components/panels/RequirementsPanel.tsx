@@ -1,0 +1,112 @@
+// Security requirements (methodology step 05) — the traceable bridge threat -> risk ->
+// requirement -> control that IEC 62443-4-1 (SR) and the CRA expect.
+import { useStore, uid } from '../../state/store';
+import { Field, Chips, useFocus, useEditMode, EditBackBar, Jump, HelpButton, confirmDelete, IdInput } from '../common';
+import type { Requirement } from '../../types';
+
+export default function RequirementsPanel() {
+    const data = useStore((s) => s.data)!;
+    const save = useStore((s) => s.save);
+    const reqs = data.requirements?.requirements || [];
+    const threats = data.threats.threats || [];
+    const cms = data.countermeasures.countermeasures || [];
+    const focusId = useFocus('requirements');
+    const { editingId, setEditingId } = useEditMode(focusId);
+    const write = (list: Requirement[]) => save('requirements', { requirements: list });
+    const add = () => {
+        const id = uid('R', reqs.map((r) => r.id));
+        write([...reqs, { id, text: 'New security requirement', derivedFromThreat: [], satisfiedByCM: [] }]);
+        setEditingId(id);
+    };
+    const threatOpts = threats.map((t) => ({ value: t.id, label: `${t.id} · ${t.title}` }));
+    const cmOpts = cms.map((c) => ({ value: c.id, label: `${c.id} · ${c.title}` }));
+    const editing = reqs.find((r) => r.id === editingId) || null;
+
+    return (
+        <div className="panel">
+            <div className="panelhead">
+                <h1>Security requirements</h1>
+                <HelpButton title="Security requirements (tips)">
+                    <ul>
+                        <li>A requirement is the missing link in the audit chain <b>threat → risk → requirement → control</b> (IEC 62443-4-1 SR).</li>
+                        <li>Cite the standard clause (e.g. IEC 62443-4-2 CR 1.2) and the SL / Foundational Requirement it satisfies.</li>
+                        <li>Every high/critical threat should derive at least one requirement; every requirement should be satisfied by a countermeasure.</li>
+                    </ul>
+                </HelpButton>
+            </div>
+            <p className="lead">
+                Derive testable security requirements from the threats and link them to the controls that satisfy them — this is the
+                traceable core of a 62443-4-1 / CRA assessment.
+            </p>
+
+            {editing ? (
+                <>
+                    <EditBackBar label={`Editing ${editing.id}`} onBack={() => setEditingId(null)} />
+                    {(() => {
+                        const r = editing;
+                        const upd = (patch: Partial<Requirement>) => write(reqs.map((x) => (x.id === r.id ? { ...x, ...patch } : x)));
+                        return (
+                            <div id={`f-requirements-${r.id}`} className="card">
+                                <div className="head">
+                                    <IdInput id={r.id} onRename={setEditingId} />
+                                    <input className="inp grow" value={r.text} onChange={(e) => upd({ text: e.target.value })} />
+                                    <button className="btn sm danger" aria-label={`Delete requirement ${r.id}`} onClick={() => confirmDelete(`requirement ${r.id}`) && (write(reqs.filter((x) => x.id !== r.id)), setEditingId(null))}>
+                                        ✕
+                                    </button>
+                                </div>
+                                <div className="grid2">
+                                    <Field label="Standard reference">
+                                        <input value={r.standardRef || ''} onChange={(e) => upd({ standardRef: e.target.value })} placeholder="IEC 62443-4-2 CR 1.2" />
+                                    </Field>
+                                    <Field label="SL / Foundational Requirement">
+                                        <input value={r.slFr || ''} onChange={(e) => upd({ slFr: e.target.value })} placeholder="FR1 SL2" />
+                                    </Field>
+                                </div>
+                                <Field label="Derived from threats">
+                                    <Chips options={threatOpts} value={r.derivedFromThreat || []} onChange={(v) => upd({ derivedFromThreat: v })} empty="No threats yet." />
+                                </Field>
+                                <Field label="Satisfied by countermeasures">
+                                    <Chips options={cmOpts} value={r.satisfiedByCM || []} onChange={(v) => upd({ satisfiedByCM: v })} empty="No countermeasures yet." />
+                                </Field>
+                            </div>
+                        );
+                    })()}
+                </>
+            ) : (
+                <>
+                    <div className="toolbar">
+                        <button className="btn primary sm" onClick={add}>
+                            + Requirement
+                        </button>
+                    </div>
+                    {reqs.length ? (
+                        <div className="list">
+                            {reqs.map((r) => (
+                                <div id={`f-requirements-${r.id}`} className={'itemcard collapsed' + (focusId === r.id ? ' focused' : '')} key={r.id}>
+                                    <div className="head">
+                                        <span className="summary-id">{r.id}</span>
+                                        <span className="summary-title">{r.text || '(untitled requirement)'}</span>
+                                        <button className="btn sm" onClick={() => setEditingId(r.id)}>
+                                            Edit
+                                        </button>
+                                        <button className="btn sm danger" aria-label={`Delete requirement ${r.id}`} onClick={() => confirmDelete(`requirement ${r.id}`) && write(reqs.filter((x) => x.id !== r.id))}>
+                                            ✕
+                                        </button>
+                                    </div>
+                                    <div className="summary-links">
+                                        <span className="lbl">From threats:</span>
+                                        {(r.derivedFromThreat || []).length ? r.derivedFromThreat!.map((tid) => <Jump key={tid} view="threats" id={tid} />) : <span className="hint">none</span>}
+                                        <span className="lbl">Satisfied by:</span>
+                                        {(r.satisfiedByCM || []).length ? r.satisfiedByCM!.map((cid) => <Jump key={cid} view="countermeasures" id={cid} />) : <span className="hint">none</span>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="hint">No requirements yet. Derive them from your rated threats.</p>
+                    )}
+                </>
+            )}
+        </div>
+    );
+}

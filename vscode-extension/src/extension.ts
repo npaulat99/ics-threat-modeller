@@ -1,0 +1,255 @@
+import * as vscode from "vscode";
+import { execFile } from "node:child_process";
+import * as os from "node:os";
+import * as path from "node:path";
+import { promisify } from "node:util";
+// Shared DeMarco converter (also a standalone CLI). DataFlowDiagram.xml carries the matching shapes.
+import { dfdToDrawio } from "../../tools/dfd-to-drawio.mjs";
+import { openWizard } from "./wizard";
+import { openKbBrowser } from "./kbBrowser";
+import { DfdEditor } from "./dfdEditor";
+import { NativeDfdEditor } from "./nativeDfdEditor";
+import { AttackTreeEditor } from "./attackTreeEditor";
+
+interface Node { id: string; label: string; type: string; layer: number; parent?: string | null }
+interface Dfd { nodes: Node[]; flows: { id: string; label?: string; from: string; to: string }[]; }
+
+let layer = 1;
+const execFileAsync = promisify(execFile);
+const decoder = new TextDecoder();
+const encoder = new TextEncoder();
+const find = () => vscode.workspace.findFiles("**/04-dfd/dfd.json", "**/node_modules/**", 1).then((f) => f[0]);
+const load = async (u: vscode.Uri): Promise<Dfd> => JSON.parse(decoder.decode(await vscode.workspace.fs.readFile(u)));
+const encodeJson = (obj: unknown) => encoder.encode(JSON.stringify(obj, null, 2));
+const writeText = (u: vscode.Uri, text: string) => vscode.workspace.fs.writeFile(u, encoder.encode(text));
+const pathExists = async (u: vscode.Uri) => { try { await vscode.workspace.fs.stat(u); return true; } catch { return false; } };
+const reportsScript = (ctx: vscode.ExtensionContext) => vscode.Uri.joinPath(ctx.extensionUri, "runtime", "tools", "generate-report.mjs");
+const projectsRoot = () => vscode.Uri.file(path.join(os.homedir(), "Documents", "EmbedRisk", "projects"));
+const importedKbRoot = (ctx: vscode.ExtensionContext) => vscode.Uri.joinPath(ctx.globalStorageUri, "knowledge-base", "imported");
+
+async function writeJson(u: vscode.Uri, obj: unknown) {
+  await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(u.fsPath)));
+  await vscode.workspace.fs.writeFile(u, encodeJson(obj));
+}
+
+async function initGitRepo(dir: vscode.Uri) {
+  try {
+    await execFileAsync("git", ["init"], { cwd: dir.fsPath });
+  } catch {
+    vscode.window.showErrorMessage("Git init failed. The project was created and can still be used without a Git repository.");
+  }
+}
+
+async function generateReport(ctx: vscode.ExtensionContext, projDir: vscode.Uri) {
+  const script = reportsScript(ctx);
+  if (!(await pathExists(script))) {
+    vscode.window.showErrorMessage("The packaged report generator is missing. Reinstall the extension.");
+    return;
+  }
+  try {
+    await execFileAsync(process.execPath, [script.fsPath, projDir.fsPath], { cwd: path.dirname(script.fsPath) });
+    const report = vscode.Uri.joinPath(projDir, "report", "index.html");
+    const act = await vscode.window.showInformationMessage("Report generated successfully.", "Open report", "Reveal folder");
+    if (act === "Open report") await vscode.commands.executeCommand("vscode.open", report);
+    else if (act === "Reveal folder") await vscode.commands.executeCommand("revealFileInOS", report);
+  } catch (err: any) {
+    const detail = String(err?.stderr || err?.stdout || err?.message || err).trim();
+    vscode.window.showErrorMessage(detail ? `Report generation failed: ${detail}` : "Report generation failed.");
+  }
+}
+
+async function scaffoldProject(dir: vscode.Uri, name: string, slug: string) {
+  const project = {
+    traVersion: "1.0",
+    projectId: slug,
+    title: `TRA: ${name}`,
+    device: { name, type: "field device", modelReference: "", purdueLevel: "0-1", version: "" },
+    scope: { mode: "graybox", boundary: "", inScope: [], outOfScope: [] },
+    slTarget: "SL2",
+    intendedUse: "",
+    foreseeableUse: [],
+    repo: { projectBranchUrl: "", kbUrl: "" },
+    steps: {
+      "01-project-description": "01-project-description/project.json",
+      "02-assumptions": "02-assumptions/assumptions.json",
+      "03-system-assets": "03-system-assets/system.json",
+      "04-dfd": "04-dfd/dfd.json",
+      "05-requirements": "05-requirements/requirements.json",
+      "06-threats": "06-threats/threats.json",
+      "07-attack-trees": "07-attack-trees/attack-trees.json",
+      "08-countermeasures": "08-countermeasures/countermeasures.json",
+      "09-defects": "09-defects/defects.json"
+    },
+    status: "draft",
+    rigorousMode: false,
+    sbom: { mode: "external", format: "spdx" }
+  };
+  const assumptions = {
+    device: [], system: [], environment: [], operational: [],
+    attacker: [{ id: "ATK-1", name: "Opportunistic attacker", capability: 2, access: "local", motivation: "disruption", resources: "limited", text: "" }]
+  };
+  const system = {
+    components: [{ id: "C-DEV", name, kind: "device", layer: 1, parent: null, trustZone: "device", provenance: "own" }],
+    interfaces: [], trustBoundaries: [],
+    assets: [{ id: "AS-1", name: "Primary function", type: "function", storage: "", components: ["C-DEV"], objectives: { confidentiality: 1, integrity: 3, availability: 3, safety: 1 } }]
+  };
+  const dfd = { nodes: [{ id: "N-DEV", label: name, type: "process", layer: 1, parent: null, componentRef: "C-DEV" }], flows: [] };
+
+  await vscode.workspace.fs.createDirectory(dir);
+  await writeJson(vscode.Uri.joinPath(dir, "01-project-description", "project.json"), project);
+  await writeJson(vscode.Uri.joinPath(dir, "02-assumptions", "assumptions.json"), assumptions);
+  await writeJson(vscode.Uri.joinPath(dir, "03-system-assets", "system.json"), system);
+  await writeJson(vscode.Uri.joinPath(dir, "04-dfd", "dfd.json"), dfd);
+  await writeJson(vscode.Uri.joinPath(dir, "05-requirements", "requirements.json"), { requirements: [] });
+  await writeJson(vscode.Uri.joinPath(dir, "06-threats", "threats.json"), { threats: [] });
+  await writeJson(vscode.Uri.joinPath(dir, "07-attack-trees", "attack-trees.json"), { trees: [] });
+  await writeJson(vscode.Uri.joinPath(dir, "08-countermeasures", "countermeasures.json"), { countermeasures: [] });
+  await writeJson(vscode.Uri.joinPath(dir, "09-defects", "defects.json"), { defects: [] });
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(dir, "documents"));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(dir, "report"));
+  await writeText(vscode.Uri.joinPath(dir, "documents", "README.md"), "# Supporting documents\n\nStore device specifications, architecture notes, and audit evidence here.\n");
+  await writeText(vscode.Uri.joinPath(dir, ".gitignore"), "report/\n");
+}
+
+async function openLayer(target: number) {
+  const u = await find();
+  if (!u) { vscode.window.showWarningMessage("No 04-dfd/dfd.json in the workspace."); return; }
+  const dfd = await load(u);
+  const layers = [...new Set(dfd.nodes.map((n) => n.layer))].sort();
+  if (!dfd.nodes.some((n) => n.layer === target)) {
+    const create = await vscode.window.showInformationMessage(`Layer ${target} has no components yet. Create it?`, "Create", "Cancel");
+    if (create !== "Create") return;
+    dfd.nodes.push({ id: `N-L${target}-1`, label: `New component (L${target})`, type: "process", layer: target, parent: dfd.nodes[0]?.id ?? null });
+    await vscode.workspace.fs.writeFile(u, encodeJson(dfd));
+  }
+  layer = target;
+  const out = vscode.Uri.joinPath(u, "..", "dfd.drawio");
+  await writeText(out, dfdToDrawio(await load(u), layer));
+  await vscode.commands.executeCommand("vscode.open", out);
+  vscode.window.setStatusBarMessage(`DFD layer ${layer} (layers: ${layers.join(", ")})`, 4000);
+}
+
+export function activate(ctx: vscode.ExtensionContext) {
+  const attackTreeEditor = new AttackTreeEditor(ctx.extensionUri);
+  ctx.subscriptions.push(
+    vscode.commands.registerCommand("tra.dfdToDrawio", () => openLayer(layer)),
+    vscode.commands.registerCommand("tra.dfdLayerDown", () => openLayer(layer + 1)),
+    vscode.commands.registerCommand("tra.dfdLayerUp", () => openLayer(Math.max(1, layer - 1))),
+    vscode.commands.registerCommand("tra.report", async () => {
+      const u = await find();
+      if (!u) { vscode.window.showWarningMessage("No TRA project (04-dfd/dfd.json) found."); return; }
+      const projDir = vscode.Uri.joinPath(u, "..", "..");
+      await generateReport(ctx, projDir);
+    }),
+    vscode.commands.registerCommand("tra.newProject", async () => {
+      const name = await vscode.window.showInputBox({ prompt: "Device / project name" });
+      if (!name) return;
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const root = projectsRoot();
+      await vscode.workspace.fs.createDirectory(root);
+      const dir = vscode.Uri.joinPath(root, slug);
+      if (await pathExists(dir)) {
+        const act = await vscode.window.showWarningMessage(`The project '${slug}' already exists at ${dir.fsPath}.`, "Open project", "Cancel");
+        if (act === "Open project") await vscode.commands.executeCommand("vscode.openFolder", dir, { forceNewWindow: true });
+        return;
+      }
+      await scaffoldProject(dir, name, slug);
+      await initGitRepo(dir);
+      const act = await vscode.window.showInformationMessage(`Created project at ${dir.fsPath}.`, "Open project", "Reveal in Explorer");
+      if (act === "Reveal in Explorer") await vscode.commands.executeCommand("revealFileInOS", dir);
+      else await vscode.commands.executeCommand("vscode.openFolder", dir, { forceNewWindow: true });
+    }),
+    vscode.commands.registerCommand("tra.wizard", () => openWizard(ctx)),
+    vscode.commands.registerCommand("tra.kbBrowse", () => openKbBrowser(ctx)),
+    vscode.commands.registerCommand("tra.dfdNative", async () => {
+      const u = await find();
+      if (!u) { vscode.window.showWarningMessage("No 04-dfd/dfd.json in the workspace."); return; }
+      await vscode.commands.executeCommand("vscode.openWith", u, "tra.dfdNative");
+    }),
+    vscode.commands.registerCommand("tra.newAttackTree", async () => {
+      const tf = await vscode.workspace.findFiles("**/06-threats/threats.json", "**/node_modules/**", 1);
+      if (!tf[0]) { vscode.window.showWarningMessage("No TRA project (06-threats/threats.json) found."); return; }
+      const projDir = vscode.Uri.joinPath(tf[0], "..", "..");
+      const file = vscode.Uri.joinPath(projDir, "07-attack-trees/attack-trees.json");
+      const readThreats = async (): Promise<any[]> => { try { return JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(tf[0])).toString()).threats || []; } catch { return []; } };
+      const readDoc = async (): Promise<any> => { try { const d = JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(file)).toString()); if (!Array.isArray(d.trees)) d.trees = []; return d; } catch { return { trees: [] }; } };
+      const writeDoc = (d: any) => vscode.workspace.fs.writeFile(file, Buffer.from(JSON.stringify(d, null, 2)));
+      const countNodes = (n: any): number => 1 + (n.children || []).reduce((s: number, c: any) => s + countNodes(c), 0);
+      const openTree = async (id?: string) => { attackTreeEditor.pendingTreeId = id; await vscode.commands.executeCommand("vscode.openWith", file, "tra.attackTree"); };
+
+      // Create a new tree, first asking which threat it models (so it carries the threat prefix).
+      const createForThreat = async () => {
+        const threats = await readThreats();
+        const items: any[] = threats.map((t: any) => ({ label: t.id, description: t.title, t }));
+        items.push({ label: "$(circle-slash) No specific threat", t: null });
+        const pick = await vscode.window.showQuickPick(items, { placeHolder: "Which threat does this attack tree model?" });
+        if (!pick) return;
+        const t = (pick as any).t;
+        const d = await readDoc();
+        const ids = new Set(d.trees.map((x: any) => x.id));
+        const base = t ? "AT-" + t.id : "AT"; let id = base; let n = 1; while (ids.has(id)) id = `${base}-${++n}`;
+        d.trees.push({ id, title: t ? t.title : "New attack goal", threatRef: t ? t.id : "", root: { id: "n1", kind: "goal", label: t ? t.title : "Attack goal", gate: "OR", children: [{ id: "n2", kind: "step", label: "Attacker step 1", access: 3, skill: 2, cost: {}, children: [] }] } });
+        attackTreeEditor.pendingTreeId = id; // set before writing so the new tree is focused whether or not the editor is already open
+        await writeDoc(d);
+        await vscode.commands.executeCommand("vscode.openWith", file, "tra.attackTree");
+      };
+
+      // Hub: list existing trees (with their threat prefix), open one, delete one, or create a new one.
+      const threats = await readThreats();
+      const doc0 = await readDoc();
+      const threatTitle = (ref: string) => ((threats.find((x: any) => x.id === ref) || {}).title) || "";
+      const NEW: any = { label: "$(add) New attack tree\u2026", alwaysShow: true };
+      const build = (d: any) => [NEW, ...d.trees.map((t: any) => ({
+        label: (t.threatRef ? "$(target) " + t.threatRef + " \u00b7 " : "") + (t.title || t.id),
+        description: t.id,
+        detail: (t.threatRef ? threatTitle(t.threatRef) + "  \u00b7  " : "") + countNodes(t.root) + " node(s)",
+        treeId: t.id,
+        buttons: [{ iconPath: new vscode.ThemeIcon("trash"), tooltip: "Delete this attack tree" }],
+      }))];
+      const qp = vscode.window.createQuickPick();
+      qp.title = "Attack trees";
+      qp.ignoreFocusOut = true;
+      qp.placeholder = doc0.trees.length ? "Open an attack tree \u00b7 trash icon deletes \u00b7 or create a new one" : "No attack trees yet \u2014 create one to model a threat";
+      qp.items = build(doc0);
+      qp.onDidTriggerItemButton(async (e) => {
+        const id = (e.item as any).treeId; if (!id) return;
+        const cur = await readDoc();
+        const idx = cur.trees.findIndex((t: any) => t.id === id); if (idx < 0) return;
+        const conf = await vscode.window.showWarningMessage(`Delete attack tree '${cur.trees[idx].title || id}' and all its nodes?`, { modal: true }, "Delete");
+        if (conf !== "Delete") return;
+        cur.trees.splice(idx, 1);
+        await writeDoc(cur);
+        qp.items = build(cur);
+      });
+      qp.onDidAccept(async () => { const sel: any = qp.selectedItems[0]; qp.hide(); if (!sel) return; if (sel.treeId) await openTree(sel.treeId); else await createForThreat(); });
+      qp.onDidHide(() => qp.dispose());
+      qp.show();
+    }),
+    vscode.commands.registerCommand("tra.kbImport", async () => {
+      const url = await vscode.window.showInputBox({ prompt: "Git URL of a TRA knowledge base to import", placeHolder: "https://github.com/org/tra-kb.git" });
+      if (!url) return;
+      const name = (url.split("/").pop() || "kb").replace(/\.git$/, "");
+      const root = importedKbRoot(ctx);
+      await vscode.workspace.fs.createDirectory(root);
+      const target = path.join(root.fsPath, name);
+      if (await pathExists(vscode.Uri.file(target))) {
+        vscode.window.showWarningMessage(`A knowledge base named '${name}' is already imported.`);
+        return;
+      }
+      try {
+        await execFileAsync("git", ["clone", url, target], { cwd: root.fsPath });
+        vscode.window.showInformationMessage(`Imported knowledge base into ${target}.`);
+      } catch (err: any) {
+        const detail = String(err?.stderr || err?.stdout || err?.message || err).trim();
+        vscode.window.showErrorMessage(detail ? `Knowledge-base import failed: ${detail}` : "Knowledge-base import failed.");
+      }
+    }),
+    vscode.window.registerCustomEditorProvider("tra.dfdNative", new NativeDfdEditor(ctx.extensionUri), { webviewOptions: { retainContextWhenHidden: true } }),
+    vscode.window.registerCustomEditorProvider("tra.attackTree", attackTreeEditor, { webviewOptions: { retainContextWhenHidden: true } }),
+    vscode.window.registerCustomEditorProvider("tra.dfdEditor", new DfdEditor(ctx.extensionUri)),
+  );
+  // The wizard no longer opens automatically on activation. Run "EmbedRisk: Open guided wizard"
+  // (command palette) to open it; the extension still activates on startup only to register its
+  // commands and the DFD / attack-tree custom editors.
+}
+export function deactivate() {}

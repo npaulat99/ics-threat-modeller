@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://thesis.local/tra/schema/tra-project.schema.json",
+  "title": "TRA Project Manifest",
+  "description": "Top-level manifest for a Threat and Risk Assessment project. References the artifacts produced by each step.",
+  "type": "object",
+  "required": ["traVersion", "device", "steps"],
+  "properties": {
+    "traVersion": { "type": "string", "description": "Version of the TRA methodology this project follows." },
+    "projectId": { "type": "string" },
+    "title": { "type": "string" },
+    "device": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "description": "e.g. radar level sensor, PLC, gateway" },
+        "modelReference": { "type": "string", "description": "Comparable commercial device, illustrative only." },
+        "purdueLevel": { "type": "string", "enum": ["0", "0-1", "1", "1-2", "2", "3"] },
+        "version": { "type": "string" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["blackbox", "graybox", "whitebox"], "description": "Configurable internal-modeling depth (FR-01)." },
+        "boundary": { "type": "string" },
+        "inScope": { "type": "array", "items": { "type": "string" } },
+        "outOfScope": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "slTarget": { "type": "string", "description": "Target IEC 62443-4-2 Security Level (SL-T), e.g. SL2." },
+    "steps": {
+      "type": "object",
+      "description": "Relative paths to the artifact files produced by each step.",
+      "additionalProperties": { "type": "string" }
+    },
+    "status": { "type": "string", "enum": ["draft", "in-progress", "review", "released"] }
+  }
+}

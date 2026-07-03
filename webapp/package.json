@@ -1,0 +1,25 @@
+{
+    "name": "tra-webapp",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Web application for the Threat & Risk Assessment (TRA) methodology: a layered DFD-centric UI with live, bidirectional JSON synchronisation.",
+    "type": "module",
+    "workspaces": [
+        "server",
+        "client"
+    ],
+    "scripts": {
+        "dev": "concurrently -n server,client -c blue,green \"npm:dev:server\" \"npm:dev:client\"",
+        "dev:server": "npm --workspace server run dev",
+        "dev:client": "npm --workspace client run dev",
+        "build": "npm --workspace client run build",
+        "start": "node server/src/index.js",
+        "serve": "npm run build && npm start"
+    },
+    "devDependencies": {
+        "concurrently": "^9.1.0"
+    },
+    "engines": {
+        "node": ">=20"
+    }
+}

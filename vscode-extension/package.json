@@ -1,0 +1,48 @@
+{
+  "name": "embedrisk",
+  "displayName": "EmbedRisk — Threat & Risk Assessment",
+  "description": "Guided Threat & Risk Assessment for embedded OT field devices: a layered DFD editor, STRIDE threats, attack-defence trees and reports. The VS Code companion to the EmbedRisk web app (shared JSON project format).",
+  "version": "0.3.0",
+  "publisher": "thesis",
+  "license": "GPL-3.0-only",
+  "icon": "media/icon.png",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["threat-modeling", "risk-assessment", "security", "ics", "ot", "iec-62443"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "tra.newProject", "title": "New project", "category": "EmbedRisk" },
+      { "command": "tra.wizard", "title": "Open guided wizard", "category": "EmbedRisk" },
+      { "command": "tra.kbBrowse", "title": "Browse knowledge base (catalogue)", "category": "EmbedRisk" },
+      { "command": "tra.kbImport", "title": "Import knowledge base (git)", "category": "EmbedRisk" },
+      { "command": "tra.dfdToDrawio", "title": "Open DFD in draw.io editor", "category": "EmbedRisk" },
+      { "command": "tra.dfdNative", "title": "Open DFD canvas (native)", "category": "EmbedRisk" },
+      { "command": "tra.newAttackTree", "title": "New attack tree for a threat", "category": "EmbedRisk" },
+      { "command": "tra.dfdLayerDown", "title": "DFD layer down (into component)", "category": "EmbedRisk" },
+      { "command": "tra.dfdLayerUp", "title": "DFD layer up (parent)", "category": "EmbedRisk" },
+      { "command": "tra.report", "title": "Generate report", "category": "EmbedRisk" }
+    ],
+    "keybindings": [
+      { "command": "tra.dfdLayerDown", "key": "ctrl+alt+down" },
+      { "command": "tra.dfdLayerUp", "key": "ctrl+alt+up" }
+    ],
+    "customEditors": [
+      { "viewType": "tra.dfdNative", "displayName": "EmbedRisk DFD canvas", "selector": [{ "filenamePattern": "**/04-dfd/dfd.json" }], "priority": "default" },
+      { "viewType": "tra.dfdEditor", "displayName": "EmbedRisk DFD (draw.io)", "selector": [{ "filenamePattern": "**/04-dfd/dfd.json" }], "priority": "option" },
+      { "viewType": "tra.attackTree", "displayName": "EmbedRisk attack trees", "selector": [{ "filenamePattern": "**/07-attack-trees/attack-trees.json" }], "priority": "default" }
+    ]
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --external:vscode --outfile=dist/extension.js --format=cjs",
+    "compile": "tsc -p . --noEmit && npm run build",
+    "watch": "npm run build -- --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.0"
+  }
+}

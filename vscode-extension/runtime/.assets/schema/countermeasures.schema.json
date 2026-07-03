@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://thesis.local/tra/schema/countermeasures.schema.json",
+  "title": "Countermeasures",
+  "description": "Countermeasures address one or more threats (m:n) and may reference affected components. Each addresses-link records the residual likelihood/impact it brings about.",
+  "type": "object",
+  "required": ["countermeasures"],
+  "properties": {
+    "countermeasures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "addresses"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "type": { "type": "string", "enum": ["preventive", "detective", "corrective", "organizational"] },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["threat"],
+              "properties": {
+                "threat": { "type": "string" },
+                "residualLikelihood": { "type": "integer", "minimum": 1, "maximum": 5 },
+                "residualImpact": { "type": "integer", "minimum": 1, "maximum": 5 }
+              }
+            }
+          },
+          "components": { "type": "array", "items": { "type": "string" } },
+          "iec62443Ref": { "type": "string", "description": "Optional FR/CR reference; not required per requirement." },
+          "status": { "type": "string", "enum": ["proposed", "planned", "implemented", "verified"] }
+        }
+      }
+    }
+  }
+}

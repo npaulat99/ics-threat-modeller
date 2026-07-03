@@ -1,0 +1,72 @@
+{
+    "templateVersion": "1.0",
+    "maintainer": "Product-security unit (shared, pull-only)",
+    "title": "Embedded OT field-device TRA template",
+    "description": "A reusable starting point (mock TRA) for a generic embedded OT field device. Copy into projects/<id>/ and adapt. Pre-seeds the mandatory attacker profiles, a typical interface set and the common threats from the shared library.",
+    "project": {
+        "traVersion": "1.0",
+        "device": {
+            "type": "field device",
+            "purdueLevel": "0-1"
+        },
+        "scope": {
+            "mode": "graybox",
+            "boundary": "The device enclosure and all its interfaces; the plant network and engineering tools are external."
+        },
+        "slTarget": "SL2",
+        "status": "draft",
+        "rigorousMode": true
+    },
+    "assumptions": {
+        "attacker": [
+            {
+                "id": "ATK-1",
+                "name": "Opportunistic proximity attacker",
+                "capability": 2,
+                "access": "adjacent",
+                "text": "Near the device during operation/maintenance; public tooling."
+            },
+            {
+                "id": "ATK-2",
+                "name": "Malicious insider / on-site",
+                "capability": 4,
+                "access": "physical",
+                "text": "Physical access to the enclosure and wiring."
+            },
+            {
+                "id": "ATK-3",
+                "name": "Remote network adversary",
+                "capability": 4,
+                "access": "remote",
+                "text": "Reaches the device only if a routable interface is fitted and unsegmented."
+            }
+        ]
+    },
+    "interfaces": [
+        {
+            "id": "I-FIELDBUS",
+            "name": "Process fieldbus",
+            "exposure": "local",
+            "category": "network"
+        },
+        {
+            "id": "I-LOCAL",
+            "name": "Local commissioning",
+            "exposure": "adjacent",
+            "category": "user"
+        },
+        {
+            "id": "I-DEBUG",
+            "name": "Debug port",
+            "exposure": "physical",
+            "category": "external"
+        }
+    ],
+    "seedThreatKeys": [
+        "hart-spoof",
+        "bt-default-cred",
+        "fw-downgrade",
+        "debug-port",
+        "level-falsify"
+    ]
+}
