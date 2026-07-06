@@ -3,7 +3,14 @@ client/dist/
 projects/*
 !projects/example-radar-level-sensor/
 !projects/example-radar-level-sensor/**
+projects/**/.git/
 projects/**/report/
 .assets/knowledge-base/imported/
+.env
+.env.*
+!.env.example
+coverage/
+*.tsbuildinfo
+.eslintcache
 *.log
 .DS_Store
