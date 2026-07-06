@@ -62,7 +62,7 @@ async function scaffoldProject(dir: vscode.Uri, name: string, slug: string) {
   const project = {
     traVersion: "1.0",
     projectId: slug,
-    title: `TRA: ${name}`,
+    title: `EmbedRisk: ${name}`,
     device: { name, type: "field device", modelReference: "", purdueLevel: "0-1", version: "" },
     scope: { mode: "graybox", boundary: "", inScope: [], outOfScope: [] },
     slTarget: "SL2",
@@ -131,51 +131,53 @@ async function openLayer(target: number) {
 
 export function activate(ctx: vscode.ExtensionContext) {
   const attackTreeEditor = new AttackTreeEditor(ctx.extensionUri);
+  const createProjectCommand = async () => {
+    const name = await vscode.window.showInputBox({ prompt: "Device / project name" });
+    if (!name) return;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const root = projectsRoot();
+    await vscode.workspace.fs.createDirectory(root);
+    const dir = vscode.Uri.joinPath(root, slug);
+    if (await pathExists(dir)) {
+      const act = await vscode.window.showWarningMessage(`The project '${slug}' already exists at ${dir.fsPath}.`, "Open project", "Cancel");
+      if (act === "Open project") await vscode.commands.executeCommand("vscode.openFolder", dir, { forceNewWindow: true });
+      return;
+    }
+    await scaffoldProject(dir, name, slug);
+    await initGitRepo(dir);
+    const act = await vscode.window.showInformationMessage(`Created project at ${dir.fsPath}.`, "Open project", "Reveal in Explorer");
+    if (act === "Reveal in Explorer") await vscode.commands.executeCommand("revealFileInOS", dir);
+    else await vscode.commands.executeCommand("vscode.openFolder", dir, { forceNewWindow: true });
+  };
+
   ctx.subscriptions.push(
-    vscode.commands.registerCommand("tra.dfdToDrawio", () => openLayer(layer)),
-    vscode.commands.registerCommand("tra.dfdLayerDown", () => openLayer(layer + 1)),
-    vscode.commands.registerCommand("tra.dfdLayerUp", () => openLayer(Math.max(1, layer - 1))),
-    vscode.commands.registerCommand("tra.report", async () => {
+    vscode.commands.registerCommand("embedrisk.dfdToDrawio", () => openLayer(layer)),
+    vscode.commands.registerCommand("embedrisk.dfdLayerDown", () => openLayer(layer + 1)),
+    vscode.commands.registerCommand("embedrisk.dfdLayerUp", () => openLayer(Math.max(1, layer - 1))),
+    vscode.commands.registerCommand("embedrisk.report", async () => {
       const u = await find();
-      if (!u) { vscode.window.showWarningMessage("No TRA project (04-dfd/dfd.json) found."); return; }
+      if (!u) { vscode.window.showWarningMessage("No EmbedRisk project (04-dfd/dfd.json) found."); return; }
       const projDir = vscode.Uri.joinPath(u, "..", "..");
       await generateReport(ctx, projDir);
     }),
-    vscode.commands.registerCommand("tra.newProject", async () => {
-      const name = await vscode.window.showInputBox({ prompt: "Device / project name" });
-      if (!name) return;
-      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-      const root = projectsRoot();
-      await vscode.workspace.fs.createDirectory(root);
-      const dir = vscode.Uri.joinPath(root, slug);
-      if (await pathExists(dir)) {
-        const act = await vscode.window.showWarningMessage(`The project '${slug}' already exists at ${dir.fsPath}.`, "Open project", "Cancel");
-        if (act === "Open project") await vscode.commands.executeCommand("vscode.openFolder", dir, { forceNewWindow: true });
-        return;
-      }
-      await scaffoldProject(dir, name, slug);
-      await initGitRepo(dir);
-      const act = await vscode.window.showInformationMessage(`Created project at ${dir.fsPath}.`, "Open project", "Reveal in Explorer");
-      if (act === "Reveal in Explorer") await vscode.commands.executeCommand("revealFileInOS", dir);
-      else await vscode.commands.executeCommand("vscode.openFolder", dir, { forceNewWindow: true });
-    }),
-    vscode.commands.registerCommand("tra.wizard", () => openWizard(ctx)),
-    vscode.commands.registerCommand("tra.kbBrowse", () => openKbBrowser(ctx)),
-    vscode.commands.registerCommand("tra.dfdNative", async () => {
+    vscode.commands.registerCommand("embedrisk.newProject", createProjectCommand),
+    vscode.commands.registerCommand("embedrisk.wizard", () => openWizard(ctx)),
+    vscode.commands.registerCommand("embedrisk.kbBrowse", () => openKbBrowser(ctx)),
+    vscode.commands.registerCommand("embedrisk.dfdNative", async () => {
       const u = await find();
       if (!u) { vscode.window.showWarningMessage("No 04-dfd/dfd.json in the workspace."); return; }
-      await vscode.commands.executeCommand("vscode.openWith", u, "tra.dfdNative");
+      await vscode.commands.executeCommand("vscode.openWith", u, "embedrisk.dfdNative");
     }),
-    vscode.commands.registerCommand("tra.newAttackTree", async () => {
+    vscode.commands.registerCommand("embedrisk.newAttackTree", async () => {
       const tf = await vscode.workspace.findFiles("**/06-threats/threats.json", "**/node_modules/**", 1);
-      if (!tf[0]) { vscode.window.showWarningMessage("No TRA project (06-threats/threats.json) found."); return; }
+      if (!tf[0]) { vscode.window.showWarningMessage("No EmbedRisk project (06-threats/threats.json) found."); return; }
       const projDir = vscode.Uri.joinPath(tf[0], "..", "..");
       const file = vscode.Uri.joinPath(projDir, "07-attack-trees/attack-trees.json");
       const readThreats = async (): Promise<any[]> => { try { return JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(tf[0])).toString()).threats || []; } catch { return []; } };
       const readDoc = async (): Promise<any> => { try { const d = JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(file)).toString()); if (!Array.isArray(d.trees)) d.trees = []; return d; } catch { return { trees: [] }; } };
       const writeDoc = (d: any) => vscode.workspace.fs.writeFile(file, Buffer.from(JSON.stringify(d, null, 2)));
       const countNodes = (n: any): number => 1 + (n.children || []).reduce((s: number, c: any) => s + countNodes(c), 0);
-      const openTree = async (id?: string) => { attackTreeEditor.pendingTreeId = id; await vscode.commands.executeCommand("vscode.openWith", file, "tra.attackTree"); };
+      const openTree = async (id?: string) => { attackTreeEditor.pendingTreeId = id; await vscode.commands.executeCommand("vscode.openWith", file, "embedrisk.attackTree"); };
 
       // Create a new tree, first asking which threat it models (so it carries the threat prefix).
       const createForThreat = async () => {
@@ -191,7 +193,7 @@ export function activate(ctx: vscode.ExtensionContext) {
         d.trees.push({ id, title: t ? t.title : "New attack goal", threatRef: t ? t.id : "", root: { id: "n1", kind: "goal", label: t ? t.title : "Attack goal", gate: "OR", children: [{ id: "n2", kind: "step", label: "Attacker step 1", access: 3, skill: 2, cost: {}, children: [] }] } });
         attackTreeEditor.pendingTreeId = id; // set before writing so the new tree is focused whether or not the editor is already open
         await writeDoc(d);
-        await vscode.commands.executeCommand("vscode.openWith", file, "tra.attackTree");
+        await vscode.commands.executeCommand("vscode.openWith", file, "embedrisk.attackTree");
       };
 
       // Hub: list existing trees (with their threat prefix), open one, delete one, or create a new one.
@@ -225,7 +227,7 @@ export function activate(ctx: vscode.ExtensionContext) {
       qp.onDidHide(() => qp.dispose());
       qp.show();
     }),
-    vscode.commands.registerCommand("tra.kbImport", async () => {
+    vscode.commands.registerCommand("embedrisk.kbImport", async () => {
       const url = await vscode.window.showInputBox({ prompt: "Git URL of a TRA knowledge base to import", placeHolder: "https://github.com/org/tra-kb.git" });
       if (!url) return;
       const name = (url.split("/").pop() || "kb").replace(/\.git$/, "");
@@ -244,12 +246,12 @@ export function activate(ctx: vscode.ExtensionContext) {
         vscode.window.showErrorMessage(detail ? `Knowledge-base import failed: ${detail}` : "Knowledge-base import failed.");
       }
     }),
-    vscode.window.registerCustomEditorProvider("tra.dfdNative", new NativeDfdEditor(ctx.extensionUri), { webviewOptions: { retainContextWhenHidden: true } }),
-    vscode.window.registerCustomEditorProvider("tra.attackTree", attackTreeEditor, { webviewOptions: { retainContextWhenHidden: true } }),
-    vscode.window.registerCustomEditorProvider("tra.dfdEditor", new DfdEditor(ctx.extensionUri)),
+    vscode.window.registerCustomEditorProvider("embedrisk.dfdNative", new NativeDfdEditor(ctx.extensionUri), { webviewOptions: { retainContextWhenHidden: true } }),
+    vscode.window.registerCustomEditorProvider("embedrisk.attackTree", attackTreeEditor, { webviewOptions: { retainContextWhenHidden: true } }),
+    vscode.window.registerCustomEditorProvider("embedrisk.dfdEditor", new DfdEditor(ctx.extensionUri)),
   );
   // The wizard no longer opens automatically on activation. Run "EmbedRisk: Open guided wizard"
   // (command palette) to open it; the extension still activates on startup only to register its
   // commands and the DFD / attack-tree custom editors.
 }
-export function deactivate() {}
+export function deactivate() { }

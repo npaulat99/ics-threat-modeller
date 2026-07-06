@@ -30,7 +30,7 @@ export async function openKbBrowser(ctx: vscode.ExtensionContext) {
         else if (entry.isFile() && entry.name.toLowerCase().endsWith(".json")) importedLibs.push(vscode.Uri.file(full));
       }
     }
-  } catch {}
+  } catch { }
   const libs = [runtimeLib, ...workspaceLibs, ...importedLibs];
   const threats: any[] = []; const cms: any[] = [];
   for (const u of libs) {
@@ -38,19 +38,19 @@ export async function openKbBrowser(ctx: vscode.ExtensionContext) {
     (j.threats || []).forEach((t: any) => threats.push({ ...t, _src: u.path.split("/").pop() }));
     (j.countermeasures || []).forEach((c: any) => cms.push({ ...c, _src: u.path.split("/").pop() }));
   }
-  const panel = vscode.window.createWebviewPanel("traKb", "EmbedRisk · Knowledge Base", vscode.ViewColumn.One, { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(ctx.extensionUri, "media")] });
+  const panel = vscode.window.createWebviewPanel("embedriskKb", "EmbedRisk · Knowledge Base", vscode.ViewColumn.One, { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(ctx.extensionUri, "media")] });
   const cssUri = panel.webview.asWebviewUri(vscode.Uri.joinPath(ctx.extensionUri, "media", "tra-ui.css"));
   const logoUri = panel.webview.asWebviewUri(vscode.Uri.joinPath(ctx.extensionUri, "media", "embedrisk-logo.svg"));
   const nonce = String(Math.random()).slice(2);
   const csp = `default-src 'none'; img-src ${panel.webview.cspSource}; style-src ${panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';`;
-  const tRows = threats.map((t, i) => `<tr><td class=idcell>${esc(t.key)}</td><td>${esc(t.title)}</td><td><span class="chip static">${esc((t.stride||[]).join(""))}</span></td><td class=hint>${esc((t.appliesTo||[]).join(", "))}</td><td>${esc(t.typicalImpact ?? "")}</td><td><button class="btn sm primary" data-act="threat" data-i="${i}">Add to project</button></td></tr>`).join("");
-  const cRows = cms.map((c, i) => `<tr><td class=idcell>${esc(c.key)}</td><td>${esc(c.title)}</td><td class=hint>${esc((c.for||[]).join(", "))}</td><td><button class="btn sm primary" data-act="cm" data-i="${i}">Add to project</button></td></tr>`).join("");
+  const tRows = threats.map((t, i) => `<tr><td class=idcell>${esc(t.key)}</td><td>${esc(t.title)}</td><td><span class="chip static">${esc((t.stride || []).join(""))}</span></td><td class=hint>${esc((t.appliesTo || []).join(", "))}</td><td>${esc(t.typicalImpact ?? "")}</td><td><button class="btn sm primary" data-act="threat" data-i="${i}">Add to project</button></td></tr>`).join("");
+  const cRows = cms.map((c, i) => `<tr><td class=idcell>${esc(c.key)}</td><td>${esc(c.title)}</td><td class=hint>${esc((c.for || []).join(", "))}</td><td><button class="btn sm primary" data-act="cm" data-i="${i}">Add to project</button></td></tr>`).join("");
   panel.webview.html = `<!doctype html><html><head><meta charset="utf8"><meta http-equiv="Content-Security-Policy" content="${csp}"><link rel="stylesheet" href="${cssUri}"></head><body>
   <div class="topbar"><div class="brand"><img class="logo" src="${logoUri}" alt="" width="22" height="22"><span>EmbedRisk <small>· Knowledge base</small></span></div></div>
   <div class="main">
   <p class="hint">Reusable, device-class threats and countermeasures. Imported items are added to the active project; you still assign affected components / links in the wizard, where plausibility is enforced.</p>
-  <div class="card"><h2>Threats</h2><table class="grid"><thead><tr><th>Key</th><th>Title</th><th>STRIDE</th><th>Applies to</th><th>Impact</th><th></th></tr></thead><tbody>${tRows||"<tr><td colspan=6 class=hint>No catalogue found.</td></tr>"}</tbody></table></div>
-  <div class="card"><h2>Countermeasures</h2><table class="grid"><thead><tr><th>Key</th><th>Title</th><th>For</th><th></th></tr></thead><tbody>${cRows||"<tr><td colspan=4 class=hint>No catalogue found.</td></tr>"}</tbody></table></div>
+  <div class="card"><h2>Threats</h2><table class="grid"><thead><tr><th>Key</th><th>Title</th><th>STRIDE</th><th>Applies to</th><th>Impact</th><th></th></tr></thead><tbody>${tRows || "<tr><td colspan=6 class=hint>No catalogue found.</td></tr>"}</tbody></table></div>
+  <div class="card"><h2>Countermeasures</h2><table class="grid"><thead><tr><th>Key</th><th>Title</th><th>For</th><th></th></tr></thead><tbody>${cRows || "<tr><td colspan=4 class=hint>No catalogue found.</td></tr>"}</tbody></table></div>
   </div>
   <script nonce="${nonce}">const v=acquireVsCodeApi();document.addEventListener('click',function(e){var b=e.target.closest('button[data-act]');if(!b)return;v.postMessage({cmd:'import',kind:b.dataset.act,i:+b.dataset.i});});</script>
   </body></html>`;
@@ -58,7 +58,7 @@ export async function openKbBrowser(ctx: vscode.ExtensionContext) {
   panel.webview.onDidReceiveMessage(async (m) => {
     if (m.cmd !== "import") return;
     const proj = await activeProject();
-    if (!proj) { vscode.window.showWarningMessage("No active TRA project found."); return; }
+    if (!proj) { vscode.window.showWarningMessage("No active EmbedRisk project found."); return; }
     if (m.kind === "threat") {
       const src = threats[m.i];
       const u = vscode.Uri.joinPath(proj, "06-threats/threats.json");

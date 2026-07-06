@@ -117,4 +117,4 @@ npm run compile   # type-check + bundle to dist/extension.js
 ```
 Press F5 to launch the Extension Development Host. The DFD and attack-tree models live in
 `media/dfd-model.js` and `media/attacktree-model.js` (shared by the webviews and by the repository test
-script in `tra/tools/test-models.js`).
+script in `tools/test-models.js`).
