@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs / bundles
+vscode-extension/dist/
+webapp/client/dist/
+webapp/client/.vite/
+
+# Packaged extension artifacts
+vscode-extension/*.vsix
+vscode-extension/*.tgz
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local env files
+.env
+.env.*
+!.env.example

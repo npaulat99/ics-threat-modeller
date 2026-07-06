@@ -67,9 +67,9 @@ async function buildData(proj: vscode.Uri) {
 
 export async function openWizard(ctx: vscode.ExtensionContext) {
   const f = await locate();
-  if (!f) { vscode.window.showWarningMessage("No TRA project found. Use 'EmbedRisk: New project from example' or copy the example."); return; }
+  if (!f) { vscode.window.showWarningMessage("No EmbedRisk project found. Use 'EmbedRisk: New Project' to create one."); return; }
   const media = vscode.Uri.joinPath(ctx.extensionUri, "media");
-  const panel = vscode.window.createWebviewPanel("traWizard", "EmbedRisk Wizard", vscode.ViewColumn.One, { enableScripts: true, localResourceRoots: [media] });
+  const panel = vscode.window.createWebviewPanel("embedriskWizard", "EmbedRisk Wizard", vscode.ViewColumn.One, { enableScripts: true, localResourceRoots: [media] });
   const cssUri = panel.webview.asWebviewUri(vscode.Uri.joinPath(media, "tra-ui.css"));
   const riskUri = panel.webview.asWebviewUri(vscode.Uri.joinPath(media, "risk-model.js"));
   const logoUri = panel.webview.asWebviewUri(vscode.Uri.joinPath(media, "embedrisk-logo.svg"));
@@ -226,10 +226,10 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
       catch { vscode.window.showInformationMessage(`${m.rel} does not exist yet.`); }
       return;
     }
-    if (m.cmd === "dfd") return void vscode.commands.executeCommand("vscode.openWith", vscode.Uri.joinPath(f.proj, "04-dfd/dfd.json"), "tra.dfdNative");
-    if (m.cmd === "report") return void vscode.commands.executeCommand("tra.report");
-    if (m.cmd === "kb") return void vscode.commands.executeCommand("tra.kbBrowse");
-    if (m.cmd === "atree") return void vscode.commands.executeCommand("tra.newAttackTree");
+    if (m.cmd === "dfd") return void vscode.commands.executeCommand("vscode.openWith", vscode.Uri.joinPath(f.proj, "04-dfd/dfd.json"), "embedrisk.dfdNative");
+    if (m.cmd === "report") return void vscode.commands.executeCommand("embedrisk.report");
+    if (m.cmd === "kb") return void vscode.commands.executeCommand("embedrisk.kbBrowse");
+    if (m.cmd === "atree") return void vscode.commands.executeCommand("embedrisk.newAttackTree");
   }, undefined, ctx.subscriptions);
 }
 
