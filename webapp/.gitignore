@@ -1,5 +1,8 @@
 node_modules/
 client/dist/
+projects/*
+!projects/example-radar-level-sensor/
+!projects/example-radar-level-sensor/**
 projects/**/report/
 .assets/knowledge-base/imported/
 *.log
