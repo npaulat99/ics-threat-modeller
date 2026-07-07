@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
+import type { StepKey } from '../../types';
 import { Field, HelpButton, confirmDelete } from '../common';
 
 type GitWorkspace = {
@@ -22,6 +23,8 @@ type GitWorkspaceStatus = {
     onProtectedBranch?: boolean;
     reason?: string;
 };
+
+const COMMIT_STEP_KEYS: StepKey[] = ['project', 'assumptions', 'system', 'dfd', 'requirements', 'threats', 'attackTrees', 'countermeasures', 'defects'];
 
 function parseDevOpsBranchUrl(raw: string): { repoUrl: string; workBranch?: string } | null {
     const value = String(raw || '').trim();
@@ -162,19 +165,65 @@ export default function ProjectPanel() {
         if (r.ok) await refreshKb();
         setGit(r.ok ? `Knowledge base ${r.action === 'clone' ? 'cloned' : 'pulled'} → ${r.dest}. Reusable threats/countermeasures are now importable.` : `Pull failed: ${r.stderr || 'error'}`);
     };
+
+    const flushProjectData = async () => {
+        if (!activeId || !data) return false;
+        setGit('Saving project data…');
+        for (const step of COMMIT_STEP_KEYS) {
+            const r = await fetch(`/api/projects/${activeId}/${step}`, {
+                method: 'PUT',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify((data as any)[step]),
+            }).catch(() => null);
+            if (!r?.ok) {
+                setGit(`Save failed before commit (${step}).`);
+                return false;
+            }
+        }
+        return true;
+    };
+
+    const ensureWorkspace = async () => {
+        if (!activeId) return false;
+        if (!effectiveRepoUrl || !effectiveWorkBranch || !baseBranch) {
+            setGit('Add a DevOps branch link first.');
+            return false;
+        }
+        setGit('Preparing git workspace…');
+        const parsed = parseDevOpsBranchUrl(p.repo?.projectBranchUrl || '');
+        const r = await fetch(`/api/projects/${activeId}/git/workspace`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ projectBranchUrl: p.repo?.projectBranchUrl || '', repoUrl: effectiveRepoUrl || parsed?.repoUrl || '', workBranch: effectiveWorkBranch || parsed?.workBranch || '', baseBranch, subdir }),
+        })
+            .then((x) => x.json())
+            .catch(() => ({ ok: false, stderr: 'request failed' }));
+        if (!r.ok) {
+            setGit(`Setup failed: ${r.stderr || 'error'}`);
+            return false;
+        }
+        setGitWorkspace(r.workspace || null);
+        setGitStatus(r.status || null);
+        return true;
+    };
+
     const commit = async () => {
         if (!activeId) return;
+        if (!(await flushProjectData())) return;
+        if (!(await ensureWorkspace())) return;
         const msg = window.prompt('Commit message:', `TRA ${p.title || ''}`.trim());
         if (msg === null) return;
         setGit('Committing project…');
         const r = await fetch(`/api/projects/${activeId}/git/commit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: msg, push: false }) })
             .then((x) => x.json())
             .catch(() => ({ ok: false, stderr: 'request failed' }));
-        setGit(r.ok ? (r.committed ? `Committed on ${r.branch}.` : r.note || 'Nothing to commit.') : `Commit failed: ${r.stderr || 'error'}`);
+        setGit(r.ok ? (r.committed ? `Local commit on ${r.branch}.` : r.note || 'Nothing to commit.') : `Commit failed: ${r.stderr || 'error'}`);
     };
 
     const commitAndPush = async () => {
         if (!activeId) return;
+        if (!(await flushProjectData())) return;
+        if (!(await ensureWorkspace())) return;
         const msg = window.prompt('Commit message:', `TRA ${p.title || ''}`.trim());
         if (msg === null) return;
         setGit('Committing and pushing…');
@@ -190,27 +239,12 @@ export default function ProjectPanel() {
             return;
         }
         const sha = r.remoteAfter || r.localSha || '';
-        setGit(`${r.committed ? 'Committed and pushed' : 'Pushed existing commit'} ${sha ? sha.slice(0, 12) : ''} to ${r.branch}. Remote SHA verified. Open a PR against ${gitWorkspace?.baseBranch || baseBranch}.`);
+        setGit(`${r.committed ? 'Pushed' : 'Already up to date'} ${sha ? sha.slice(0, 12) : ''} to ${r.branch}.`);
     };
 
     const prepareWorkspace = async () => {
         if (!activeId) return;
-        setGit('Preparing local git workspace…');
-        const parsed = parseDevOpsBranchUrl(p.repo?.projectBranchUrl || '');
-        const r = await fetch(`/api/projects/${activeId}/git/workspace`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ projectBranchUrl: p.repo?.projectBranchUrl || '', repoUrl: effectiveRepoUrl || parsed?.repoUrl || '', workBranch: effectiveWorkBranch || parsed?.workBranch || '', baseBranch, subdir }),
-        })
-            .then((x) => x.json())
-            .catch(() => ({ ok: false, stderr: 'request failed' }));
-        if (!r.ok) {
-            setGit(`Workspace setup failed: ${r.stderr || 'error'}`);
-            return;
-        }
-        setGitWorkspace(r.workspace || null);
-        setGitStatus(r.status || null);
-        setGit(r.note || `Workspace ready on ${r.workspace?.workBranch || workBranch}.`);
+        if (await ensureWorkspace()) setGit(`Ready: ${effectiveWorkBranch}.`);
     };
 
     const refreshWorkspace = async () => {
@@ -232,7 +266,7 @@ export default function ProjectPanel() {
             setGit(`DevOps access check failed: ${r.stderr || 'error'}`);
             return;
         }
-        setGit(`DevOps access OK for ${r.branch}. Local ${String(r.localSha || '').slice(0, 12) || 'n/a'}, remote ${String(r.remoteSha || '').slice(0, 12) || 'not created yet'}.`);
+        setGit(`DevOps access OK: ${r.branch}.`);
     };
 
     return (
@@ -396,12 +430,66 @@ export default function ProjectPanel() {
             </div>
 
             <div className="card">
-                <h3>Repository &amp; traceability</h3>
-                <Field label="DevOps branch / PR link" hint="Paste the working-branch link here; if it contains a branch version, the app will derive the repo URL and work branch automatically.">
+                <h3>Project repository</h3>
+                <Field label="DevOps branch / PR link">
                     <input value={p.repo?.projectBranchUrl || ''} onChange={(e) => setRepo({ projectBranchUrl: e.target.value })} placeholder="https://devops.vega.com/tfs/VEGA/Entwicklung/_git/EmbedRisk-TestProject?path=%2F&version=GBdocs%2Ftest-infrastructure&_a=contents" />
                 </Field>
-                <div className="grid2">
-                    <Field label="Knowledge base git URL (pull-only)" hint="Shared, security-unit-owned KB. The app only pulls it — it never pushes. A local path or file:// URL also works (e.g. the bundled tra-demo-library).">
+                <div className="inline">
+                    <button className="btn sm" onClick={commit} disabled={!activeId || !effectiveRepoUrl || !effectiveWorkBranch}>
+                        Commit locally
+                    </button>
+                    <button className="btn sm primary" onClick={commitAndPush} disabled={!activeId || !effectiveRepoUrl || !effectiveWorkBranch}>
+                        Commit + push
+                    </button>
+                </div>
+                <div className="inline" style={{ marginTop: 2 }}>
+                    {effectiveWorkBranch && <span className="hint">Branch: <code>{effectiveWorkBranch}</code></span>}
+                    {gitStatus?.remoteExists !== undefined && <span className="hint">Remote: {gitStatus.remoteExists ? 'ready' : 'new branch'}</span>}
+                </div>
+                <details style={{ marginTop: 10 }}>
+                    <summary className="hint" style={{ cursor: 'pointer' }}>Advanced git settings</summary>
+                    <div className="row">
+                        <Field label="Repository URL">
+                            <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://devops.example/_git/project" />
+                        </Field>
+                        <Field label="Work branch">
+                            <input value={workBranch} onChange={(e) => setWorkBranch(e.target.value)} placeholder="docs/test-infrastructure" />
+                        </Field>
+                    </div>
+                    <div className="row">
+                        <Field label="Base branch">
+                            <input value={baseBranch} onChange={(e) => setBaseBranch(e.target.value)} placeholder="main" />
+                        </Field>
+                        <Field label="Repo subdirectory">
+                            <input value={subdir} onChange={(e) => setSubdir(e.target.value)} placeholder="security/tra/my-device" />
+                        </Field>
+                    </div>
+                    <div className="inline">
+                        <button className="btn sm" onClick={verifyDevOpsAccess} disabled={!gitStatus?.configured}>
+                            Verify access
+                        </button>
+                        <button className="btn sm" onClick={prepareWorkspace} disabled={!activeId || !effectiveRepoUrl || !effectiveWorkBranch || !baseBranch}>Prepare</button>
+                        <button className="btn sm" onClick={refreshWorkspace} disabled={!activeId}>Refresh</button>
+                    </div>
+                    {gitWorkspace && (
+                        <p className="hint"><code>{gitWorkspace.localPath}</code></p>
+                    )}
+                    {gitStatus && (
+                        <p className="hint">
+                            {gitStatus.configured ? (gitStatus.ready ? 'Ready' : gitStatus.reason || 'Not ready') : 'Not configured'}
+                            {gitStatus.branch ? ` | current: ${gitStatus.branch}` : ''}
+                            {typeof gitStatus.ahead === 'number' && typeof gitStatus.behind === 'number' ? ` | ahead/behind: ${gitStatus.ahead}/${gitStatus.behind}` : ''}
+                            {gitStatus.onProtectedBranch ? ' | protected branch' : ''}
+                        </p>
+                    )}
+                </details>
+                {git && <p className="hint" style={{ marginTop: 4 }}>{git}</p>}
+            </div>
+
+            <div className="card">
+                <h3>Knowledge base</h3>
+                <div className="row">
+                    <Field label="Knowledge base URL">
                         <input value={p.repo?.kbUrl || ''} onChange={(e) => setRepo({ kbUrl: e.target.value })} placeholder="https://github.com/org/tra-knowledge-base.git" />
                     </Field>
                     <div className="field">
@@ -410,65 +498,9 @@ export default function ProjectPanel() {
                             <button className="btn sm" onClick={pullKb} disabled={!p.repo?.kbUrl}>
                                 ↓ Pull knowledge base
                             </button>
-                            <button className="btn sm" onClick={refreshWorkspace} disabled={!activeId}>
-                                Refresh git status
-                            </button>
                         </div>
                     </div>
                 </div>
-                <div className="card" style={{ marginTop: 10 }}>
-                    <h3 style={{ marginTop: 0 }}>Project git workspace (local-only)</h3>
-                    <p className="hint" style={{ marginTop: 0 }}>
-                        Commits are made in a local clone at <code>.local/git-workspaces</code> on a dedicated work branch. The app blocks protected branches like main/master.
-                    </p>
-                    <div className="row">
-                        <Field label="Project repository URL" hint="Remote repo where the TRA project should be committed.">
-                            <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://github.com/org/device-project.git" />
-                        </Field>
-                        <Field label="Work branch" hint="Feature branch for TRA changes, e.g. tra/rl-100-q3.">
-                            <input value={workBranch} onChange={(e) => setWorkBranch(e.target.value)} placeholder="tra/rl-100" />
-                        </Field>
-                    </div>
-                    <div className="row">
-                        <Field label="Base branch" hint="Branch to branch from when the work branch does not exist.">
-                            <input value={baseBranch} onChange={(e) => setBaseBranch(e.target.value)} placeholder="main" />
-                        </Field>
-                        <Field label="Repo subdirectory (optional)" hint="Use if TRA files live below repo root.">
-                            <input value={subdir} onChange={(e) => setSubdir(e.target.value)} placeholder="security/tra/my-device" />
-                        </Field>
-                    </div>
-                    <div className="inline" style={{ marginTop: 6 }}>
-                        <button className="btn sm" onClick={prepareWorkspace} disabled={!activeId || !effectiveRepoUrl || !effectiveWorkBranch || !baseBranch}>
-                            Prepare / switch work branch
-                        </button>
-                        <button className="btn sm" onClick={verifyDevOpsAccess} disabled={!gitStatus?.configured}>
-                            Verify DevOps access
-                        </button>
-                        <button className="btn sm" onClick={commit} disabled={!gitStatus?.configured}>
-                            Commit to work branch
-                        </button>
-                        <button className="btn sm primary" onClick={commitAndPush} disabled={!gitStatus?.configured}>
-                            Commit + push branch
-                        </button>
-                    </div>
-                    {gitWorkspace && (
-                        <p className="hint" style={{ marginTop: 6 }}>
-                            Local clone: <code>{gitWorkspace.localPath}</code> | expected branch: <code>{gitWorkspace.workBranch}</code>
-                            {gitWorkspace.subdir ? <> | target dir: <code>{gitWorkspace.subdir}</code></> : null}
-                        </p>
-                    )}
-                    {gitStatus && (
-                        <p className="hint" style={{ marginTop: 4 }}>
-                            Status: {gitStatus.configured ? (gitStatus.ready ? 'ready' : gitStatus.reason || 'not ready') : 'not configured'}
-                            {gitStatus.branch ? ` | current: ${gitStatus.branch}` : ''}
-                            {gitStatus.expectedBranch ? ` | expected: ${gitStatus.expectedBranch}` : ''}
-                            {typeof gitStatus.ahead === 'number' && typeof gitStatus.behind === 'number' ? ` | ahead/behind: ${gitStatus.ahead}/${gitStatus.behind}` : ''}
-                            {typeof gitStatus.remoteExists === 'boolean' ? ` | remote branch: ${gitStatus.remoteExists ? 'yes' : 'not yet'}` : ''}
-                            {gitStatus.onProtectedBranch ? ' | protected branch detected' : ''}
-                        </p>
-                    )}
-                </div>
-                {git && <p className="hint" style={{ marginTop: 4 }}>{git}</p>}
             </div>
         </div>
     );
