@@ -39,6 +39,10 @@ function NodeInspector() {
     const nodeLabel = (id: string) => dfd.nodes.find((n) => n.id === id)?.label || connIfaces.find((i) => i.id === id)?.name || id;
     const updNode = (patch: any) => save('dfd', { ...dfd, nodes: dfd.nodes.map((n) => (n.id === node.id ? { ...n, ...patch } : n)) });
     const setFlows = (flows: any[]) => save('dfd', { ...dfd, flows });
+    const deleteNode = () => {
+        save('dfd', { ...dfd, nodes: dfd.nodes.filter((n) => n.id !== node.id), flows: dfd.flows.filter((f) => f.from !== node.id && f.to !== node.id) });
+        useStore.getState().selectNode(null);
+    };
     const cms = data.countermeasures.countermeasures || [];
     const compIds = node.componentRef ? descendantComponentIds(data.system.components || [], node.componentRef) : null;
     const rolledUp = !!compIds && compIds.size > 1;
@@ -90,6 +94,9 @@ function NodeInspector() {
                         onChange={(v) => updNode({ members: v })}
                         empty="No nodes on this layer yet."
                     />
+                    <button className="btn sm danger" style={{ marginTop: 8 }} onClick={deleteNode}>
+                        Delete trust boundary
+                    </button>
                 </div>
             ) : (
                 <>
@@ -304,8 +311,12 @@ function InterfaceInspector() {
                 <input className="inp" value={itf.name} onChange={(e) => upd({ name: e.target.value })} />
             </div>
             <div className="field">
-                <label>Short tag / protocol (shown on the chip)</label>
-                <input className="inp" value={itf.protocol || ''} onChange={(e) => upd({ protocol: e.target.value })} placeholder="e.g. HART, BLE, JTAG" />
+                <label>Chip tag (shown on the chip)</label>
+                <input className="inp" value={itf.tag || ''} onChange={(e) => upd({ tag: e.target.value })} placeholder="e.g. BLE, HMI, JTAG" />
+            </div>
+            <div className="field">
+                <label>Protocol / transport</label>
+                <input className="inp" value={itf.protocol || ''} onChange={(e) => upd({ protocol: e.target.value })} placeholder="e.g. Bluetooth LE, RS-485, UART" />
             </div>
             <div className="field">
                 <label>Linked component</label>

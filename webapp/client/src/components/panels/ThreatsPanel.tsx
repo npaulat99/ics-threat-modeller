@@ -61,6 +61,27 @@ export default function ThreatsPanel() {
     const renderEditor = (t: Threat) => {
         const upd = (patch: any) => setThreats(threats.map((x) => (x.id === t.id ? { ...x, ...patch } : x)));
         const orphan = !(t.components || []).length;
+        const ifaceOpts = (data.system.interfaces || []).map((itf) => ({ value: itf.id, label: `${itf.name}${itf.protocol ? ` (${itf.protocol})` : ''}` }));
+        const interfaceRefs = t.interfaceRefs?.length ? t.interfaceRefs : t.interfaceRef && t.interfaceRef !== 'custom' ? [t.interfaceRef] : [];
+        const setInterfaces = (next: string[]) => upd({ interfaceRefs: next, interfaceRef: next[0] || undefined });
+        const splitByInterface = () => {
+            if (interfaceRefs.length < 2 || t.interfaceLabel) return;
+            const suffix = new Map((data.system.interfaces || []).map((itf) => [itf.id, itf.name]));
+            const usedIds = [...threats.filter((x) => x.id !== t.id).map((x) => x.id)];
+            const clones = interfaceRefs.map((ifaceId) => {
+                const nextId = uid('T', usedIds);
+                usedIds.push(nextId);
+                return {
+                    ...t,
+                    id: nextId,
+                    title: `${t.title} - ${suffix.get(ifaceId) || ifaceId}`,
+                    interfaceRef: ifaceId,
+                    interfaceRefs: [ifaceId],
+                };
+            });
+            setThreats([...threats.filter((x) => x.id !== t.id), ...clones]);
+            setEditingId(clones[0]?.id || null);
+        };
         return (
             <div id={`f-threats-${t.id}`} className="itemcard" key={t.id} style={orphan ? { borderColor: '#f0c9a8' } : undefined}>
                 <div className="head">
@@ -111,33 +132,19 @@ export default function ThreatsPanel() {
                                 ))}
                             </select>
                         </Field>
-                        <Field label="Primary interface / vector" hint="Where the threat enters the device.">
-                            <select
-                                value={t.interfaceRef === 'custom' ? 'custom' : t.interfaceRef || ''}
-                                onChange={(e) => {
-                                    const v = e.target.value;
-                                    if (!v) upd({ interfaceRef: undefined, interfaceLabel: undefined });
-                                    else if (v === 'custom') upd({ interfaceRef: 'custom' });
-                                    else upd({ interfaceRef: v, interfaceLabel: undefined });
-                                }}
-                            >
-                                <option value="">— none —</option>
-                                {(data.system.interfaces || []).map((itf) => (
-                                    <option key={itf.id} value={itf.id}>
-                                        {itf.name}
-                                        {itf.protocol ? ` (${itf.protocol})` : ''}
-                                    </option>
-                                ))}
-                                <option value="custom">Custom…</option>
-                            </select>
-                            {t.interfaceRef === 'custom' && (
-                                <input
-                                    className="inp"
-                                    style={{ marginTop: 6 }}
-                                    placeholder="e.g. over USB service port"
-                                    value={t.interfaceLabel || ''}
-                                    onChange={(e) => upd({ interfaceLabel: e.target.value })}
-                                />
+                        <Field label="Affected interfaces / vectors" hint="Assess several interfaces together, or split them into one threat per interface.">
+                            <Chips options={ifaceOpts} value={interfaceRefs} onChange={setInterfaces} empty="No interfaces defined in step 03 yet." />
+                            <input
+                                className="inp"
+                                style={{ marginTop: 6 }}
+                                placeholder="Optional custom vector, e.g. over USB service port"
+                                value={t.interfaceLabel || ''}
+                                onChange={(e) => upd({ interfaceLabel: e.target.value || undefined })}
+                            />
+                            {interfaceRefs.length > 1 && !t.interfaceLabel && (
+                                <button type="button" className="btn sm" style={{ marginTop: 6 }} onClick={splitByInterface}>
+                                    Split into one threat per interface
+                                </button>
                             )}
                         </Field>
                     </div>

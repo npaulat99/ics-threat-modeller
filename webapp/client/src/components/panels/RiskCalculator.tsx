@@ -9,6 +9,13 @@ import { cvssBaseScore } from '../../lib/cvss';
 import BugBarTable from '../BugBarTable';
 import type { Threat } from '../../types';
 
+type GuidedRiskModel = Pick<Threat, 'attackerRef' | 'interfaceRef' | 'interfaceRefs' | 'impactDimensions' | 'likelihoodFactors' | 'cvss' | 'ratedBy' | 'ratedAt'> & {
+    likelihood?: number;
+    impact?: number;
+    residualLikelihood?: number;
+    residualImpact?: number;
+};
+
 const IMPACT_DIMS: { k: 'confidentiality' | 'integrity' | 'availability' | 'safety'; label: string }[] = [
     { k: 'confidentiality', label: 'Confidentiality' },
     { k: 'integrity', label: 'Integrity' },
@@ -58,7 +65,23 @@ function cvssExploitability(vector?: string, base?: number, version?: string): n
     return null;
 }
 
-export default function RiskCalculator({ t, upd }: { t: Threat; upd: (patch: any) => void }) {
+export default function RiskCalculator({
+    t,
+    upd,
+    likelihoodField = 'likelihood',
+    impactField = 'impact',
+    summary = 'Guided rating - Bug Bar impact + attacker-grounded likelihood (optional)',
+    defaultOpen = false,
+}: {
+    t: GuidedRiskModel;
+    upd: (patch: any) => void;
+    likelihoodField?: 'likelihood' | 'residualLikelihood';
+    impactField?: 'impact' | 'residualImpact';
+    summary?: string;
+    defaultOpen?: boolean;
+}) {
+    const likelihood = Number((t as any)[likelihoodField] ?? 0);
+    const impact = Number((t as any)[impactField] ?? 0);
     const dims = t.impactDimensions || {};
     const fac = t.likelihoodFactors || {};
     const cvss = t.cvss || {};
@@ -72,22 +95,23 @@ export default function RiskCalculator({ t, upd }: { t: Threat; upd: (patch: any
     const attackers = useStore((s) => s.data?.assumptions.attacker || []);
     const interfaces = useStore((s) => s.data?.system.interfaces || []);
     const attacker = attackers.find((a) => a.id === t.attackerRef);
-    const iface = interfaces.find((i) => i.id === t.interfaceRef);
+    const primaryInterface = t.interfaceRefs?.[0] || t.interfaceRef;
+    const iface = interfaces.find((i) => i.id === primaryInterface);
     const today = new Date().toISOString().slice(0, 10);
 
     const setDim = (k: string, v: number) => {
         const d = { ...dims, [k]: v };
-        upd({ impactDimensions: d, impact: deriveImpact(d) ?? t.impact, ratedAt: today });
+        upd({ impactDimensions: d, [impactField]: deriveImpact(d) ?? impact, ratedAt: today });
     };
     const setFac = (k: string, v: number) => {
         const f = { ...fac, [k]: v };
-        upd({ likelihoodFactors: f, likelihood: deriveLikelihood(f) ?? t.likelihood, ratedAt: today });
+        upd({ likelihoodFactors: f, [likelihoodField]: deriveLikelihood(f) ?? likelihood, ratedAt: today });
     };
     const seed = () => {
         const exp = exposureFromInterface(iface?.exposure);
         if (typeof exp !== 'number') return;
         const f = { ...fac, exposure: exp }; // exposure = attack-surface reachability of the entry interface
-        upd({ likelihoodFactors: f, likelihood: deriveLikelihood(f) ?? t.likelihood, ratedAt: today });
+        upd({ likelihoodFactors: f, [likelihoodField]: deriveLikelihood(f) ?? likelihood, ratedAt: today });
     };
     // Prefer CVSS exploitability metrics over the base score (which double-counts impact).
     const suggestExp = cvssExploitability(cvss.vector, cvss.baseScore, cvss.version);
@@ -107,13 +131,13 @@ export default function RiskCalculator({ t, upd }: { t: Threat; upd: (patch: any
     }, [hasVector, computedBase]);
     const derivedL = deriveLikelihood(fac);
     const derivedI = deriveImpact(dims);
-    const overridden = (derivedL != null && derivedL !== t.likelihood) || (derivedI != null && derivedI !== t.impact);
+    const overridden = (derivedL != null && derivedL !== likelihood) || (derivedI != null && derivedI !== impact);
     const capGate = attacker && typeof attacker.capability === 'number' && typeof fac.exploitability === 'number' && attacker.capability + fac.exploitability < 6;
 
     return (
         <>
-            <details className="calc">
-                <summary>Guided rating — Bug Bar impact + attacker-grounded likelihood (optional)</summary>
+            <details className="calc" open={defaultOpen}>
+                <summary>{summary}</summary>
 
                 <div className="calcgrid">
                     <div>
@@ -209,9 +233,9 @@ export default function RiskCalculator({ t, upd }: { t: Threat; upd: (patch: any
                     </div>
                 </div>
                 <p className="hint">
-                    Derived → likelihood <b>{derivedL ?? t.likelihood}</b>, impact <b>{derivedI ?? t.impact}</b>.{' '}
+                    Derived → likelihood <b>{derivedL ?? likelihood}</b>, impact <b>{derivedI ?? impact}</b>.{' '}
                     {overridden ? (
-                        <span className="warnmark">stored risk uses likelihood {t.likelihood} × impact {t.impact} (manually overridden or set from an attack tree).</span>
+                        <span className="warnmark">stored risk uses likelihood {likelihood} × impact {impact}.</span>
                     ) : (
                         'These drive the risk above; you can still override the numbers directly.'
                     )}

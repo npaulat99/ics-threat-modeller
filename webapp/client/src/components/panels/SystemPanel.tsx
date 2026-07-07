@@ -15,7 +15,14 @@ const CATEGORY_OPTS = [
     { value: 'external', label: 'external / debug' },
     { value: 'user', label: 'user / local HMI' },
 ];
-const ASSET_TYPE_OPTS = ['data', 'function', 'credential', 'firmware', 'config', 'physical-process'].map((v) => ({ value: v }));
+const ASSET_TYPE_OPTS = [
+    { value: 'function', label: 'function - control logic, service, operation' },
+    { value: 'data', label: 'data - measurements, recipes, logs, set-points' },
+    { value: 'credential', label: 'credential - password, token, key material' },
+    { value: 'firmware', label: 'firmware - executable image or boot content' },
+    { value: 'config', label: 'config - parameters, calibration, provisioning' },
+    { value: 'physical-process', label: 'physical-process - plant state or safety effect' },
+].map((v) => ({ value: v.value, label: v.label }));
 
 type Tab = 'components' | 'interfaces' | 'boundaries' | 'assets';
 
@@ -36,11 +43,23 @@ export default function SystemPanel() {
         setTab(t);
     };
 
+    const layerForParent = (parentId?: string | null) => {
+        if (!parentId) return 1;
+        const parent = (sys.components || []).find((c) => c.id === parentId);
+        return (parent?.layer || 0) + 1;
+    };
+
     const addComp = () =>
         set({
             components: [
                 ...sys.components,
-                { id: uid('C-', sys.components.map((c) => c.id)), name: 'New component', kind: 'software', layer: 2, parent: sys.components[0]?.id || null },
+                {
+                    id: uid('C-', sys.components.map((c) => c.id)),
+                    name: 'New component',
+                    kind: 'software',
+                    parent: sys.components[0]?.id || null,
+                    layer: layerForParent(sys.components[0]?.id || null),
+                },
             ],
         });
     const addIface = () =>
@@ -126,11 +145,8 @@ export default function SystemPanel() {
                                         <Field label="Provenance">
                                             <ComboInput value={c.provenance} onChange={(v) => upd({ provenance: v || undefined })} options={PROVENANCE_OPTS} placeholder="own / third-party…" />
                                         </Field>
-                                        <Field label="Layer">
-                                            <input type="number" min={1} value={c.layer} onChange={(e) => upd({ layer: Number(e.target.value) })} />
-                                        </Field>
                                         <Field label="Parent">
-                                            <select value={c.parent || ''} onChange={(e) => upd({ parent: e.target.value || null })}>
+                                            <select value={c.parent || ''} onChange={(e) => upd({ parent: e.target.value || null, layer: layerForParent(e.target.value || null) })}>
                                                 <option value="">— none —</option>
                                                 {sys.components.filter((x) => x.id !== c.id).map((x) => (
                                                     <option key={x.id} value={x.id}>
@@ -138,6 +154,9 @@ export default function SystemPanel() {
                                                     </option>
                                                 ))}
                                             </select>
+                                        </Field>
+                                        <Field label="Layer">
+                                            <input value={String(c.layer || layerForParent(c.parent))} readOnly disabled />
                                         </Field>
                                         <Field label="Trust zone">
                                             <input value={c.trustZone || ''} onChange={(e) => upd({ trustZone: e.target.value })} />
@@ -176,6 +195,9 @@ export default function SystemPanel() {
                                     <div className="grid4">
                                         <Field label="Category">
                                             <ComboInput value={c.category} onChange={(v) => upd({ category: v || undefined })} options={CATEGORY_OPTS} placeholder="network…" />
+                                        </Field>
+                                        <Field label="Chip tag" hint="Short text shown on the DFD chip.">
+                                            <input value={c.tag || ''} onChange={(e) => upd({ tag: e.target.value })} placeholder="BLE, HMI, JTAG…" />
                                         </Field>
                                         <Field label="On component">
                                             <select value={c.component || ''} onChange={(e) => upd({ component: e.target.value })}>
@@ -297,6 +319,11 @@ export default function SystemPanel() {
                                                     <ScaleSelect value={(c.objectives as any)?.[k] ?? 0} onChange={(n) => obj(k, n)} levels={OBJECTIVE_LEVELS} />
                                                 </Field>
                                             ))}
+                                        </div>
+                                        <div className="grid2">
+                                            <Field label="Asset type" hint="Pick the closest business or technical asset class so later threat/risk text stays concrete.">
+                                                <ComboInput value={c.type || 'function'} onChange={(v) => upd({ type: v })} options={ASSET_TYPE_OPTS} placeholder="function, data, credential…" />
+                                            </Field>
                                         </div>
                                         <div className="grid2">
                                             <Field label="Stored in" hint="Where the data / asset physically lives.">

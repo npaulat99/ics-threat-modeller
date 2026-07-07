@@ -9,6 +9,7 @@ import { readProject } from './artifacts.js';
 import { loadScheme, band, residual } from './risk.js';
 import { validate } from './validate.js';
 import { kbVersion } from './git.js';
+import { routeAround, roundedPath, labelPtOnPolyline, borderPoint } from '../../shared/dfdEngine.js';
 
 const esc = (s) =>
     String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -30,111 +31,6 @@ function bboxOfBoxes(items) {
         maxX: Math.max(...items.map((b) => b.x + b.w)),
         maxY: Math.max(...items.map((b) => b.y + b.h)),
     };
-}
-function segHitsRect(x1, y1, x2, y2, r) {
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    let t0 = 0;
-    let t1 = 1;
-    const E = [
-        [-dx, x1 - r.x],
-        [dx, r.x + r.w - x1],
-        [-dy, y1 - r.y],
-        [dy, r.y + r.h - y1],
-    ];
-    for (const [p, q] of E) {
-        if (p === 0) {
-            if (q < 0) return false;
-        } else {
-            const t = q / p;
-            if (p < 0) {
-                if (t > t1) return false;
-                if (t > t0) t0 = t;
-            } else {
-                if (t < t0) return false;
-                if (t < t1) t1 = t;
-            }
-        }
-    }
-    return t0 < t1;
-}
-function routeAround(sx, sy, tx, ty, obstacles, pad, depth = 0) {
-    if (depth >= 5) return [[sx, sy], [tx, ty]];
-    let best = null;
-    let bestD = Infinity;
-    for (const o of obstacles) {
-        const r = { x: o.x - pad, y: o.y - pad, w: o.w + 2 * pad, h: o.h + 2 * pad };
-        // Skip an obstacle that an endpoint already sits inside/touches — you cannot route around it.
-        const inside = (px, py) => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
-        if (inside(sx, sy) || inside(tx, ty)) continue;
-        if (segHitsRect(sx, sy, tx, ty, r)) {
-            const d = (o.x + o.w / 2 - sx) ** 2 + (o.y + o.h / 2 - sy) ** 2;
-            if (d < bestD) {
-                bestD = d;
-                best = o;
-            }
-        }
-    }
-    if (!best) return [[sx, sy], [tx, ty]];
-    const x0 = best.x - pad;
-    const x1 = best.x + best.w + pad;
-    const y0 = best.y - pad;
-    const y1 = best.y + best.h + pad;
-    let wps;
-    if (Math.abs(tx - sx) >= Math.abs(ty - sy)) {
-        const midY = (sy + ty) / 2;
-        const wy = Math.abs(y0 - midY) <= Math.abs(y1 - midY) ? y0 : y1;
-        wps = sx <= tx ? [[x0, wy], [x1, wy]] : [[x1, wy], [x0, wy]];
-    } else {
-        const midX = (sx + tx) / 2;
-        const wx = Math.abs(x0 - midX) <= Math.abs(x1 - midX) ? x0 : x1;
-        wps = sy <= ty ? [[wx, y0], [wx, y1]] : [[wx, y1], [wx, y0]];
-    }
-    const rest = obstacles.filter((o) => o !== best);
-    const a = routeAround(sx, sy, wps[0][0], wps[0][1], rest, pad, depth + 1);
-    const b = routeAround(wps[0][0], wps[0][1], wps[1][0], wps[1][1], rest, pad, depth + 1);
-    const c = routeAround(wps[1][0], wps[1][1], tx, ty, rest, pad, depth + 1);
-    return [...a, ...b.slice(1), ...c.slice(1)];
-}
-function roundedPathStr(pts, r) {
-    if (pts.length <= 2) return `M ${pts[0][0]},${pts[0][1]} L ${pts[1][0]},${pts[1][1]}`;
-    let d = `M ${pts[0][0]},${pts[0][1]}`;
-    for (let i = 1; i < pts.length - 1; i++) {
-        const [px, py] = pts[i - 1];
-        const [cx, cy] = pts[i];
-        const [nx, ny] = pts[i + 1];
-        const l1 = Math.hypot(px - cx, py - cy) || 1;
-        const l2 = Math.hypot(nx - cx, ny - cy) || 1;
-        const rr = Math.min(r, l1 / 2, l2 / 2);
-        d += ` L ${cx + ((px - cx) / l1) * rr},${cy + ((py - cy) / l1) * rr} Q ${cx},${cy} ${cx + ((nx - cx) / l2) * rr},${cy + ((ny - cy) / l2) * rr}`;
-    }
-    d += ` L ${pts[pts.length - 1][0]},${pts[pts.length - 1][1]}`;
-    return d;
-}
-function midOfPolyline(pts) {
-    let total = 0;
-    for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-    let half = total / 2;
-    for (let i = 1; i < pts.length; i++) {
-        const seg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-        if (half <= seg) {
-            const r = seg ? half / seg : 0;
-            return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * r, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * r];
-        }
-        half -= seg;
-    }
-    return pts[Math.floor(pts.length / 2)];
-}
-function borderPoint(b, tx, ty) {
-    const cx = b.x + b.w / 2;
-    const cy = b.y + b.h / 2;
-    const dx = tx - cx;
-    const dy = ty - cy;
-    if (!dx && !dy) return [cx, cy];
-    const tX = dx !== 0 ? b.w / 2 / Math.abs(dx) : Infinity;
-    const tY = dy !== 0 ? b.h / 2 / Math.abs(dy) : Infinity;
-    const t = Math.min(tX, tY);
-    return [cx + dx * t, cy + dy * t];
 }
 
 /** Render one DFD layer to SVG so it matches the interactive editor: trust boundaries as dashed
@@ -249,8 +145,8 @@ function layerSvg(dfd, parentId, system = {}) {
         let d;
         let mid;
         if (route.length > 2 && polyLen <= 2.4 * directDist) {
-            d = roundedPathStr(route.map(([x, y]) => [tx(x), ty(y)]), 12);
-            const m = midOfPolyline(route);
+            d = roundedPath(route.map(([x, y]) => [tx(x), ty(y)]), 12);
+            const m = labelPtOnPolyline(route);
             mid = [tx(m[0]), ty(m[1])];
         } else {
             const off = opts.offset || 0;
@@ -286,22 +182,6 @@ function layerSvg(dfd, parentId, system = {}) {
         const offset = visualLane * (f.from < f.to ? 1 : -1);
         drawLink(f.from, f.to, { stroke: '#6b7688', width: 1.5, offset, label: f.label });
     }
-    // Derived interface connectors: smooth curves (no obstacle routing), fanned out per target.
-    const perTarget = {};
-    const targetCount = {};
-    ifaces.forEach((itf) => {
-        const t = targetOf.get(itf.id);
-        if (t) targetCount[t] = (targetCount[t] || 0) + 1;
-    });
-    for (const itf of ifaces) {
-        const t = targetOf.get(itf.id);
-        if (!t) continue;
-        const idx = (perTarget[t] = perTarget[t] || 0);
-        perTarget[t]++;
-        const grp = targetCount[t] || 1;
-        const spread = (idx - (grp - 1) / 2) * 30;
-        drawLink(itf.id, t, { stroke: '#9aa4b2', width: 1.2, dash: '4 3', offset: spread, noRoute: true });
-    }
     // Shapes (front) — occlude any flow that passes underneath.
     for (const n of nodes) {
         const b = bxs.get(n.id);
@@ -323,7 +203,7 @@ function layerSvg(dfd, parentId, system = {}) {
         const y = ty(b.y);
         out.push(
             `<rect x='${x}' y='${y}' width='${b.w}' height='${b.h}' rx='7' fill='#fff' stroke='#0f9d8f' stroke-width='1.3'/>` +
-            `<text x='${x + 8}' y='${y + 14}' font-size='9' font-weight='700' fill='#0f9d8f'>${esc(itf.protocol || 'iface')}</text>` +
+            `<text x='${x + 8}' y='${y + 14}' font-size='9' font-weight='700' fill='#0f9d8f'>${esc(itf.tag || itf.protocol || 'interface')}</text>` +
             `<text x='${x + 8}' y='${y + 26}' font-size='9.5'>${esc((itf.name || '').slice(0, 22))}</text>`,
         );
     }
@@ -365,7 +245,7 @@ export function buildTraceability({ system, threats, requirements, countermeasur
             residual: res,
             residualBand: band(scheme, res).name,
             evidence: ctrls
-                .flatMap((c) => [c.ticketUrl, c.verificationUrl])
+                .flatMap((c) => [...(c.ticketUrls || []), c.ticketUrl, c.verificationUrl])
                 .filter(Boolean)
                 .join(' '),
             status: t.status || '',
@@ -451,7 +331,7 @@ export function buildStrideCoverage(system, threats) {
         ...(system.interfaces || []).map((i) => ({ id: i.id, name: i.name, kind: 'interface' })),
     ];
     return elems.map((e) => {
-        const rel = (threats || []).filter((t) => (t.components || []).includes(e.id) || t.interfaceRef === e.id);
+        const rel = (threats || []).filter((t) => (t.components || []).includes(e.id) || (t.interfaceRefs || []).includes(e.id) || t.interfaceRef === e.id);
         const covered = new Set(rel.flatMap((t) => t.stride || []));
         return { ...e, cells: S.map((s) => covered.has(s)), gaps: S.filter((s) => !covered.has(s)).length === S.length };
     });
@@ -533,7 +413,7 @@ export async function buildReport(id) {
     const cmrows = cms
         .map(
             (c) =>
-                `<li><b>${esc(c.id)}</b> ${esc(c.title)} <i>(${esc(c.type || '')}, ${esc(c.status || '')})</i> &rarr; ${esc((c.addresses || []).map((a) => a.threat).join(', '))}${c.ticketUrl ? ` · <a href='${esc(c.ticketUrl)}'>ticket</a>` : ''}${c.verificationUrl ? ` · <a href='${esc(c.verificationUrl)}'>verification</a>` : ''}</li>`,
+                `<li><b>${esc(c.id)}</b> ${esc(c.title)} <i>(${esc(c.type || '')}, ${esc(c.status || '')})</i> &rarr; ${esc((c.addresses || []).map((a) => a.threat).join(', '))}${[...(c.ticketUrls || []), c.ticketUrl].filter(Boolean).map((u, i) => ` · <a href='${esc(u)}'>ticket ${i + 1}</a>`).join('')}${c.verificationUrl ? ` · <a href='${esc(c.verificationUrl)}'>verification</a>` : ''}</li>`,
         )
         .join('');
     const sbomRows = sbom.components
@@ -572,12 +452,13 @@ export async function buildReport(id) {
 
     const html =
         `<!doctype html><meta charset=utf8><title>TRA ${esc(project.title)}</title>` +
-        '<style>body{font:14px system-ui;margin:2rem;max-width:70rem;color:#1d2430}table{border-collapse:collapse;width:100%;margin:.5rem 0}td,th{border:1px solid #ccc;padding:6px;text-align:left;vertical-align:top;font-size:12.5px}h1{font-size:1.5rem}h2{margin-top:1.6rem;border-bottom:2px solid #eee;padding-bottom:3px}.warn{color:#c62828}.mono{font-family:ui-monospace,monospace}svg{max-width:100%;border:1px solid #eee;border-radius:8px;margin:.3rem 0}</style>' +
+        '<style>body{font:14px system-ui;margin:2rem auto;max-width:78rem;color:#1d2430;line-height:1.45}table{border-collapse:collapse;width:100%;margin:.75rem 0 1.25rem;background:#fff}td,th{border:1px solid #d9dee7;padding:8px 10px;text-align:left;vertical-align:top;font-size:12.5px}th{background:#f4f7fb}h1{font-size:1.65rem;margin-bottom:.35rem}h2{margin-top:1.8rem;border-bottom:2px solid #e7ebf2;padding-bottom:4px}.lead{color:#4d5a6d;max-width:68rem}.warn{color:#c62828}.mono{font-family:ui-monospace,monospace}.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin:1rem 0 1.5rem}.meta div{background:#f7f9fc;border:1px solid #e2e7ef;border-radius:10px;padding:.75rem .9rem}svg{max-width:100%;border:1px solid #e7ebf2;border-radius:10px;margin:.4rem 0;background:#fff}.trace-note{background:#f7f9fc;border:1px solid #e2e7ef;border-radius:10px;padding:.8rem 1rem;margin:.5rem 0 1rem}</style>' +
         `<h1>${esc(project.title)}</h1><p>Device: ${esc(project.device?.name)} | SL-T ${esc(project.slTarget)} | mode ${esc(project.scope?.mode)} | status ${esc(project.status)} | generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')}${kbv ? ` | KB/repo ${esc(kbv)}` : ''}</p>` +
+        `<div class='meta'><div><b>Device</b><br>${esc(project.device?.name || '—')}</div><div><b>Security target</b><br>${esc(project.slTarget || '—')}</div><div><b>Assessment mode</b><br>${esc(project.scope?.mode || '—')}</div><div><b>Status</b><br>${esc(project.status || 'draft')}</div></div>` +
         `<p><b>Scope:</b> ${esc(project.scope?.boundary || '')}</p>` +
         (project.intendedUse ? `<p><b>Intended purpose:</b> ${esc(project.intendedUse)}</p>` : '') +
         (project.foreseeableUse?.length ? `<p><b>Reasonably foreseeable use:</b></p><ul>${project.foreseeableUse.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>` : '') +
-        `<h2>Traceability matrix</h2><p>Asset → threat → risk → requirement → control → residual → evidence. Machine-readable copies: <code>report/traceability.csv</code>, <code>report/traceability.json</code>, SBOM <code>${esc(sbomFile)}</code>.</p>` +
+        `<h2>Traceability matrix</h2><div class='trace-note'>This matrix shows the full chain from protected asset to assessed threat, required security response, implemented countermeasure, residual risk and linked evidence. Machine-readable exports are written alongside the report as <code>report/traceability.csv</code>, <code>report/traceability.json</code> and <code>${esc(sbomFile)}</code>.</div>` +
         `<table><tr><th>Asset</th><th>C/I/A/S</th><th>Threat</th><th>Initial</th><th>Requirement</th><th>Control</th><th>Residual</th><th>Evidence</th><th>Status</th></tr>${traceRows}</table>` +
         `<h2>Data flow diagram (all layers)</h2>${dfdHtml}` +
         tbSection +
