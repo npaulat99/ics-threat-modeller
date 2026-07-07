@@ -29,7 +29,8 @@ export default function DashboardPanel() {
     const interfaces = sys.interfaces || [];
     const assets = sys.assets || [];
     const thirdParty = components.filter((c) => c.provenance && !/^own\b/i.test(c.provenance));
-    const missingTicket = cms.filter((c) => (c.status === 'implemented' || c.status === 'verified') && !c.ticketUrl);
+    const ticketsOf = (c: any) => (c.ticketUrls?.length ? c.ticketUrls : c.ticketUrl ? [c.ticketUrl] : []);
+    const missingTicket = cms.filter((c) => (c.status === 'implemented' || c.status === 'verified') && !ticketsOf(c).length);
     const openThreats = threats.filter((t) => t.status === 'open');
     const reqs = data.requirements?.requirements || [];
     const defects = data.defects?.defects || [];
@@ -210,7 +211,8 @@ export default function DashboardPanel() {
                     </thead>
                     <tbody>
                         {cms.map((c) => {
-                            const needsTicket = (c.status === 'implemented' || c.status === 'verified') && !c.ticketUrl;
+                            const tickets = ticketsOf(c);
+                            const needsTicket = (c.status === 'implemented' || c.status === 'verified') && !tickets.length;
                             return (
                                 <tr key={c.id} style={needsTicket ? { background: 'rgba(239,108,0,0.08)' } : undefined}>
                                     <td className="mono">
@@ -224,10 +226,12 @@ export default function DashboardPanel() {
                                     </td>
                                     <td style={{ textTransform: 'capitalize' }}>{c.status}</td>
                                     <td>
-                                        {c.ticketUrl ? (
-                                            <a className="linkbtn" href={c.ticketUrl} target="_blank" rel="noreferrer">
-                                                ticket ↗
-                                            </a>
+                                        {tickets.length ? (
+                                            tickets.map((ticket: string, idx: number) => (
+                                                <a key={ticket + idx} className="linkbtn" href={ticket} target="_blank" rel="noreferrer" style={{ marginRight: 6 }}>
+                                                    ticket {idx + 1} ↗
+                                                </a>
+                                            ))
                                         ) : needsTicket ? (
                                             <span style={{ color: 'var(--warn)' }}>required</span>
                                         ) : (

@@ -53,6 +53,7 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
         for (const c of arr(t.components)) if (!compIds.has(c)) issues.push(`${t.id}: references unknown component '${c}'.`);
         for (const a of arr(t.assets)) if (!assetIds.has(a)) issues.push(`${t.id}: references unknown asset '${a}'.`);
         if (t.attackerRef && !attackerById.has(t.attackerRef)) issues.push(`${t.id}: references unknown attacker profile '${t.attackerRef}'.`);
+        for (const iface of arr(t.interfaceRefs)) if (!ifaceIds.has(iface)) issues.push(`${t.id}: references unknown interface '${iface}'.`);
         if (t.interfaceRef && !ifaceIds.has(t.interfaceRef)) issues.push(`${t.id}: references unknown interface '${t.interfaceRef}'.`);
         const atk = t.attackerRef ? attackerById.get(t.attackerRef) : null;
         const exposure = t.likelihoodFactors?.exposure;
@@ -83,7 +84,8 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
         if (!arr(c.addresses).length) issues.push(`${c.id || 'countermeasure'}: addresses no threat (orphaned countermeasure).`);
         for (const a of arr(c.addresses)) if (!tIds.has(a.threat)) issues.push(`${c.id}: addresses unknown threat '${a.threat}'.`);
         for (const comp of arr(c.components)) if (!compIds.has(comp)) issues.push(`${c.id}: references unknown component '${comp}'.`);
-        if ((c.status === 'implemented' || c.status === 'verified') && !c.ticketUrl)
+        const ticketCount = arr(c.ticketUrls).filter(Boolean).length || (c.ticketUrl ? 1 : 0);
+        if ((c.status === 'implemented' || c.status === 'verified') && !ticketCount)
             issues.push(`${c.id}: status '${c.status}' requires a ticket link as proof of implementation.`);
         if (c.status === 'verified' && !c.verificationUrl)
             issues.push(`${c.id}: status 'verified' requires a verification link as evidence the control was tested.`);
@@ -114,7 +116,7 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
     for (const c of components)
         if (c.kind !== 'external-entity' && c.kind !== 'device' && !parents.has(c.id) && !threatComps.has(c.id))
             issues.push(`Coverage: component '${c.id}' (${c.name}) has no threat — STRIDE-per-element coverage gap.`);
-    const threatIfaces = new Set(threatList.map((t) => t.interfaceRef).filter(Boolean));
+    const threatIfaces = new Set(threatList.flatMap((t) => [...arr(t.interfaceRefs), ...(t.interfaceRef ? [t.interfaceRef] : [])]).filter(Boolean));
     for (const i of interfaces)
         if (!threatIfaces.has(i.id)) issues.push(`Coverage: interface '${i.id}' (${i.name}) has no threat — every external interface should have at least one.`);
 

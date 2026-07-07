@@ -1,5 +1,6 @@
 import { useStore, uid } from '../../state/store';
 import { Field, Chips, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, Jump, HelpButton, confirmDelete, IdInput } from '../common';
+import RiskCalculator from './RiskCalculator';
 import type { Countermeasure } from '../../types';
 
 export default function CountermeasuresPanel() {
@@ -9,6 +10,9 @@ export default function CountermeasuresPanel() {
 
     const cms = data.countermeasures.countermeasures || [];
     const threats = data.threats.threats || [];
+    const attackers = data.assumptions.attacker || [];
+    const ifaceOpts = (data.system.interfaces || []).map((itf) => ({ value: itf.id, label: `${itf.name}${itf.protocol ? ` (${itf.protocol})` : ''}` }));
+    const attackerOpts = attackers.map((a) => ({ value: a.id, label: `${a.name} (cap ${a.capability}, ${a.access})` }));
     const focusId = useFocus('countermeasures');
     const { editingId, setEditingId } = useEditMode(focusId);
     const threatOpts = threats.map((t) => ({ value: t.id, label: `${t.id} · ${t.title}` }));
@@ -28,13 +32,31 @@ export default function CountermeasuresPanel() {
         setEditingId(id);
     };
     const editing = cms.find((c) => c.id === editingId) || null;
+    const ticketList = (c: Countermeasure) => (c.ticketUrls?.length ? c.ticketUrls : c.ticketUrl ? [c.ticketUrl] : ['']);
+    const seedResidualFromThreat = (t: any) => ({
+        residualLikelihood: t?.likelihood ?? 2,
+        residualImpact: t?.impact ?? 2,
+        attackerRef: t?.attackerRef,
+        interfaceRef: t?.interfaceRef,
+        interfaceRefs: t?.interfaceRefs?.length ? [...t.interfaceRefs] : t?.interfaceRef ? [t.interfaceRef] : [],
+        interfaceLabel: t?.interfaceLabel,
+        likelihoodFactors: t?.likelihoodFactors ? { ...t.likelihoodFactors } : undefined,
+        impactDimensions: t?.impactDimensions ? { ...t.impactDimensions } : undefined,
+        cvss: t?.cvss ? { ...t.cvss } : undefined,
+        ratedBy: t?.ratedBy,
+        ratedAt: t?.ratedAt,
+    });
 
     const renderEditor = (c: Countermeasure) => {
         const upd = (patch: any) => setCms(cms.map((x) => (x.id === c.id ? { ...x, ...patch } : x)));
+        const setTickets = (tickets: string[]) => {
+            const cleaned = tickets.map((t) => t.trim()).filter(Boolean);
+            upd({ ticketUrl: cleaned[0] || '', ticketUrls: cleaned });
+        };
         const addrThreatIds = (c.addresses || []).map((a) => a.threat);
         const toggleThreat = (next: string[]) => {
             const existing = new Map((c.addresses || []).map((a) => [a.threat, a]));
-            const addresses = next.map((tid) => existing.get(tid) || { threat: tid, residualLikelihood: 2, residualImpact: 2 });
+            const addresses = next.map((tid) => existing.get(tid) || { threat: tid, ...seedResidualFromThreat(threats.find((x) => x.id === tid)) });
             upd({ addresses });
         };
         const updAddr = (tid: string, patch: any) => upd({ addresses: (c.addresses || []).map((a) => (a.threat === tid ? { ...a, ...patch } : a)) });
@@ -66,16 +88,77 @@ export default function CountermeasuresPanel() {
                     <div className="card" style={{ boxShadow: 'none', background: 'var(--surface-2)', marginBottom: 10 }}>
                         {(c.addresses || []).map((a) => {
                             const t = threats.find((x) => x.id === a.threat);
+                            const residualIfaces = a.interfaceRefs?.length ? a.interfaceRefs : t?.interfaceRefs?.length ? t.interfaceRefs : t?.interfaceRef ? [t.interfaceRef] : [];
+                            const residualModel = {
+                                likelihood: t?.likelihood ?? 2,
+                                impact: t?.impact ?? 2,
+                                residualLikelihood: a.residualLikelihood ?? t?.likelihood ?? 2,
+                                residualImpact: a.residualImpact ?? t?.impact ?? 2,
+                                attackerRef: a.attackerRef ?? t?.attackerRef,
+                                interfaceRef: a.interfaceRef ?? residualIfaces[0],
+                                interfaceRefs: residualIfaces,
+                                interfaceLabel: a.interfaceLabel ?? t?.interfaceLabel,
+                                likelihoodFactors: a.likelihoodFactors ?? t?.likelihoodFactors,
+                                impactDimensions: a.impactDimensions ?? t?.impactDimensions,
+                                cvss: a.cvss ?? t?.cvss,
+                                ratedBy: a.ratedBy ?? '',
+                                ratedAt: a.ratedAt,
+                            };
                             return (
-                                <div className="inline" key={a.threat} style={{ marginBottom: 6 }}>
-                                    <Jump view="threats" id={a.threat} />
-                                    <span className="grow muted" style={{ flex: 1, minWidth: 120 }}>
-                                        {t?.title || 'unknown threat'}
-                                    </span>
-                                    <label className="hint">res L</label>
-                                    <ScaleSelect value={a.residualLikelihood ?? 2} onChange={(n) => updAddr(a.threat, { residualLikelihood: n })} levels={LIKELIHOOD_LEVELS} style={{ width: 150 }} />
-                                    <label className="hint">res I</label>
-                                    <ScaleSelect value={a.residualImpact ?? 2} onChange={(n) => updAddr(a.threat, { residualImpact: n })} levels={IMPACT_LEVELS} style={{ width: 150 }} />
+                                <div key={a.threat} className="itemcard residual-card" style={{ marginBottom: 8 }}>
+                                    <div className="inline" style={{ marginBottom: 8, alignItems: 'center' }}>
+                                        <Jump view="threats" id={a.threat} />
+                                        <span className="grow muted" style={{ flex: 1, minWidth: 180 }}>
+                                            {t?.title || 'unknown threat'}
+                                        </span>
+                                        <span className="hint">Initial {t?.likelihood ?? '—'} × {t?.impact ?? '—'}</span>
+                                        <button className="btn sm" type="button" onClick={() => updAddr(a.threat, seedResidualFromThreat(t))}>
+                                            Reset from threat
+                                        </button>
+                                    </div>
+                                    <div className="grid2">
+                                        <Field label="Residual attacker profile">
+                                            <select className="inp" value={residualModel.attackerRef || ''} onChange={(e) => updAddr(a.threat, { attackerRef: e.target.value || undefined })}>
+                                                <option value="">— none —</option>
+                                                {attackerOpts.map((opt) => (
+                                                    <option key={opt.value} value={opt.value}>
+                                                        {opt.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </Field>
+                                        <Field label="Residual interfaces / vectors">
+                                            <Chips options={ifaceOpts} value={residualIfaces} onChange={(v) => updAddr(a.threat, { interfaceRefs: v, interfaceRef: v[0] || undefined })} empty="No interfaces defined in step 03 yet." />
+                                            <input className="inp" style={{ marginTop: 6 }} value={a.interfaceLabel ?? t?.interfaceLabel ?? ''} placeholder="Optional custom vector" onChange={(e) => updAddr(a.threat, { interfaceLabel: e.target.value || undefined })} />
+                                        </Field>
+                                    </div>
+                                    <div className="grid2">
+                                        <Field label="Residual likelihood">
+                                            <ScaleSelect value={a.residualLikelihood ?? t?.likelihood ?? 2} onChange={(n) => updAddr(a.threat, { residualLikelihood: Math.min(n, t?.likelihood ?? n) })} levels={LIKELIHOOD_LEVELS} style={{ width: '100%' }} />
+                                        </Field>
+                                        <Field label="Residual impact">
+                                            <ScaleSelect value={a.residualImpact ?? t?.impact ?? 2} onChange={(n) => updAddr(a.threat, { residualImpact: Math.min(n, t?.impact ?? n) })} levels={IMPACT_LEVELS} style={{ width: '100%' }} />
+                                        </Field>
+                                    </div>
+                                    <div style={{ marginTop: 8 }}>
+                                        <h4 style={{ margin: '0 0 8px 0' }}>Guided residual assessment</h4>
+                                        <RiskCalculator
+                                            t={residualModel as any}
+                                            upd={(patch) => updAddr(a.threat, patch)}
+                                            likelihoodField="residualLikelihood"
+                                            impactField="residualImpact"
+                                            summary="Open Bug Bar, likelihood factors and CVSS tools for the residual assessment"
+                                            defaultOpen={true}
+                                        />
+                                    </div>
+                                    {(t?.likelihoodRationale || t?.impactRationale || t?.interfaceLabel || t?.interfaceRefs?.length || t?.interfaceRef) && (
+                                        <div className="hint" style={{ marginTop: 6 }}>
+                                            {(t.interfaceRefs?.length || t.interfaceRef) ? `Interfaces: ${[...(t.interfaceRefs?.length ? t.interfaceRefs : t.interfaceRef ? [t.interfaceRef] : [])].join(', ')}. ` : ''}
+                                            {t.interfaceLabel ? `Vector: ${t.interfaceLabel}. ` : ''}
+                                            {t.likelihoodRationale ? `Likelihood rationale: ${t.likelihoodRationale}. ` : ''}
+                                            {t.impactRationale ? `Impact rationale: ${t.impactRationale}.` : ''}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
@@ -96,15 +179,34 @@ export default function CountermeasuresPanel() {
                 {(c.status === 'implemented' || c.status === 'verified') && (
                     <div className="grid2">
                         <Field
-                            label="Implementation ticket (required)"
-                            hint={!c.ticketUrl ? 'A ticketing-system link is required to prove this control was implemented.' : undefined}
+                            label="Implementation tickets (at least one required)"
+                            hint={!ticketList(c).some((t) => t.trim()) ? 'At least one ticketing-system link is required to prove this control was implemented.' : undefined}
                         >
-                            <input
-                                value={c.ticketUrl || ''}
-                                onChange={(e) => upd({ ticketUrl: e.target.value })}
-                                placeholder="https://dev.azure.com/org/proj/_workitems/edit/123"
-                                style={!c.ticketUrl ? { borderColor: 'var(--warn)' } : undefined}
-                            />
+                            <div className="list" style={{ gap: 6 }}>
+                                {ticketList(c).map((ticket, idx) => (
+                                    <div className="inline" key={idx} style={{ gap: 6 }}>
+                                        <input
+                                            className="inp grow"
+                                            value={ticket}
+                                            onChange={(e) => {
+                                                const next = [...ticketList(c)];
+                                                next[idx] = e.target.value;
+                                                setTickets(next);
+                                            }}
+                                            placeholder="https://dev.azure.com/org/proj/_workitems/edit/123"
+                                            style={!ticket.trim() && !ticketList(c).some((t) => t.trim()) ? { borderColor: 'var(--warn)' } : undefined}
+                                        />
+                                        {ticketList(c).length > 1 && (
+                                            <button className="btn sm danger" type="button" onClick={() => setTickets(ticketList(c).filter((_, i) => i !== idx))}>
+                                                ✕
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                                <button className="btn sm" type="button" onClick={() => setTickets([...ticketList(c), ''])}>
+                                    + Another ticket
+                                </button>
+                            </div>
                         </Field>
                         <Field label="Verification evidence link">
                             <input

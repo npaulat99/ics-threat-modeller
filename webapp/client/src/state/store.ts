@@ -9,6 +9,254 @@
 import { create } from 'zustand';
 import type { ProjectData, ProjectSummary, RiskScheme, StepKey, ViewKey } from '../types';
 
+const norm = (v: string | null | undefined) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+const suffixNum = (id?: string | null) => {
+    const m = String(id || '').match(/(\d+)$/);
+    return m ? Number(m[1]) : null;
+};
+const defaultNodeType = (kind?: string) => {
+    if (kind === 'store') return 'store';
+    if (kind === 'external-entity') return 'external-entity';
+    if (kind === 'multiprocess') return 'multiprocess';
+    return 'process';
+};
+
+function inferFlowBoundaryId(system: any, dfd: any, flow: any) {
+    const compById = new Map((system.components || []).map((c: any) => [c.id, c]));
+    const nodeById = new Map((dfd.nodes || []).map((n: any) => [n.id, n]));
+    const nodesByComponent = new Map<string, any[]>();
+    for (const node of dfd.nodes || []) {
+        if (!node.componentRef) continue;
+        const list = nodesByComponent.get(node.componentRef) || [];
+        list.push(node);
+        nodesByComponent.set(node.componentRef, list);
+    }
+    const tbNodes = (dfd.nodes || []).filter((n: any) => n.type === 'trust-boundary');
+    const interfaceById = new Map((system.interfaces || []).map((itf: any) => [itf.id, itf]));
+
+    const boundaryDepthsForNode = (nodeId: string) => {
+        const depths = new Map<string, number>();
+        let current: any = nodeById.get(nodeId);
+        let depth = 0;
+        const seen = new Set<string>();
+        while (current && !seen.has(current.id)) {
+            seen.add(current.id);
+            for (const tb of tbNodes) {
+                if ((tb.parent ?? null) === (current.parent ?? null) && (tb.members || []).includes(current.id)) {
+                    depths.set(tb.id, Math.max(depths.get(tb.id) || 0, depth + 1));
+                }
+            }
+            current = current.parent ? nodeById.get(current.parent) : null;
+            depth++;
+        }
+        return depths;
+    };
+
+    const boundaryDepthsForEndpoint = (endpointId: string) => {
+        const direct: any = nodeById.get(endpointId);
+        if (direct) return boundaryDepthsForNode(endpointId);
+        const itf: any = interfaceById.get(endpointId);
+        if (!itf?.component) return new Map<string, number>();
+        const depths = new Map<string, number>();
+        let compId: string | null | undefined = itf.component;
+        let depth = 0;
+        const seen = new Set<string>();
+        while (compId && !seen.has(compId)) {
+            seen.add(compId);
+            for (const node of nodesByComponent.get(compId) || []) {
+                for (const [tbId, tbDepth] of boundaryDepthsForNode(node.id)) depths.set(tbId, Math.max(depths.get(tbId) || 0, tbDepth + depth));
+            }
+            compId = (compById.get(compId) as any)?.parent ?? null;
+            depth++;
+        }
+        return depths;
+    };
+
+    const a = boundaryDepthsForEndpoint(flow.from);
+    const b = boundaryDepthsForEndpoint(flow.to);
+    let best: { id: string; depth: number } | null = null;
+    const ids = new Set([...a.keys(), ...b.keys()]);
+    for (const id of ids) {
+        const inA = a.has(id);
+        const inB = b.has(id);
+        if (inA === inB) continue;
+        const depth = Math.max(a.get(id) || 0, b.get(id) || 0);
+        if (!best || depth > best.depth) best = { id, depth };
+    }
+    return best?.id || null;
+}
+
+function reconcileSystemDfd(system: any, dfd: any, authoritative: 'system' | 'dfd' = 'system') {
+    const compIds = new Set((system?.components || []).map((c: any) => c.id));
+    const sysTbIds = new Set((system?.trustBoundaries || []).map((b: any) => b.id));
+    const nodes = [...(dfd?.nodes || [])].filter((n: any) => {
+        if (authoritative !== 'system') return true;
+        if (n.type === 'trust-boundary') return sysTbIds.has(n.id);
+        if (n.componentRef) return compIds.has(n.componentRef);
+        return true;
+    });
+    const flows = [...(dfd?.flows || [])];
+    const existingIds = new Set(nodes.map((n: any) => n.id));
+    const nodeById = new Map(nodes.map((n: any) => [n.id, n]));
+    const makeNodeId = (compId: string) => {
+        const num = suffixNum(compId);
+        const preferred = num ? `N-${num}` : null;
+        if (preferred && !existingIds.has(preferred)) {
+            existingIds.add(preferred);
+            return preferred;
+        }
+        let n = existingIds.size + 1;
+        let id = `N-${n}`;
+        while (existingIds.has(id)) id = `N-${++n}`;
+        existingIds.add(id);
+        return id;
+    };
+    const nodeId = () => {
+        let n = existingIds.size + 1;
+        let id = `N-${n}`;
+        while (existingIds.has(id)) id = `N-${++n}`;
+        existingIds.add(id);
+        return id;
+    };
+    const components = [...(system?.components || [])].sort((a: any, b: any) => (a.layer || 0) - (b.layer || 0) || a.name.localeCompare(b.name));
+    const nodesByComponent = new Map<string, any>();
+    const compById = new Map(components.map((c: any) => [c.id, c]));
+    const unlinked = nodes.filter((n: any) => n.type !== 'trust-boundary' && !n.componentRef);
+
+    for (const node of nodes) if (node.componentRef && compById.has(node.componentRef) && !nodesByComponent.has(node.componentRef)) nodesByComponent.set(node.componentRef, node);
+
+    for (const comp of components) {
+        if (nodesByComponent.has(comp.id)) continue;
+        const parentNode = comp.parent ? nodesByComponent.get(comp.parent) : null;
+        const candidate = unlinked.find(
+            (node: any) =>
+                !node.componentRef &&
+                node.type !== 'trust-boundary' &&
+                (node.parent ?? null) === (parentNode?.id ?? null) &&
+                norm(node.label) === norm(comp.name),
+        );
+        if (candidate) {
+            candidate.componentRef = comp.id;
+            candidate.layer = comp.layer;
+            candidate.parent = parentNode?.id ?? null;
+            nodesByComponent.set(comp.id, candidate);
+            continue;
+        }
+        const created = {
+            id: comp.parent ? makeNodeId(comp.id) : 'N-DEV',
+            label: comp.name,
+            type: defaultNodeType(comp.kind),
+            layer: comp.layer,
+            parent: parentNode?.id ?? null,
+            componentRef: comp.id,
+        };
+        if (created.id === 'N-DEV' && existingIds.has(created.id)) created.id = nodeId();
+        else existingIds.add(created.id);
+        nodes.push(created);
+        nodesByComponent.set(comp.id, created);
+    }
+
+    for (const node of nodes) {
+        if (!node.componentRef) continue;
+        const comp = compById.get(node.componentRef);
+        if (!comp) {
+            delete node.componentRef;
+            continue;
+        }
+        const parentNode = comp.parent ? nodesByComponent.get(comp.parent) : null;
+        node.layer = comp.layer;
+        node.parent = parentNode?.id ?? null;
+        if (!node.label || norm(node.label) === norm(comp.id)) node.label = comp.name;
+    }
+
+    const tbNodes = nodes.filter((n: any) => n.type === 'trust-boundary');
+    const tbById = new Map(tbNodes.map((n: any) => [n.id, n]));
+    for (const tb of system?.trustBoundaries || []) {
+        const memberNodeIds = (tb.members || []).map((cid: string) => nodesByComponent.get(cid)?.id).filter(Boolean);
+        const memberParent = memberNodeIds.length ? nodes.find((n: any) => n.id === memberNodeIds[0])?.parent ?? null : null;
+        const memberLayer = memberNodeIds.length ? nodes.find((n: any) => n.id === memberNodeIds[0])?.layer ?? 1 : 1;
+        const existing = tbById.get(tb.id) || tbNodes.find((n: any) => norm(n.label) === norm(tb.name));
+        if (existing) {
+            const unlinkedMembers = (existing.members || []).filter((nodeId: string) => !(nodeById.get(nodeId) as any)?.componentRef);
+            existing.id = tb.id;
+            existing.label = tb.name;
+            existing.members = [...new Set([...memberNodeIds, ...unlinkedMembers])];
+            existing.parent = memberParent;
+            existing.layer = memberLayer;
+            tbById.set(tb.id, existing);
+        } else {
+            const created = { id: tb.id, label: tb.name, type: 'trust-boundary', members: memberNodeIds, parent: memberParent, layer: memberLayer };
+            nodes.push(created);
+            tbById.set(tb.id, created);
+        }
+    }
+
+    const validNodeIds = new Set(nodes.map((n: any) => n.id));
+    const validBoundaryIds = new Set(nodes.filter((n: any) => n.type === 'trust-boundary').map((n: any) => n.id));
+    const nextFlows = flows.filter((flow: any) => {
+        const fromNode = validNodeIds.has(flow.from) || (system.interfaces || []).some((itf: any) => itf.id === flow.from);
+        const toNode = validNodeIds.has(flow.to) || (system.interfaces || []).some((itf: any) => itf.id === flow.to);
+        return fromNode && toNode;
+    }).map((flow: any) => {
+        if (flow.crossesBoundary && validBoundaryIds.has(flow.crossesBoundary)) return flow;
+        return { ...flow, crossesBoundary: inferFlowBoundaryId(system, { ...dfd, nodes }, flow) };
+    });
+
+    return { ...(dfd || {}), nodes, flows: nextFlows };
+}
+
+function reconcileDfdSystem(system: any, dfd: any) {
+    const nodeById = new Map((dfd?.nodes || []).map((n: any) => [n.id, n]));
+    const componentNodes = (dfd?.nodes || []).filter((n: any) => n.type !== 'trust-boundary' && n.componentRef);
+    const existingComponents = new Map((system?.components || []).map((c: any) => [c.id, c]));
+
+    const nextComponents = componentNodes.map((node: any) => {
+        const existing: any = existingComponents.get(node.componentRef) || {};
+        return {
+            ...existing,
+            id: node.componentRef,
+            name: node.label || existing.name || node.componentRef,
+            kind: existing.kind || (node.type === 'store' ? 'store' : node.type === 'external-entity' ? 'external-entity' : node.type === 'multiprocess' ? 'multiprocess' : 'software'),
+            layer: Number(node.layer) || 1,
+            parent: node.parent ? ((nodeById.get(node.parent) as any)?.componentRef ?? null) : null,
+        };
+    });
+
+    const keptComponentIds = new Set(nextComponents.map((c: any) => c.id));
+    const preservedSystemOnly = (system?.components || []).filter((c: any) => c.kind === 'device' && !keptComponentIds.has(c.id));
+
+    const componentIdSet = new Set([...keptComponentIds, ...preservedSystemOnly.map((c: any) => c.id)]);
+
+    // Keep interfaces/assets bound to existing components only, and keep threat-boundary references valid.
+    const nextInterfaces = (system?.interfaces || []).map((itf: any) => {
+        if (!itf.component || componentIdSet.has(itf.component)) return itf;
+        return { ...itf, component: null };
+    });
+
+    const nextAssets = (system?.assets || []).map((asset: any) => ({
+        ...asset,
+        components: (asset.components || []).filter((cid: string) => componentIdSet.has(cid)),
+    }));
+
+    const nextTrustBoundaries = (dfd?.nodes || [])
+        .filter((n: any) => n.type === 'trust-boundary')
+        .map((tb: any) => ({
+            id: tb.id,
+            name: tb.label || tb.id,
+            members: (tb.members || [])
+                .map((nodeId: string) => (nodeById.get(nodeId) as any)?.componentRef)
+                .filter(Boolean),
+        }));
+
+    return {
+        ...(system || {}),
+        components: [...preservedSystemOnly, ...nextComponents],
+        interfaces: nextInterfaces,
+        assets: nextAssets,
+        trustBoundaries: nextTrustBoundaries,
+    };
+}
+
 const wsUrl = () => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 
 async function getJSON<T>(url: string): Promise<T> {
@@ -219,15 +467,35 @@ export const useStore = create<Store>((set, get) => ({
         const data = get().data;
         if (!data) return;
         if (!histSuppress) pushHistory(data, step);
-        set({ data: { ...data, [step]: value } });
+        const nextData = { ...data, [step]: value } as ProjectData;
+        if (step === 'system') nextData.dfd = reconcileSystemDfd(nextData.system, nextData.dfd, 'system');
+        if (step === 'dfd') {
+            nextData.system = reconcileDfdSystem(nextData.system, nextData.dfd);
+            nextData.dfd = reconcileSystemDfd(nextData.system, nextData.dfd, 'dfd');
+        }
+        set({ data: nextData });
         const id = get().activeId;
         if (!id) return;
         clearTimeout(saveTimers[step]);
+        clearTimeout(saveTimers.dfd);
+        clearTimeout(saveTimers.system);
         set({ saveState: 'saving' });
         saveTimers[step] = setTimeout(() => {
             const latest = get().data;
             if (latest) sendSave(id, step, (latest as any)[step]);
         }, 160);
+        if (step === 'system') {
+            saveTimers.dfd = setTimeout(() => {
+                const latest = get().data;
+                if (latest) sendSave(id, 'dfd', latest.dfd);
+            }, 160);
+        }
+        if (step === 'dfd') {
+            saveTimers.system = setTimeout(() => {
+                const latest = get().data;
+                if (latest) sendSave(id, 'system', latest.system);
+            }, 160);
+        }
     },
 
     renameId(oldId, newId) {
@@ -247,7 +515,7 @@ export const useStore = create<Store>((set, get) => ({
                 assets: (data.system.assets || []).map((a) => ({ ...a, id: m(a.id), components: arr(a.components) })),
             },
             threats: {
-                threats: (data.threats.threats || []).map((t) => ({ ...t, id: m(t.id), components: arr(t.components), assets: arr(t.assets), attackerRef: t.attackerRef === oldId ? newId : t.attackerRef, interfaceRef: t.interfaceRef === oldId ? newId : t.interfaceRef, countermeasures: arr(t.countermeasures) })),
+                threats: (data.threats.threats || []).map((t) => ({ ...t, id: m(t.id), components: arr(t.components), assets: arr(t.assets), attackerRef: t.attackerRef === oldId ? newId : t.attackerRef, interfaceRef: t.interfaceRef === oldId ? newId : t.interfaceRef, interfaceRefs: arr(t.interfaceRefs), countermeasures: arr(t.countermeasures) })),
             },
             requirements: {
                 requirements: (data.requirements?.requirements || []).map((r) => ({ ...r, id: m(r.id), derivedFromThreat: arr(r.derivedFromThreat), satisfiedByCM: arr(r.satisfiedByCM) })),
@@ -357,9 +625,14 @@ function sendSave(id: string, step: string, data: unknown) {
 
 // Small id helper used across panels.
 export const uid = (prefix: string, existing: string[]) => {
-    let n = existing.length + 1;
-    let id = `${prefix}${n}`;
-    const set = new Set(existing);
-    while (set.has(id)) id = `${prefix}${++n}`;
-    return id;
+    const esc = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const used = new Set<number>();
+    const rx = new RegExp(`^${esc}(\\d+)$`);
+    for (const id of existing) {
+        const m = rx.exec(id);
+        if (m) used.add(Number(m[1]));
+    }
+    let n = 1;
+    while (used.has(n)) n++;
+    return `${prefix}${n}`;
 };

@@ -86,6 +86,7 @@ export interface Interface {
     component?: string;
     category?: string; // suggested: network / external / user; free text allowed
     exposure: 'physical' | 'local' | 'adjacent' | 'remote';
+    tag?: string; // short chip tag shown in the DFD (e.g. BLE, HMI, JTAG)
     protocol?: string;
 }
 export interface TrustBoundary {
@@ -143,6 +144,7 @@ export interface Dfd {
     ifacePos?: Record<string, { x: number; y: number }>; // user-positioned interface chips, keyed "${parentId ?? 'root'}:${ifaceId}"
     ifaceRot?: Record<string, number>; // user-rotated interface chips in degrees, keyed "${parentId ?? 'root'}:${ifaceId}"
     ifaceLink?: Record<string, { sourceHandle?: string | null; targetHandle?: string | null }>; // dashed interface link handle overrides, keyed "${parentId ?? 'root'}:${ifaceId}"
+    portPos?: Record<string, { x: number; y: number }>; // user-positioned deeper-layer context ports, keyed "${parentId ?? 'root'}:${endpointId}"
 }
 
 export type Stride = 'S' | 'T' | 'R' | 'I' | 'D' | 'E';
@@ -160,6 +162,7 @@ export interface Threat {
     likelihoodRationale?: string;
     impactRationale?: string;
     interfaceRef?: string; // primary interface/attack vector id (system.interfaces) the threat enters through
+    interfaceRefs?: string[]; // additional affected interfaces/vectors assessed together with the same threat
     interfaceLabel?: string; // free-text interface/vector when not in the interface list
     impactDimensions?: Objectives; // Bug Bar per-dimension impact (C/I/A/Safety); impact = max(...)
     // Likelihood = f(Exposure × Exploitability), decomposing a single coarse "likelihood" into two
@@ -185,6 +188,15 @@ export interface CmAddress {
     threat: string;
     residualLikelihood?: number;
     residualImpact?: number;
+    attackerRef?: string;
+    interfaceRef?: string;
+    interfaceRefs?: string[];
+    interfaceLabel?: string;
+    likelihoodFactors?: { exposure?: number; exploitability?: number };
+    impactDimensions?: Objectives;
+    cvss?: { baseScore?: number; vector?: string; version?: string };
+    ratedBy?: string;
+    ratedAt?: string;
 }
 export interface Countermeasure {
     id: string;
@@ -196,6 +208,7 @@ export interface Countermeasure {
     iec62443Ref?: string;
     status?: 'proposed' | 'planned' | 'implemented' | 'verified';
     ticketUrl?: string; // required once status is implemented/verified — proof of implementation
+    ticketUrls?: string[]; // optional additional implementation tickets linked to the same control
     verificationUrl?: string; // link to the verification/test evidence
 }
 export interface CountermeasuresDoc {

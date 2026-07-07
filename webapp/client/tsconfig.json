@@ -12,6 +12,12 @@
         "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,
         "resolveJsonModule": true,
+        "baseUrl": ".",
+        "paths": {
+            "@shared/*": [
+                "../shared/*"
+            ]
+        },
         "isolatedModules": true,
         "noEmit": true,
         "jsx": "react-jsx",
@@ -21,7 +27,8 @@
         "allowJs": true
     },
     "include": [
-        "src"
+        "src",
+        "../shared"
     ],
     "references": [
         {

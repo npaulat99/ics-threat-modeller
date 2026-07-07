@@ -5,6 +5,11 @@ import react from '@vitejs/plugin-react';
 // backend (4317). In production the backend serves the built files from client/dist.
 export default defineConfig({
     plugins: [react()],
+    resolve: {
+        alias: {
+            '@shared': '../shared',
+        },
+    },
     server: {
         host: true,
         port: 5173,

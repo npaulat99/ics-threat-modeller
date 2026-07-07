@@ -2,12 +2,17 @@
   "nodes": [
     {
       "id": "TB-ENC",
-      "label": "Sensor enclosure (trust boundary)",
+      "label": "Sensor enclosure",
       "type": "trust-boundary",
-      "layer": 1,
-      "parent": null,
+      "layer": 2,
+      "parent": "N-DEV",
       "members": [
-        "N-DEV"
+        "N-MCU",
+        "N13",
+        "N-BT",
+        "N-HART",
+        "N14",
+        "N-CFG"
       ],
       "x": 90,
       "y": 550
@@ -19,8 +24,8 @@
       "layer": 1,
       "parent": null,
       "componentRef": "C-DCS",
-      "x": 37,
-      "y": 145
+      "x": 20,
+      "y": 179
     },
     {
       "id": "N-PHONE",
@@ -126,6 +131,33 @@
       "members": [
         "N11"
       ]
+    },
+    {
+      "id": "N13",
+      "label": "Radar front-end",
+      "type": "process",
+      "layer": 2,
+      "parent": "N-DEV",
+      "componentRef": "C-RADAR"
+    },
+    {
+      "id": "N14",
+      "label": "Signed bootloader",
+      "type": "process",
+      "layer": 2,
+      "parent": "N-DEV",
+      "componentRef": "C-BOOT"
+    },
+    {
+      "id": "TB-WIRE",
+      "label": "Field wiring to DCS",
+      "type": "trust-boundary",
+      "members": [
+        "N-HART",
+        "N-DCS"
+      ],
+      "parent": "N-DEV",
+      "layer": 2
     }
   ],
   "flows": [
@@ -150,7 +182,7 @@
       "label": "measured distance",
       "from": "N-MCU",
       "to": "N-HART",
-      "crossesBoundary": null,
+      "crossesBoundary": "TB-WIRE",
       "sourceHandle": "s-l",
       "targetHandle": "t-t"
     },
@@ -159,7 +191,7 @@
       "label": "HART setpoint / command",
       "from": "N-HART",
       "to": "N-MCU",
-      "crossesBoundary": null,
+      "crossesBoundary": "TB-WIRE",
       "sourceHandle": "s-tr",
       "targetHandle": "t-bl"
     },
@@ -185,7 +217,8 @@
       "to": "N10",
       "label": "store data",
       "sourceHandle": "s-b",
-      "targetHandle": "t-t"
+      "targetHandle": "t-t",
+      "crossesBoundary": null
     },
     {
       "id": "F8",
@@ -193,7 +226,8 @@
       "to": "N-MCU",
       "label": "sign message",
       "sourceHandle": "s-t",
-      "targetHandle": "t-b"
+      "targetHandle": "t-b",
+      "crossesBoundary": "N12"
     },
     {
       "id": "F9",
@@ -201,7 +235,8 @@
       "to": "N-DCS",
       "label": "data",
       "sourceHandle": "s-t",
-      "targetHandle": "t-b"
+      "targetHandle": "t-b",
+      "crossesBoundary": "TB-ENC"
     }
   ],
   "ifacePos": {

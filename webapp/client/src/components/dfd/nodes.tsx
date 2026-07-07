@@ -123,7 +123,7 @@ export function InterfaceNodeView({ id, data, selected }: any) {
             }}
         >
             <NodeHandles />
-            <span className="ifaceproto">{data.protocol || 'iface'}</span>
+            <span className="ifaceproto">{data.tag || data.protocol || 'interface'}</span>
             <span className="ifacename">{data.label}</span>
             {data.exposure ? <span className={'ifaceexp exp-' + data.exposure}>{data.exposure}</span> : null}
         </div>

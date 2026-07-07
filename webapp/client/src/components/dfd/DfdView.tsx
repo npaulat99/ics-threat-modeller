@@ -24,115 +24,7 @@ import DfdOverview from './DfdOverview';
 import { riskOf } from '../../lib/risk';
 import { cx, confirmDelete } from '../common';
 import type { Dfd, DfdNode, DfdNodeType } from '../../types';
-
-type Pt = [number, number];
-
-// Liang–Barsky: does the segment (x1,y1)-(x2,y2) cross the interior of rect r?
-function segHitsRect(x1: number, y1: number, x2: number, y2: number, r: { x: number; y: number; w: number; h: number }) {
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    let t0 = 0;
-    let t1 = 1;
-    const edges = [
-        [-dx, x1 - r.x],
-        [dx, r.x + r.w - x1],
-        [-dy, y1 - r.y],
-        [dy, r.y + r.h - y1],
-    ];
-    for (const [p, q] of edges) {
-        if (p === 0) {
-            if (q < 0) return false;
-        } else {
-            const t = q / p;
-            if (p < 0) {
-                if (t > t1) return false;
-                if (t > t0) t0 = t;
-            } else {
-                if (t < t0) return false;
-                if (t < t1) t1 = t;
-            }
-        }
-    }
-    return t0 < t1;
-}
-
-// Greedy router: bend the S→T segment around any obstacle box it would otherwise cross, so a flow
-// never disappears behind a process / store / entity / interface. Trust boundaries and other edges
-// are NOT obstacles (they are not passed in).
-function routeAround(sx: number, sy: number, tx: number, ty: number, obstacles: { x: number; y: number; w: number; h: number }[], pad: number, depth = 0): Pt[] {
-    if (depth >= 5) return [[sx, sy], [tx, ty]];
-    let best: { x: number; y: number; w: number; h: number } | null = null;
-    let bestD = Infinity;
-    for (const o of obstacles) {
-        const r = { x: o.x - pad, y: o.y - pad, w: o.w + 2 * pad, h: o.h + 2 * pad };
-        // Skip an obstacle that an endpoint already sits inside/touches — you cannot route around it.
-        const inside = (px: number, py: number) => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
-        if (inside(sx, sy) || inside(tx, ty)) continue;
-        if (segHitsRect(sx, sy, tx, ty, r)) {
-            const d = (o.x + o.w / 2 - sx) ** 2 + (o.y + o.h / 2 - sy) ** 2;
-            if (d < bestD) {
-                bestD = d;
-                best = o;
-            }
-        }
-    }
-    if (!best) return [[sx, sy], [tx, ty]];
-    const x0 = best.x - pad;
-    const x1 = best.x + best.w + pad;
-    const y0 = best.y - pad;
-    const y1 = best.y + best.h + pad;
-    let wps: Pt[];
-    if (Math.abs(tx - sx) >= Math.abs(ty - sy)) {
-        const midY = (sy + ty) / 2;
-        const wy = Math.abs(y0 - midY) <= Math.abs(y1 - midY) ? y0 : y1;
-        wps = sx <= tx ? [[x0, wy], [x1, wy]] : [[x1, wy], [x0, wy]];
-    } else {
-        const midX = (sx + tx) / 2;
-        const wx = Math.abs(x0 - midX) <= Math.abs(x1 - midX) ? x0 : x1;
-        wps = sy <= ty ? [[wx, y0], [wx, y1]] : [[wx, y1], [wx, y0]];
-    }
-    const rest = obstacles.filter((o) => o !== best);
-    const a = routeAround(sx, sy, wps[0][0], wps[0][1], rest, pad, depth + 1);
-    const b = routeAround(wps[0][0], wps[0][1], wps[1][0], wps[1][1], rest, pad, depth + 1);
-    const c = routeAround(wps[1][0], wps[1][1], tx, ty, rest, pad, depth + 1);
-    return [...a, ...b.slice(1), ...c.slice(1)];
-}
-
-/** SVG path through a polyline with rounded corners. */
-function roundedPath(pts: Pt[], r: number) {
-    if (pts.length <= 2) return `M ${pts[0][0]},${pts[0][1]} L ${pts[1][0]},${pts[1][1]}`;
-    let d = `M ${pts[0][0]},${pts[0][1]}`;
-    for (let i = 1; i < pts.length - 1; i++) {
-        const [px, py] = pts[i - 1];
-        const [cx, cy] = pts[i];
-        const [nx, ny] = pts[i + 1];
-        const l1 = Math.hypot(px - cx, py - cy) || 1;
-        const l2 = Math.hypot(nx - cx, ny - cy) || 1;
-        const rr = Math.min(r, l1 / 2, l2 / 2);
-        const a: Pt = [cx + ((px - cx) / l1) * rr, cy + ((py - cy) / l1) * rr];
-        const b: Pt = [cx + ((nx - cx) / l2) * rr, cy + ((ny - cy) / l2) * rr];
-        d += ` L ${a[0]},${a[1]} Q ${cx},${cy} ${b[0]},${b[1]}`;
-    }
-    const last = pts[pts.length - 1];
-    d += ` L ${last[0]},${last[1]}`;
-    return d;
-}
-
-/** Point at 2/3 along a polyline by arc length — places the flow label closer to the target end. */
-function labelPtOnPolyline(pts: Pt[]): Pt {
-    let total = 0;
-    for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-    let dist = total * 2 / 3;
-    for (let i = 1; i < pts.length; i++) {
-        const seg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-        if (dist <= seg) {
-            const r = seg ? dist / seg : 0;
-            return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * r, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * r];
-        }
-        dist -= seg;
-    }
-    return pts[Math.floor(pts.length * 2 / 3)];
-}
+import { routeAround, roundedPath, labelPtOnPolyline } from '@shared/dfdEngine.js';
 
 // Data-flow edge. It routes around foreground entities so it never hides behind them; when the
 // straight line is already clear it keeps a gentle curve (offset) so bidirectional pairs separate.
@@ -193,6 +85,12 @@ const TYPE_LABEL: Record<DfdNodeType, string> = {
     'trust-boundary': 'Trust boundary',
 };
 const PALETTE: DfdNodeType[] = ['process', 'store', 'external-entity', 'multiprocess', 'trust-boundary'];
+const COMPONENT_KIND: Record<Exclude<DfdNodeType, 'trust-boundary'>, string> = {
+    process: 'software',
+    multiprocess: 'multiprocess',
+    store: 'store',
+    'external-entity': 'external-entity',
+};
 
 const ROW: Record<string, number> = { 'external-entity': 0, process: 1, multiprocess: 1, store: 2, 'trust-boundary': 3 };
 function autoLayout(nodes: DfdNode[]): Record<string, { x: number; y: number }> {
@@ -372,7 +270,7 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
 
         // Size each trust-boundary box to enclose its members AND host a header (name) plus a row
         // of interface chips at the top, so nothing overlaps and the boundary name stays readable.
-        const tbBoxes: Record<string, Box> = {};
+        let tbBoxes: Record<string, Box> = {};
         tbNodes.forEach((tb) => {
             const members = real.filter((p) => (tb.members || []).includes(p.id));
             if (!members.length) return;
@@ -417,6 +315,26 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             boxes[`iface:${ifaces[i].id}`] = { x: chipPos[i].x, y: chipPos[i].y, w: CHIP_W, h: CHIP_H };
         });
 
+        const fittedTbBoxes: Record<string, Box> = {};
+        tbNodes.forEach((tb) => {
+            const members = real.filter((p) => (tb.members || []).includes(p.id));
+            if (!members.length) return;
+            const chips = (groups[`tb:${tb.id}`] || []).map((i) => ({ x: chipPos[i].x, y: chipPos[i].y, w: CHIP_W, h: CHIP_H }));
+            const memberBox = bboxOf(members);
+            const minX = Math.min(memberBox.minX, ...(chips.length ? chips.map((c) => c.x) : [memberBox.minX]));
+            const maxX = Math.max(memberBox.maxX, ...(chips.length ? chips.map((c) => c.x + c.w) : [memberBox.maxX]));
+            const topContentY = chips.length ? Math.min(...chips.map((c) => c.y)) : memberBox.minY;
+            const bottomContentY = Math.max(memberBox.maxY, ...(chips.length ? chips.map((c) => c.y + c.h) : [memberBox.maxY]));
+            const y = Math.round(Math.min(memberBox.minY - TB_LABEL_H, topContentY - (TB_LABEL_H + TB_GAP)));
+            fittedTbBoxes[tb.id] = {
+                x: Math.round(minX - TB_PAD),
+                y,
+                w: Math.round(maxX - minX + TB_PAD * 2),
+                h: Math.round(bottomContentY - y + TB_PAD),
+            };
+        });
+        tbBoxes = fittedTbBoxes;
+
         // Ports: on a non-root layer, show the modelled component's external touch-points — its own
         // interfaces plus the endpoints it exchanges data with on its PARENT layer — as connectable
         // chips, WITHOUT modelling those sibling components here. This keeps the external interfaces
@@ -427,20 +345,10 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             const parentOfP = P?.parent ?? null;
             const sibIds = new Set(dfd.nodes.filter((n) => (n.parent ?? null) === parentOfP && n.id !== currentParent && n.type !== 'trust-boundary').map((n) => n.id));
             const ifaceIdSet = new Set(ifaces.map((it) => it.id));
+            const parentIfaceIds = new Set(ifaces.filter((it) => it.component === Pcomp).map((it) => it.id));
             const visibleIfaceHere = new Set(ifaces.filter((it) => targetForComponent(it.component)).map((it) => it.id));
             const nodeById = new Map(dfd.nodes.map((n) => [n.id, n]));
             const internalHas = (id: string) => real.some((r) => r.id === id);
-            const isAncestorComp = (compId?: string) => {
-                if (!Pcomp || !compId) return false;
-                let c: string | undefined = Pcomp;
-                const seen = new Set<string>();
-                while (c && !seen.has(c)) {
-                    seen.add(c);
-                    if (c === compId) return true;
-                    c = compById.get(c)?.parent;
-                }
-                return false;
-            };
             const portMap = new Map<string, { in: boolean; out: boolean; labels: string[] }>();
             const addPort = (ep: string, dir: 'in' | 'out', label?: string) => {
                 if (visibleIfaceHere.has(ep) || internalHas(ep)) return; // already shown on this layer
@@ -452,11 +360,16 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             for (const f of dfd.flows) {
                 const other = f.from === currentParent ? f.to : f.to === currentParent ? f.from : null;
                 if (other && (sibIds.has(other) || ifaceIdSet.has(other))) addPort(other, f.from === currentParent ? 'out' : 'in', f.label);
+                const fromParentIface = parentIfaceIds.has(f.from);
+                const toParentIface = parentIfaceIds.has(f.to);
+                if (fromParentIface || toParentIface) {
+                    const ifaceId = fromParentIface ? f.from : f.to;
+                    addPort(ifaceId, fromParentIface ? 'out' : 'in', f.label);
+                }
                 // Flows the user has already drawn from an internal node to an external endpoint.
                 if (internalHas(f.from) && (sibIds.has(f.to) || ifaceIdSet.has(f.to))) addPort(f.to, 'out', f.label);
                 if (internalHas(f.to) && (sibIds.has(f.from) || ifaceIdSet.has(f.from))) addPort(f.from, 'in', f.label);
             }
-            for (const itf of ifaces) if (isAncestorComp(itf.component) && !portMap.has(itf.id)) addPort(itf.id, 'in', itf.protocol || undefined);
 
             const portList = [...portMap.entries()];
             const PW = 150;
@@ -472,6 +385,12 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
                 const name = isIface ? ifaces.find((x) => x.id === ep)?.name || ep : nodeById.get(ep)?.label || ep;
                 const dir = info.in && info.out ? '⇄' : info.out ? '→' : '←';
                 const box = { x: Math.round(startX + i * (PW + PGAP)), y: Math.round(portY), w: PW, h: PH };
+                const posKey = `${currentParent ?? 'root'}:${ep}`;
+                const placed = dfd.portPos?.[posKey];
+                if (placed) {
+                    box.x = placed.x;
+                    box.y = placed.y;
+                }
                 boxes[rfid] = box;
                 portEndpointIds.add(ep);
                 if (isIface) ifacePortIds.add(ep);
@@ -566,6 +485,7 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
                 data: {
                     label: itf.name,
                     protocol: itf.protocol,
+                    tag: itf.tag,
                     exposure: itf.exposure,
                     category: itf.category,
                     connMode,
@@ -589,7 +509,7 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
                 height: p.box.h,
                 selected: selectedNodeId === p.rfid,
                 data: { name: p.name, dir: p.dir, detail: p.detail, connMode, title: `${p.name}${p.detail ? ' · ' + p.detail : ''}` },
-                draggable: false,
+                draggable: !connMode,
                 selectable: true,
                 connectable: true,
                 deletable: false,
@@ -662,45 +582,6 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             });
         });
 
-        // Interface connectors (derived iface -> device component). They are reconnectable so the
-        // user can manually move the connector endpoints/handles (blue edge dots), while the
-        // logical interface->component pairing itself remains fixed.
-        const perTarget: Record<string, number> = {};
-        const targetCount: Record<string, number> = {};
-        ifaces.forEach((itf) => {
-            const t = targetForComponent(itf.component);
-            if (t) targetCount[t] = (targetCount[t] || 0) + 1;
-        });
-        ifaces.forEach((itf) => {
-            const target = targetForComponent(itf.component);
-            if (!target) return;
-            const linkKey = `${currentParent ?? 'root'}:${itf.id}`;
-            const manual = dfd.ifaceLink?.[linkKey];
-            const sId = `iface:${itf.id}`;
-            const sBox = boxes[sId];
-            const tBox = boxes[target];
-            const sh = manual?.sourceHandle || `s-${sBox && tBox ? sideToward(sBox, tBox) : 'b'}`;
-            const th = manual?.targetHandle || `t-${sBox && tBox ? sideToward(tBox, sBox) : 't'}`;
-            const idx = (perTarget[target] = perTarget[target] || 0);
-            perTarget[target]++;
-            const grp = targetCount[target] || 1;
-            // Always curve to the right: base curve + spread for multiple connectors on same target.
-            const spread = CURVE + (idx - (grp - 1) / 2) * 20;
-            out.push({
-                id: `if:${itf.id}`,
-                source: sId,
-                target,
-                sourceHandle: sh,
-                targetHandle: th,
-                type: 'offset',
-                data: { offset: spread, obstacles: [] },
-                className: cx('edge-iface', isEdgeSelected(`if:${itf.id}`) && 'edge-sel'),
-                deletable: false,
-                selectable: true,
-                reconnectable: true,
-                markerEnd: { type: MarkerType.ArrowClosed },
-            });
-        });
         return out;
     };
 
@@ -720,6 +601,7 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
         conn: connMode,
         sc: !!scheme,
         ip: dfd.ifacePos || null,
+        pp: dfd.portPos || null,
         ir: dfd.ifaceRot || null,
         il: dfd.ifaceLink || null,
     });
@@ -764,6 +646,9 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
                 const ifaceId = node.id.slice(6);
                 const posKey = `${currentParent ?? 'root'}:${ifaceId}`;
                 persist({ ifacePos: { ...(dfd.ifacePos || {}), [posKey]: { x: Math.round(node.position.x), y: Math.round(node.position.y) } } });
+            } else if (layoutRef.current.portEndpointIds.has(node.id)) {
+                const posKey = `${currentParent ?? 'root'}:${node.id}`;
+                persist({ portPos: { ...(dfd.portPos || {}), [posKey]: { x: Math.round(node.position.x), y: Math.round(node.position.y) } } });
             } else {
                 persist({ nodes: dfd.nodes.map((n) => (n.id === node.id ? { ...n, x: Math.round(node.position.x), y: Math.round(node.position.y) } : n)) });
             }
@@ -786,24 +671,6 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
     );
     const onReconnect = useCallback(
         (oldEdge: any, conn: any) => {
-            if (String(oldEdge.id).startsWith('if:')) {
-                if (!conn.source || !conn.target) return;
-                const ifaceId = String(oldEdge.id).slice(3);
-                const linkKey = `${currentParent ?? 'root'}:${ifaceId}`;
-                const ifaceEndpoint = `iface:${ifaceId}`;
-                // Keep topology fixed (interface <-> associated component), only store moved handles.
-                if (conn.source !== ifaceEndpoint || conn.target !== oldEdge.target) return;
-                persist({
-                    ifaceLink: {
-                        ...(dfd.ifaceLink || {}),
-                        [linkKey]: {
-                            sourceHandle: conn.sourceHandle || null,
-                            targetHandle: conn.targetHandle || null,
-                        },
-                    },
-                });
-                return;
-            }
             if (!conn.source || !conn.target) return;
             const strip = (x: string) => (x.startsWith('iface:') ? x.slice(6) : x);
             persist({
@@ -843,21 +710,36 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
     };
 
     const addNode = (type: DfdNodeType) => {
-        const id = uid('N', dfd.nodes.map((n) => n.id));
-        const x = 120 + (visible.length % 4) * 230;
-        const y = 110 + Math.floor(visible.length / 4) * 170;
-        const node: DfdNode = {
-            id,
-            label: `New ${TYPE_LABEL[type].toLowerCase()}`,
-            type,
+        if (type === 'trust-boundary') {
+            const id = uid('TB-', [...(data.system.trustBoundaries || []).map((b) => b.id), ...dfd.nodes.filter((n) => n.type === 'trust-boundary').map((n) => n.id)]);
+            const x = 120 + (visible.length % 4) * 230;
+            const y = 110 + Math.floor(visible.length / 4) * 170;
+            const node: DfdNode = {
+                id,
+                label: 'New trust boundary',
+                type,
+                layer,
+                parent: currentParent,
+                x,
+                y,
+                members: [],
+            };
+            save('dfd', { ...dfd, nodes: [...dfd.nodes, node] });
+            selectNode(id);
+            return;
+        }
+        const compId = uid('C-', data.system.components.map((c) => c.id));
+        const parentComp = currentParent ? dfd.nodes.find((n) => n.id === currentParent)?.componentRef : null;
+        const comp = {
+            id: compId,
+            name: `New ${TYPE_LABEL[type].toLowerCase()}`,
+            kind: COMPONENT_KIND[type],
+            parent: parentComp,
             layer,
-            parent: currentParent,
-            x,
-            y,
-            ...(type === 'trust-boundary' ? { members: [] } : {}),
         };
-        save('dfd', { ...dfd, nodes: [...dfd.nodes, node] });
-        selectNode(id);
+        save('system', { ...data.system, components: [...data.system.components, comp] });
+        const nodeNum = compId.match(/(\d+)$/)?.[1];
+        selectNode(nodeNum ? `N-${nodeNum}` : null);
     };
 
     const tidy = () => {
