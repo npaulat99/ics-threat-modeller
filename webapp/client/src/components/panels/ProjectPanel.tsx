@@ -1,6 +1,45 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
+import type { StepKey } from '../../types';
 import { Field, HelpButton, confirmDelete } from '../common';
+
+type GitWorkspace = {
+    repoUrl: string;
+    workBranch: string;
+    baseBranch: string;
+    subdir?: string;
+    localPath: string;
+};
+
+type GitWorkspaceStatus = {
+    configured?: boolean;
+    ready?: boolean;
+    branch?: string | null;
+    expectedBranch?: string | null;
+    dirty?: boolean;
+    ahead?: number;
+    behind?: number;
+    remoteExists?: boolean;
+    onProtectedBranch?: boolean;
+    reason?: string;
+};
+
+const COMMIT_STEP_KEYS: StepKey[] = ['project', 'assumptions', 'system', 'dfd', 'requirements', 'threats', 'attackTrees', 'countermeasures', 'defects'];
+
+function parseDevOpsBranchUrl(raw: string): { repoUrl: string; workBranch?: string } | null {
+    const value = String(raw || '').trim();
+    if (!value) return null;
+    try {
+        const url = new URL(value);
+        const repoMatch = url.pathname.match(/(.*?\/_git\/[^/?#]+)/);
+        const repoUrl = repoMatch ? `${url.origin}${repoMatch[1]}` : value.split('?')[0];
+        const version = url.searchParams.get('version') || '';
+        const workBranch = version.startsWith('GB') ? decodeURIComponent(version.slice(2)) : '';
+        return { repoUrl, workBranch: workBranch || undefined };
+    } catch {
+        return null;
+    }
+}
 
 const DEPTH_HELP: Record<string, string> = {
     blackbox:
@@ -68,6 +107,55 @@ export default function ProjectPanel() {
     const setRepo = (patch: any) => set({ repo: { ...(p.repo || {}), ...patch } });
     const setSbom = (patch: any) => set({ sbom: { ...(p.sbom || {}), ...patch } });
     const [git, setGit] = useState('');
+    const [gitWorkspace, setGitWorkspace] = useState<GitWorkspace | null>(null);
+    const [gitStatus, setGitStatus] = useState<GitWorkspaceStatus | null>(null);
+    const [repoUrl, setRepoUrl] = useState('');
+    const [workBranch, setWorkBranch] = useState('');
+    const [baseBranch, setBaseBranch] = useState('main');
+    const [subdir, setSubdir] = useState('');
+    const parsedProjectBranchUrl = parseDevOpsBranchUrl(p.repo?.projectBranchUrl || '');
+    const effectiveRepoUrl = repoUrl || parsedProjectBranchUrl?.repoUrl || '';
+    const effectiveWorkBranch = workBranch || parsedProjectBranchUrl?.workBranch || '';
+
+    useEffect(() => {
+        const parsed = parseDevOpsBranchUrl(p.repo?.projectBranchUrl || '');
+        if (!parsed) return;
+        if (parsed.repoUrl) setRepoUrl(parsed.repoUrl);
+        if (parsed.workBranch) setWorkBranch(parsed.workBranch);
+    }, [p.repo?.projectBranchUrl]);
+
+    useEffect(() => {
+        if (!activeId) return;
+        let cancelled = false;
+        fetch(`/api/projects/${activeId}/git/workspace`)
+            .then((x) => x.json())
+            .then((r) => {
+                if (cancelled) return;
+                if (r.workspace) {
+                    setGitWorkspace(r.workspace);
+                    setRepoUrl(r.workspace.repoUrl || '');
+                    setWorkBranch(r.workspace.workBranch || '');
+                    setBaseBranch(r.workspace.baseBranch || 'main');
+                    setSubdir(r.workspace.subdir || '');
+                } else {
+                    const seed = String(p.title || activeId || 'tra-project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+                    const parsed = parseDevOpsBranchUrl(p.repo?.projectBranchUrl || '');
+                    setWorkBranch(parsed?.workBranch || `tra/${seed || 'project'}`);
+                    setRepoUrl(parsed?.repoUrl || String(p.repo?.projectBranchUrl || '').trim());
+                    setSubdir('');
+                }
+                setGitStatus(r.status || null);
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setGitWorkspace(null);
+                    setGitStatus(null);
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [activeId]);
 
     const pullKb = async () => {
         setGit('Pulling knowledge base…');
@@ -77,15 +165,108 @@ export default function ProjectPanel() {
         if (r.ok) await refreshKb();
         setGit(r.ok ? `Knowledge base ${r.action === 'clone' ? 'cloned' : 'pulled'} → ${r.dest}. Reusable threats/countermeasures are now importable.` : `Pull failed: ${r.stderr || 'error'}`);
     };
+
+    const flushProjectData = async () => {
+        if (!activeId || !data) return false;
+        setGit('Saving project data…');
+        for (const step of COMMIT_STEP_KEYS) {
+            const r = await fetch(`/api/projects/${activeId}/${step}`, {
+                method: 'PUT',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify((data as any)[step]),
+            }).catch(() => null);
+            if (!r?.ok) {
+                setGit(`Save failed before commit (${step}).`);
+                return false;
+            }
+        }
+        return true;
+    };
+
+    const ensureWorkspace = async () => {
+        if (!activeId) return false;
+        if (!effectiveRepoUrl || !effectiveWorkBranch || !baseBranch) {
+            setGit('Add a DevOps branch link first.');
+            return false;
+        }
+        setGit('Preparing git workspace…');
+        const parsed = parseDevOpsBranchUrl(p.repo?.projectBranchUrl || '');
+        const r = await fetch(`/api/projects/${activeId}/git/workspace`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ projectBranchUrl: p.repo?.projectBranchUrl || '', repoUrl: effectiveRepoUrl || parsed?.repoUrl || '', workBranch: effectiveWorkBranch || parsed?.workBranch || '', baseBranch, subdir }),
+        })
+            .then((x) => x.json())
+            .catch(() => ({ ok: false, stderr: 'request failed' }));
+        if (!r.ok) {
+            setGit(`Setup failed: ${r.stderr || 'error'}`);
+            return false;
+        }
+        setGitWorkspace(r.workspace || null);
+        setGitStatus(r.status || null);
+        return true;
+    };
+
     const commit = async () => {
         if (!activeId) return;
+        if (!(await flushProjectData())) return;
+        if (!(await ensureWorkspace())) return;
         const msg = window.prompt('Commit message:', `TRA ${p.title || ''}`.trim());
         if (msg === null) return;
         setGit('Committing project…');
-        const r = await fetch(`/api/projects/${activeId}/git/commit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: msg }) })
+        const r = await fetch(`/api/projects/${activeId}/git/commit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: msg, push: false }) })
             .then((x) => x.json())
             .catch(() => ({ ok: false, stderr: 'request failed' }));
-        setGit(r.ok ? (r.committed ? 'Committed.' : r.note || 'Nothing to commit.') : `Commit failed: ${r.stderr || 'error'}`);
+        setGit(r.ok ? (r.committed ? `Local commit on ${r.branch}.` : r.note || 'Nothing to commit.') : `Commit failed: ${r.stderr || 'error'}`);
+    };
+
+    const commitAndPush = async () => {
+        if (!activeId) return;
+        if (!(await flushProjectData())) return;
+        if (!(await ensureWorkspace())) return;
+        const msg = window.prompt('Commit message:', `TRA ${p.title || ''}`.trim());
+        if (msg === null) return;
+        setGit('Committing and pushing…');
+        const r = await fetch(`/api/projects/${activeId}/git/commit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: msg, push: true }) })
+            .then((x) => x.json())
+            .catch(() => ({ ok: false, stderr: 'request failed' }));
+        if (!r.ok) {
+            setGit(`Commit/push failed: ${r.stderr || 'error'}`);
+            return;
+        }
+        if (!r.pushOk) {
+            setGit(`Push failed: ${r.stderr || r.pushOutput || 'error'}`);
+            return;
+        }
+        const sha = r.remoteAfter || r.localSha || '';
+        setGit(`${r.committed ? 'Pushed' : 'Already up to date'} ${sha ? sha.slice(0, 12) : ''} to ${r.branch}.`);
+    };
+
+    const prepareWorkspace = async () => {
+        if (!activeId) return;
+        if (await ensureWorkspace()) setGit(`Ready: ${effectiveWorkBranch}.`);
+    };
+
+    const refreshWorkspace = async () => {
+        if (!activeId) return;
+        const r = await fetch(`/api/projects/${activeId}/git/workspace`)
+            .then((x) => x.json())
+            .catch(() => ({ ok: false }));
+        setGitWorkspace(r.workspace || null);
+        setGitStatus(r.status || null);
+    };
+
+    const verifyDevOpsAccess = async () => {
+        if (!activeId) return;
+        setGit('Checking DevOps git access…');
+        const r = await fetch(`/api/projects/${activeId}/git/workspace/verify`, { method: 'POST' })
+            .then((x) => x.json())
+            .catch(() => ({ ok: false, stderr: 'request failed' }));
+        if (!r.ok) {
+            setGit(`DevOps access check failed: ${r.stderr || 'error'}`);
+            return;
+        }
+        setGit(`DevOps access OK: ${r.branch}.`);
     };
 
     return (
@@ -249,12 +430,66 @@ export default function ProjectPanel() {
             </div>
 
             <div className="card">
-                <h3>Repository &amp; traceability</h3>
-                <Field label="Project branch / PR link" hint="Link to this TRA's branch or pull request in DevOps/GitHub.">
-                    <input value={p.repo?.projectBranchUrl || ''} onChange={(e) => setRepo({ projectBranchUrl: e.target.value })} placeholder="https://dev.azure.com/org/proj/_git/repo?version=GBtra/rl-100" />
+                <h3>Project repository</h3>
+                <Field label="DevOps branch / PR link">
+                    <input value={p.repo?.projectBranchUrl || ''} onChange={(e) => setRepo({ projectBranchUrl: e.target.value })} placeholder="https://devops.vega.com/tfs/VEGA/Entwicklung/_git/EmbedRisk-TestProject?path=%2F&version=GBdocs%2Ftest-infrastructure&_a=contents" />
                 </Field>
-                <div className="grid2">
-                    <Field label="Knowledge base git URL (pull-only)" hint="Shared, security-unit-owned KB. The app only pulls it — it never pushes. A local path or file:// URL also works (e.g. the bundled tra-demo-library).">
+                <div className="inline">
+                    <button className="btn sm" onClick={commit} disabled={!activeId || !effectiveRepoUrl || !effectiveWorkBranch}>
+                        Commit locally
+                    </button>
+                    <button className="btn sm primary" onClick={commitAndPush} disabled={!activeId || !effectiveRepoUrl || !effectiveWorkBranch}>
+                        Commit + push
+                    </button>
+                </div>
+                <div className="inline" style={{ marginTop: 2 }}>
+                    {effectiveWorkBranch && <span className="hint">Branch: <code>{effectiveWorkBranch}</code></span>}
+                    {gitStatus?.remoteExists !== undefined && <span className="hint">Remote: {gitStatus.remoteExists ? 'ready' : 'new branch'}</span>}
+                </div>
+                <details style={{ marginTop: 10 }}>
+                    <summary className="hint" style={{ cursor: 'pointer' }}>Advanced git settings</summary>
+                    <div className="row">
+                        <Field label="Repository URL">
+                            <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://devops.example/_git/project" />
+                        </Field>
+                        <Field label="Work branch">
+                            <input value={workBranch} onChange={(e) => setWorkBranch(e.target.value)} placeholder="docs/test-infrastructure" />
+                        </Field>
+                    </div>
+                    <div className="row">
+                        <Field label="Base branch">
+                            <input value={baseBranch} onChange={(e) => setBaseBranch(e.target.value)} placeholder="main" />
+                        </Field>
+                        <Field label="Repo subdirectory">
+                            <input value={subdir} onChange={(e) => setSubdir(e.target.value)} placeholder="security/tra/my-device" />
+                        </Field>
+                    </div>
+                    <div className="inline">
+                        <button className="btn sm" onClick={verifyDevOpsAccess} disabled={!gitStatus?.configured}>
+                            Verify access
+                        </button>
+                        <button className="btn sm" onClick={prepareWorkspace} disabled={!activeId || !effectiveRepoUrl || !effectiveWorkBranch || !baseBranch}>Prepare</button>
+                        <button className="btn sm" onClick={refreshWorkspace} disabled={!activeId}>Refresh</button>
+                    </div>
+                    {gitWorkspace && (
+                        <p className="hint"><code>{gitWorkspace.localPath}</code></p>
+                    )}
+                    {gitStatus && (
+                        <p className="hint">
+                            {gitStatus.configured ? (gitStatus.ready ? 'Ready' : gitStatus.reason || 'Not ready') : 'Not configured'}
+                            {gitStatus.branch ? ` | current: ${gitStatus.branch}` : ''}
+                            {typeof gitStatus.ahead === 'number' && typeof gitStatus.behind === 'number' ? ` | ahead/behind: ${gitStatus.ahead}/${gitStatus.behind}` : ''}
+                            {gitStatus.onProtectedBranch ? ' | protected branch' : ''}
+                        </p>
+                    )}
+                </details>
+                {git && <p className="hint" style={{ marginTop: 4 }}>{git}</p>}
+            </div>
+
+            <div className="card">
+                <h3>Knowledge base</h3>
+                <div className="row">
+                    <Field label="Knowledge base URL">
                         <input value={p.repo?.kbUrl || ''} onChange={(e) => setRepo({ kbUrl: e.target.value })} placeholder="https://github.com/org/tra-knowledge-base.git" />
                     </Field>
                     <div className="field">
@@ -263,13 +498,9 @@ export default function ProjectPanel() {
                             <button className="btn sm" onClick={pullKb} disabled={!p.repo?.kbUrl}>
                                 ↓ Pull knowledge base
                             </button>
-                            <button className="btn sm" onClick={commit}>
-                                Commit project
-                            </button>
                         </div>
                     </div>
                 </div>
-                {git && <p className="hint" style={{ marginTop: 4 }}>{git}</p>}
             </div>
         </div>
     );

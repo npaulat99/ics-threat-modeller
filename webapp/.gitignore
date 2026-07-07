@@ -6,6 +6,7 @@ projects/*
 projects/**/.git/
 projects/**/report/
 .assets/knowledge-base/imported/
+.local/
 .env
 .env.*
 !.env.example
