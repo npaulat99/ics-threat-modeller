@@ -1,0 +1,114 @@
+{
+    "version": "1.0",
+    "description": "OT attacker profiles aligned to IEC 62443 security-level thinking. The target level SL-1 to SL-4 is embedded into each profile description.",
+    "attackers": [
+        {
+            "key": "sl1-casual-local-operator",
+            "name": "Casual local operator or opportunistic maintainer",
+            "capability": 1,
+            "access": "local",
+            "motivation": "Convenience, curiosity, or accidental misuse",
+            "resources": "Commodity tools and normal workstation access",
+            "description": "Target level SL-1: protects against casual or coincidental misuse by an operator, technician, or maintainer with little cyber skill, limited knowledge of the device internals, and only the access normally available during operation or routine maintenance. Typical OT examples are accidental parameter changes, misuse of an exposed engineering function, or use of default local credentials."
+        },
+        {
+            "key": "sl2-intentional-site-attacker",
+            "name": "Intentional site attacker with generic cyber skills",
+            "capability": 2,
+            "access": "adjacent",
+            "motivation": "Personal gain, sabotage, or targeted disruption",
+            "resources": "Portable tooling, public exploit knowledge, and short-term plant-network access",
+            "description": "Target level SL-2: protects against an intentional attacker using simple means, generic skills, and low to moderate resources. In OT this fits a contractor, disgruntled insider, or nearby adversary who can reach an engineering laptop, wireless service interface, or flat plant network segment and apply publicly known attack methods against field devices."
+        },
+        {
+            "key": "sl3-skilled-ot-intrusion-team",
+            "name": "Skilled OT intrusion team or malicious integrator",
+            "capability": 4,
+            "access": "remote",
+            "motivation": "Deliberate process manipulation or sustained intrusion",
+            "resources": "IACS knowledge, custom tooling, time for reconnaissance, and coordinated access paths",
+            "description": "Target level SL-3: protects against an attacker with moderate resources, IACS-specific knowledge, and a deliberate objective. This profile fits a malicious system integrator, a focused cybercriminal group, or an intrusion team able to pivot from IT into OT, abuse engineering workflows, understand device protocols, and modify logic, firmware, or safety-relevant parameters without immediate detection."
+        },
+        {
+            "key": "sl4-highly-resourced-ics-adversary",
+            "name": "Highly resourced ICS adversary",
+            "capability": 5,
+            "access": "remote",
+            "motivation": "Strategic sabotage, espionage, or high-impact disruption",
+            "resources": "Sophisticated tooling, OT tradecraft, supply-chain reach, and long dwell time",
+            "description": "Target level SL-4: protects against sophisticated attackers using extensive resources and highly developed IACS-specific skills. This profile fits a state-backed or similarly capable adversary that can combine supply-chain compromise, stealthy persistence, tailored exploit development, and deep process knowledge to manipulate field devices or plant operations while evading normal operational controls."
+        },
+        {
+            "key": "sl1-casual-remote-maint-user",
+            "name": "Casual remote maintenance user with weak account hygiene",
+            "capability": 1,
+            "access": "remote",
+            "motivation": "Convenience and shortcut behavior",
+            "resources": "Normal remote service access and publicly available instructions",
+            "description": "Target level SL-1: covers accidental or low-skill misuse by a legitimate remote user of a field device service interface, for example reused passwords, unsafe remote parameter changes, or insecure file transfer during maintenance."
+        },
+        {
+            "key": "sl2-intentional-remote-ot-opportunist",
+            "name": "Intentional remote opportunist targeting exposed OT services",
+            "capability": 2,
+            "access": "remote",
+            "motivation": "Financial gain or opportunistic disruption",
+            "resources": "Internet scanning, leaked credentials, commodity exploit kits",
+            "description": "Target level SL-2: protects against an intentional attacker with generic skills who reaches field-device web, VPN, or remote-management interfaces from outside the plant and abuses known weaknesses or stolen credentials."
+        },
+        {
+            "key": "sl2-intentional-onsite-service-port-attacker",
+            "name": "Intentional onsite attacker abusing service/debug ports",
+            "capability": 2,
+            "access": "physical",
+            "motivation": "Tampering, sabotage, or data extraction",
+            "resources": "Portable tools, short physical access window, public hardware guides",
+            "description": "Target level SL-2: covers a determined but not highly specialized attacker who gets temporary physical access to a field device and abuses exposed maintenance or debug ports to alter configuration, copy firmware, or recover basic secrets."
+        },
+        {
+            "key": "sl3-skilled-offsite-device-lab-re",
+            "name": "Skilled lab attacker with off-site device acquisition",
+            "capability": 4,
+            "access": "physical",
+            "motivation": "Build reusable exploits or recover high-value secrets",
+            "resources": "Own device samples, hardware labs, firmware analysis toolchain, fault-injection tooling",
+            "description": "Target level SL-3: from a field-device viewpoint, a sophisticated attacker can buy or otherwise obtain device samples, reverse engineer firmware and hardware off-site, and attempt extraction of shared secrets, update credentials, or signing-related material to enable scalable attacks later."
+        },
+        {
+            "key": "sl3-skilled-plant-insider-collusion",
+            "name": "Skilled attacker with insider-assisted plant access",
+            "capability": 4,
+            "access": "local",
+            "motivation": "Sustained process manipulation",
+            "resources": "Insider timing information, engineering-laptop access, custom OT tooling",
+            "description": "Target level SL-3: covers attackers who combine technical OT knowledge with local plant access through insider support, enabling targeted changes to field-device configuration, control logic, or safety thresholds while minimizing immediate detection."
+        },
+        {
+            "key": "sl4-highly-resourced-remote-campaign",
+            "name": "Highly resourced remote ICS campaign actor",
+            "capability": 5,
+            "access": "remote",
+            "motivation": "Strategic long-term espionage and disruption",
+            "resources": "Zero-day capability, multi-stage malware, long-term command-and-control infrastructure",
+            "description": "Target level SL-4: models an advanced actor operating primarily remotely through IT-to-OT pivoting, supplier compromise, and stealthy persistence to impact many field devices without immediate physical presence in the plant."
+        },
+        {
+            "key": "sl4-highly-resourced-covert-plant-intruder",
+            "name": "Highly resourced covert plant intruder",
+            "capability": 5,
+            "access": "physical",
+            "motivation": "High-impact sabotage",
+            "resources": "Dedicated team, covert entry capability, specialist hardware attack equipment",
+            "description": "Target level SL-4: models a sophisticated attacker that can penetrate secured facilities, access field devices directly, and perform advanced invasive or semi-invasive attacks to implant persistent modifications or extract protected secrets."
+        },
+        {
+            "key": "sl4-highly-resourced-hybrid-device-program",
+            "name": "Highly resourced hybrid attacker program (remote plus hardware)",
+            "capability": 5,
+            "access": "adjacent",
+            "motivation": "Scalable compromise across product lines",
+            "resources": "Parallel remote intrusion and hardware reverse-engineering teams",
+            "description": "Target level SL-4: combines remote operations with dedicated device teardown and cryptographic key-harvesting attempts, then uses findings to attack deployed field devices at scale through network channels or malicious updates."
+        }
+    ]
+}

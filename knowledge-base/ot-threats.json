@@ -1,0 +1,186 @@
+{
+    "version": "1.0",
+    "description": "Common OT field-device and component attack examples for reuse in projects. CVSS values use proper CVSS v4.0 vectors with matching calculated base scores for generic scenarios and must be adjusted for a real product context.",
+    "threats": [
+        {
+            "key": "ot-modbus-unauth-write",
+            "title": "Unauthenticated Modbus register write changes process values or setpoints",
+            "description": "An attacker writes unauthorized values through Modbus or a similar unauthenticated OT protocol to alter setpoints, disable protections, or falsify a field device output. Common on devices placed on flat plant networks or bridged maintenance segments.",
+            "stride": [
+                "T",
+                "E"
+            ],
+            "appliesTo": [
+                "interface:Modbus",
+                "interface:industrial-ethernet",
+                "component:communication-stack",
+                "component:field-device"
+            ],
+            "typicalImpact": 5,
+            "likelyAttackers": [
+                "sl2-intentional-site-attacker",
+                "sl3-skilled-ot-intrusion-team"
+            ],
+            "cvss": {
+                "version": "4.0",
+                "vector": "CVSS:4.0/AV:A/AC:L/AT:N/PR:N/UI:N/VC:N/VI:H/VA:H/SC:N/SI:H/SA:H",
+                "baseScore": 8.5
+            }
+        },
+        {
+            "key": "ot-firmware-update-bypass",
+            "title": "Firmware update bypass or rollback installs unauthorized code",
+            "description": "The device accepts unsigned firmware, weakly verified update packages, or rollback images. An attacker uses the update path to implant malicious code, disable controls, or reintroduce fixed vulnerabilities into an OT endpoint.",
+            "stride": [
+                "T",
+                "E"
+            ],
+            "appliesTo": [
+                "component:firmware",
+                "component:bootloader",
+                "interface:update",
+                "component:field-device"
+            ],
+            "typicalImpact": 5,
+            "likelyAttackers": [
+                "sl3-skilled-ot-intrusion-team",
+                "sl4-highly-resourced-ics-adversary"
+            ],
+            "cvss": {
+                "version": "4.0",
+                "vector": "CVSS:4.0/AV:A/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:H/SA:H",
+                "baseScore": 9.3
+            }
+        },
+        {
+            "key": "ot-service-port-abuse",
+            "title": "Service or debug port abuse exposes secrets or privileged functions",
+            "description": "An exposed UART, JTAG, SWD, or local service connector is used to dump firmware, recover credentials, change calibration data, or unlock protected functions on a field device during manufacturing, commissioning, or onsite maintenance.",
+            "stride": [
+                "I",
+                "T",
+                "E"
+            ],
+            "appliesTo": [
+                "interface:debug",
+                "interface:service-port",
+                "component:hardware",
+                "component:field-device"
+            ],
+            "typicalImpact": 4,
+            "likelyAttackers": [
+                "sl1-casual-local-operator",
+                "sl2-intentional-site-attacker",
+                "sl3-skilled-ot-intrusion-team"
+            ],
+            "cvss": {
+                "version": "4.0",
+                "vector": "CVSS:4.0/AV:P/AC:L/AT:N/PR:N/UI:P/VC:H/VI:H/VA:L/SC:N/SI:N/SA:N",
+                "baseScore": 6.9
+            }
+        },
+        {
+            "key": "ot-wireless-default-credential",
+            "title": "Default or weak wireless commissioning credentials allow unauthorized access",
+            "description": "A Bluetooth, WLAN, or proprietary wireless maintenance interface is left with default credentials or a predictable pairing secret. An attacker nearby joins the service channel and changes configuration, extracts data, or stages a later process-impacting attack.",
+            "stride": [
+                "S",
+                "I",
+                "E"
+            ],
+            "appliesTo": [
+                "interface:BLE",
+                "interface:wifi",
+                "interface:wireless-service",
+                "component:field-device"
+            ],
+            "typicalImpact": 4,
+            "likelyAttackers": [
+                "sl2-intentional-site-attacker",
+                "sl3-skilled-ot-intrusion-team"
+            ],
+            "cvss": {
+                "version": "4.0",
+                "vector": "CVSS:4.0/AV:A/AC:L/AT:N/PR:N/UI:N/VC:H/VI:L/VA:L/SC:N/SI:L/SA:L",
+                "baseScore": 7.2
+            }
+        },
+        {
+            "key": "ot-telemetry-replay-spoof",
+            "title": "Replay or spoofing of field telemetry hides the real process state",
+            "description": "Captured cyclic messages, telemetry frames, or sensor values are replayed or spoofed so operators and higher-level controllers see believable but false process data. This can mask unsafe conditions and support follow-on manipulation of the physical process.",
+            "stride": [
+                "S",
+                "T"
+            ],
+            "appliesTo": [
+                "asset:measurement-integrity",
+                "interface:fieldbus",
+                "interface:sensor-link",
+                "component:sensor",
+                "component:field-device"
+            ],
+            "typicalImpact": 5,
+            "likelyAttackers": [
+                "sl2-intentional-site-attacker",
+                "sl3-skilled-ot-intrusion-team",
+                "sl4-highly-resourced-ics-adversary"
+            ],
+            "cvss": {
+                "version": "4.0",
+                "vector": "CVSS:4.0/AV:A/AC:L/AT:N/PR:N/UI:N/VC:N/VI:H/VA:L/SC:N/SI:H/SA:H",
+                "baseScore": 8.4
+            }
+        },
+        {
+            "key": "ot-engineering-parameter-tamper",
+            "title": "Engineering parameter tampering weakens control or safety behavior",
+            "description": "An attacker abuses an engineering workstation session, service account, or maintenance protocol to change calibration constants, alarm thresholds, permissives, or fail-safe behavior in a field device. The change may remain unnoticed until the process is stressed.",
+            "stride": [
+                "T",
+                "R",
+                "E"
+            ],
+            "appliesTo": [
+                "component:configuration",
+                "interface:engineering-station",
+                "component:controller",
+                "component:field-device"
+            ],
+            "typicalImpact": 5,
+            "likelyAttackers": [
+                "sl2-intentional-site-attacker",
+                "sl3-skilled-ot-intrusion-team"
+            ],
+            "cvss": {
+                "version": "4.0",
+                "vector": "CVSS:4.0/AV:A/AC:L/AT:N/PR:L/UI:N/VC:N/VI:H/VA:H/SC:N/SI:H/SA:H",
+                "baseScore": 8.4
+            }
+        },
+        {
+            "key": "ot-fieldbus-dos",
+            "title": "Fieldbus or device interface denial of service disrupts availability",
+            "description": "Malformed traffic, excessive polling, bus flooding, or protocol-state abuse causes a field device or communication segment to stop responding, reboot, or fall back to a degraded mode. This is common where fragile protocol stacks are exposed to engineering or plant networks.",
+            "stride": [
+                "D"
+            ],
+            "appliesTo": [
+                "interface:fieldbus",
+                "interface:industrial-ethernet",
+                "component:communication-stack",
+                "component:field-device"
+            ],
+            "typicalImpact": 4,
+            "likelyAttackers": [
+                "sl2-intentional-site-attacker",
+                "sl3-skilled-ot-intrusion-team"
+            ],
+            "cvss": {
+                "version": "4.0",
+                "vector": "CVSS:4.0/AV:A/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:L",
+                "baseScore": 7.1
+            }
+        }
+    ]
+}
