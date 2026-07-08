@@ -19,6 +19,7 @@ export default function ReviewPanel() {
     const cms = data.countermeasures.countermeasures || [];
     const [html, setHtml] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+
     useEffect(() => {
         if (!html) return;
         const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setHtml(null);

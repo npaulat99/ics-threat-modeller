@@ -502,6 +502,7 @@ export default function ProjectPanel() {
                     </div>
                 </div>
             </div>
+
         </div>
     );
 }

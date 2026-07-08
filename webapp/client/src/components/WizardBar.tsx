@@ -3,7 +3,7 @@
 import { useStore } from '../state/store';
 import type { ViewKey } from '../types';
 
-const ORDER: ViewKey[] = ['project', 'assumptions', 'system', 'dfd', 'requirements', 'threats', 'attackTrees', 'countermeasures', 'review'];
+const ORDER: ViewKey[] = ['project', 'assumptions', 'system', 'dfd', 'requirements', 'threats', 'attackTrees', 'countermeasures', 'review', 'versions'];
 const LABEL: Record<string, string> = {
     project: 'Project',
     assumptions: 'Assumptions',
@@ -14,6 +14,7 @@ const LABEL: Record<string, string> = {
     countermeasures: 'Countermeasures',
     attackTrees: 'Attack trees',
     review: 'Review & report',
+    versions: 'TRA versions',
 };
 const DONE_WHEN: Record<string, string> = {
     project: 'the device, a one-sentence scope boundary and the SL-T are set.',
@@ -25,6 +26,7 @@ const DONE_WHEN: Record<string, string> = {
     attackTrees: 'optional — decompose your highest-risk threats (you can skip this).',
     countermeasures: 'each requirement is satisfied by a control with a residual rating.',
     review: 'the plausibility check is clean; then export the report.',
+    versions: 'the current TRA baseline is tagged explicitly and, when needed, compared against earlier versions.',
 };
 
 export default function WizardBar() {

@@ -20,11 +20,14 @@ import {
     STEP_KEYS,
     listProjects,
     readProject,
+    readChangeTracker,
     writeArtifact,
     scaffoldProject,
     pathToStep,
     isExternalChange,
     recordHash,
+    recordAssessmentVersion,
+    diffProjectVersions,
 } from './artifacts.js';
 import { loadScheme } from './risk.js';
 import { validate } from './validate.js';
@@ -134,6 +137,30 @@ app.post('/api/projects', async (req, res) => {
 app.get('/api/projects/:id', async (req, res) => {
     const data = await readProject(req.params.id);
     res.json(data);
+});
+
+app.get('/api/projects/:id/change-tracker', async (req, res) => {
+    const tracker = await readChangeTracker(req.params.id);
+    res.json(tracker);
+});
+
+app.post('/api/projects/:id/change-tracker/versions', async (req, res) => {
+    try {
+        const result = await recordAssessmentVersion(req.params.id, req.body || {});
+        if (result.ok && result.project) broadcastArtifact(req.params.id, 'project', result.project, null);
+        res.json(result);
+    } catch (error) {
+        res.status(400).json({ ok: false, error: error?.message || 'Could not record the TRA version.' });
+    }
+});
+
+app.get('/api/projects/:id/change-tracker/diff', async (req, res) => {
+    try {
+        const diff = await diffProjectVersions(req.params.id, req.query.from, req.query.to);
+        res.json(diff);
+    } catch (error) {
+        res.status(400).json({ ok: false, error: error?.message || 'Could not compare the requested TRA versions.' });
+    }
 });
 
 app.put('/api/projects/:id/:step', async (req, res) => {
