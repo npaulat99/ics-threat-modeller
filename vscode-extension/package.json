@@ -3,7 +3,11 @@
   "displayName": "EmbedRisk — Threat & Risk Assessment",
   "description": "Guided Threat & Risk Assessment for embedded OT field devices: a layered DFD editor, STRIDE threats, attack-defence trees and reports. The VS Code companion to the EmbedRisk web app (shared JSON project format).",
   "version": "0.3.0",
-  "publisher": "thesis",
+  "publisher": "npaulat",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/npaulat99/EmbedRisk.git"
+  },
   "license": "GPL-3.0-only",
   "icon": "media/icon.png",
   "engines": {
@@ -123,11 +127,14 @@
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --platform=node --external:vscode --outfile=dist/extension.js --format=cjs",
     "compile": "tsc -p . --noEmit && npm run build",
-    "watch": "npm run build -- --watch"
+    "watch": "npm run build -- --watch",
+    "package": "npm run compile && vsce package --no-dependencies",
+    "publish:marketplace": "vsce publish --no-dependencies --pat $VSCE_PAT"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.23.0",
     "typescript": "^5.5.0"
   }

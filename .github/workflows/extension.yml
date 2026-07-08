@@ -1,0 +1,180 @@
+name: VS Code Extension CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "vscode-extension/**"
+      - ".github/workflows/extension.yml"
+    tags:
+      - "extension/v[0-9]+.[0-9]+.[0-9]+"
+  pull_request:
+    branches: [main]
+    paths:
+      - "vscode-extension/**"
+      - ".github/workflows/extension.yml"
+
+# Cancel in-flight CI runs (not publish runs triggered by tags).
+concurrency:
+  group: extension-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  audit:
+    name: Dependency audit (npm)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode-extension
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit (high+)
+        run: npm audit --audit-level=high
+
+  typecheck-and-build:
+    name: Typecheck & bundle
+    runs-on: ubuntu-latest
+    needs: audit
+    defaults:
+      run:
+        working-directory: vscode-extension
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript typecheck
+        run: npx tsc -p . --noEmit
+
+      - name: esbuild bundle
+        run: npm run build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-dist
+          path: vscode-extension/dist/
+          retention-days: 7
+
+  trivy-scan:
+    name: Trivy security scan
+    runs-on: ubuntu-latest
+    needs: audit
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy (vuln + secret, HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: "fs"
+          scan-ref: "vscode-extension"
+          scanners: "vuln,secret"
+          severity: "HIGH,CRITICAL"
+          exit-code: "1"
+          format: "sarif"
+          output: "trivy-extension.sarif"
+        env:
+          TRIVY_DB_REPOSITORY: "ghcr.io/aquasecurity/trivy-db"
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-extension.sarif
+          category: extension-trivy
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-extension-sarif
+          path: trivy-extension.sarif
+          retention-days: 30
+
+  package:
+    name: Package .vsix
+    runs-on: ubuntu-latest
+    needs: [typecheck-and-build, trivy-scan]
+    defaults:
+      run:
+        working-directory: vscode-extension
+    outputs:
+      vsix-name: ${{ steps.pkg.outputs.vsix-name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: esbuild bundle
+        run: npm run build
+
+      - name: Package .vsix
+        id: pkg
+        run: |
+          npx vsce package --no-dependencies
+          VSIX=$(ls *.vsix)
+          echo "vsix-name=$VSIX" >> "$GITHUB_OUTPUT"
+
+      - name: Upload .vsix artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.pkg.outputs.vsix-name }}
+          path: vscode-extension/${{ steps.pkg.outputs.vsix-name }}
+          retention-days: 30
+
+  publish:
+    name: Publish to VS Code Marketplace
+    runs-on: ubuntu-latest
+    # Only publish when triggered by a tag — never on branch pushes or PRs.
+    if: startsWith(github.ref, 'refs/tags/extension/v')
+    needs: package
+    environment: marketplace  # optional GitHub environment for extra approval gate
+    defaults:
+      run:
+        working-directory: vscode-extension
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: esbuild bundle
+        run: npm run build
+
+      - name: Publish to Marketplace
+        # VSCE_PAT must be stored as a GitHub Actions secret.
+        # Generate at: dev.azure.com → User Settings → Personal Access Tokens
+        # Required scope: Marketplace → Manage
+        run: npx vsce publish --no-dependencies --pat "${{ secrets.VSCE_PAT }}"

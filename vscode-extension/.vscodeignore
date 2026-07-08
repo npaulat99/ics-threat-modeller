@@ -1,6 +1,21 @@
 node_modules/
-media/drawio/**
+
+# Source — only dist/ ships at runtime
 src/
 tsconfig.json
 **/*.ts
+
+# Vendored draw.io (large; extension falls back to hosted embed when absent)
+media/drawio/**
+
+# Dev tooling & CI
 .vscode/
+.github/
+.esbuild/
+.vscode-test/
+coverage/
+
+# Artefacts
+*.vsix
+.trivyignore
+.gitignore
