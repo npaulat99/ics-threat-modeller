@@ -12,6 +12,7 @@ import RequirementsPanel from './components/panels/RequirementsPanel';
 import CountermeasuresPanel from './components/panels/CountermeasuresPanel';
 import AttackTreesPanel from './components/panels/AttackTreesPanel';
 import ReviewPanel from './components/panels/ReviewPanel';
+import VersionsPanel from './components/panels/VersionsPanel';
 import DashboardPanel from './components/panels/DashboardPanel';
 import DefectsPanel from './components/panels/DefectsPanel';
 import AssistantPanel from './components/panels/AssistantPanel';
@@ -42,6 +43,8 @@ export default function App() {
                 return <AttackTreesPanel />;
             case 'review':
                 return <ReviewPanel />;
+            case 'versions':
+                return <VersionsPanel />;
             case 'dashboard':
                 return <DashboardPanel />;
             case 'defects':
@@ -59,13 +62,13 @@ export default function App() {
         <div className="app">
             <TopBar />
             {data ? (
-                <div className={'layout' + (view === 'dashboard' || view === 'kb' || view === 'defects' || view === 'assistant' ? ' wide' : '')}>
+                <div className={'layout' + (view === 'dashboard' || view === 'kb' || view === 'defects' || view === 'assistant' || view === 'versions' ? ' wide' : '')}>
                     <StepNav />
                     <main className={'main' + (view === 'dfd' ? ' is-dfd' : '')}>
                         {main()}
                         {view !== 'dfd' && <WizardBar />}
                     </main>
-                    {view !== 'dashboard' && view !== 'kb' && view !== 'defects' && view !== 'assistant' && <Inspector />}
+                    {view !== 'dashboard' && view !== 'kb' && view !== 'defects' && view !== 'assistant' && view !== 'versions' && <Inspector />}
                 </div>
             ) : (
                 <div className="empty">

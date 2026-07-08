@@ -1,6 +1,48 @@
 // Shared TypeScript types mirroring the TRA JSON schemas (tra/.assets/schema/*).
 export type StepKey = 'project' | 'assumptions' | 'system' | 'dfd' | 'threats' | 'requirements' | 'countermeasures' | 'attackTrees' | 'defects';
-export type ViewKey = StepKey | 'review';
+export type ViewKey = StepKey | 'review' | 'versions';
+export type ChangeReason = 'initial' | 'functional changes' | 'new vulnerabilities' | 'regular reassessment';
+
+export interface ChangeTrackerEntry {
+    version: string;
+    reason: ChangeReason;
+    assessedAt: string;
+    assessors: string[];
+    summary?: string;
+    changedSteps?: StepKey[];
+    changedFiles?: string[];
+    hasChanges?: boolean;
+    snapshotPath?: string;
+}
+
+export interface ChangeTracker {
+    currentVersion: string | null;
+    entries: ChangeTrackerEntry[];
+}
+
+export interface VersionDiffItem {
+    path: string;
+    value?: unknown;
+    before?: unknown;
+    after?: unknown;
+}
+
+export interface VersionDiffFile {
+    step: StepKey;
+    path: string;
+    diff: {
+        added: VersionDiffItem[];
+        removed: VersionDiffItem[];
+        changed: VersionDiffItem[];
+    };
+}
+
+export interface VersionDiff {
+    fromVersion: string;
+    toVersion: string;
+    changedFiles: { step: StepKey; path: string }[];
+    files: VersionDiffFile[];
+}
 
 export interface DeviceInfo {
     name?: string;
@@ -261,6 +303,7 @@ export interface ProjectData {
     countermeasures: CountermeasuresDoc;
     attackTrees: AttackTreesDoc;
     defects: DefectsDoc;
+    changeTracker: ChangeTracker;
 }
 
 // ---- Security requirements (step 05) — the threat -> risk -> requirement -> control chain ----

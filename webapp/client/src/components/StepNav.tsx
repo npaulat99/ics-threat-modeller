@@ -19,6 +19,7 @@ const STEPS: StepDef[] = [
     { key: 'attackTrees', num: '07', label: 'Attack trees', sub: 'Optional · AND/OR/SAND' },
     { key: 'countermeasures', num: '08', label: 'Countermeasures', sub: 'Residual risk' },
     { key: 'review', num: '09', label: 'Review & Report', sub: 'Plausibility check' },
+    { key: 'versions', num: '10', label: 'TRA Versions', sub: 'Tagging history + diffs' },
 ];
 
 export default function StepNav() {
@@ -47,6 +48,7 @@ export default function StepNav() {
         requirements: (data.requirements?.requirements?.length || 0) > 0,
         countermeasures: (data.countermeasures.countermeasures?.length || 0) > 0,
         review: issues.length === 0,
+        versions: (data.changeTracker?.entries?.length || 0) > 0,
     };
     const stepIdx = STEPS.findIndex((s) => s.key === view);
 
