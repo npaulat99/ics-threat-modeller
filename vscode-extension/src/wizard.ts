@@ -20,6 +20,33 @@ async function countTrees(proj: vscode.Uri): Promise<number> {
   } catch { return 0; }
 }
 
+async function readChangeTracker(proj: vscode.Uri) {
+  const doc = await rdRaw(proj, "01-project-description/change-tracker.json", {});
+  const entries: any[] = Array.isArray(doc.entries) ? doc.entries : [];
+  const currentVersion: string | null = doc.currentVersion || (entries.length ? (entries[entries.length - 1]?.version || null) : null);
+  return { currentVersion, entries };
+}
+
+async function writeSnapshot(proj: vscode.Uri, version: string): Promise<void> {
+  const steps: Record<string, string> = {
+    project: "01-project-description/project.json",
+    assumptions: "02-assumptions/assumptions.json",
+    system: "03-system-assets/system.json",
+    dfd: "04-dfd/dfd.json",
+    requirements: "05-requirements/requirements.json",
+    threats: "06-threats/threats.json",
+    attackTrees: "07-attack-trees/attack-trees.json",
+    countermeasures: "08-countermeasures/countermeasures.json",
+  };
+  const base = vscode.Uri.joinPath(proj, "10-tra-versions", version);
+  for (const [, rel] of Object.entries(steps)) {
+    const data = await rdRaw(proj, rel, {});
+    const dir = rel.slice(0, rel.lastIndexOf("/"));
+    await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(base, dir));
+    await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(base, rel), Buffer.from(JSON.stringify(data, null, 2)));
+  }
+}
+
 async function buildData(proj: vscode.Uri) {
   const project = await rdRaw(proj, "01-project-description/project.json", {});
   const threats = (await rdRaw(proj, "06-threats/threats.json", { threats: [] })).threats || [];
@@ -28,8 +55,10 @@ async function buildData(proj: vscode.Uri) {
   const assumptions = await rdRaw(proj, "02-assumptions/assumptions.json", {});
   const dfd = await rdRaw(proj, "04-dfd/dfd.json", { nodes: [] });
   const reqs = (await rdRaw(proj, "05-requirements/requirements.json", { requirements: [] })).requirements || [];
+  const tracker = await readChangeTracker(proj);
   const comps = (system.components || []).map((c: any) => ({ id: c.id, name: c.name }));
   return {
+    changeTracker: tracker,
     project: {
       name: project.device?.name || "",
       sl: project.slTarget || "SL2",
@@ -61,6 +90,7 @@ async function buildData(proj: vscode.Uri) {
       threats: threats.length,
       attackTrees: await countTrees(proj),
       countermeasures: cms.length,
+      versions: tracker.entries.length,
     },
   };
 }
@@ -221,6 +251,45 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
       return panel.webview.postMessage({ cmd: "requirements", requirements: norm, counts: await counts(), text: "Requirements saved." });
     }
 
+    if (m.cmd === "versionRecord") {
+      const validReasons = ["initial", "functional changes", "new vulnerabilities", "regular reassessment"];
+      if (!validReasons.includes(m.reason)) {
+        return panel.webview.postMessage({ cmd: "versionResult", ok: false, error: "Invalid reason." });
+      }
+      const assessors: string[] = Array.isArray(m.assessors)
+        ? m.assessors.map((x: any) => String(x).trim()).filter(Boolean)
+        : [];
+      if (!assessors.length) {
+        return panel.webview.postMessage({ cmd: "versionResult", ok: false, error: "At least one assessor is required." });
+      }
+      const tracker = await readChangeTracker(f.proj);
+      const isFirst = tracker.entries.length === 0;
+      if (isFirst && m.reason !== "initial") {
+        return panel.webview.postMessage({ cmd: "versionResult", ok: false, error: "The first recorded version must have reason 'initial'." });
+      }
+      if (!isFirst && m.reason === "initial") {
+        return panel.webview.postMessage({ cmd: "versionResult", ok: false, error: "An initial version has already been recorded." });
+      }
+      let nextVer = "v1.0";
+      if (!isFirst && tracker.currentVersion) {
+        const mm = /^v?(\d+)\.(\d+)$/.exec(tracker.currentVersion);
+        const maj = mm ? Number(mm[1]) : 1;
+        const min = mm ? Number(mm[2]) : 0;
+        nextVer = m.reason === "functional changes" ? `v${maj + 1}.0` : `v${maj}.${min + 1}`;
+      }
+      try { await writeSnapshot(f.proj, nextVer); } catch { /* non-critical */ }
+      const entry = {
+        version: nextVer,
+        reason: m.reason,
+        assessedAt: String(m.assessedAt || new Date().toISOString().slice(0, 10)),
+        assessors,
+        summary: String(m.summary || ""),
+      };
+      const nextTracker = { currentVersion: nextVer, entries: [...tracker.entries, entry] };
+      await write(f.proj, "01-project-description/change-tracker.json", nextTracker);
+      return panel.webview.postMessage({ cmd: "versionResult", ok: true, tracker: nextTracker, counts: await counts(), text: `Recorded ${nextVer}.` });
+    }
+
     if (m.cmd === "openFile") {
       try { const doc = await vscode.workspace.openTextDocument(vscode.Uri.joinPath(f.proj, m.rel)); await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside); }
       catch { vscode.window.showInformationMessage(`${m.rel} does not exist yet.`); }
@@ -302,6 +371,12 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
         <div id="cms-list"></div>
         <div style="margin-top:10px"><button class="btn" data-act="addC">+ Countermeasure</button> <button class="btn primary" data-act="saveC">Save countermeasures</button></div>
       </div>
+
+      <div class="card" id="card-versions">
+        <h2>10 · TRA versions</h2>
+        <div class="desc">Tag assessment baselines so you can track changes across reassessments.</div>
+        <div id="versions-body"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -320,6 +395,7 @@ const EXPOSURE=['physical','local','adjacent','remote'];
 const ASSET_TYPES=['data','function','credential','firmware','config','physical-process'];
 const OBJS=[['confidentiality','C'],['integrity','I'],['availability','A'],['safety','S']];
 let threats=[], cms=[], comps=[], counts={};
+let changeTracker={currentVersion:null,entries:[]};
 let assumptions={attacker:[],device:[],system:[],environment:[],operational:[]};
 let system={components:[],interfaces:[],trustBoundaries:[],assets:[]};
 let requirements=[];
@@ -355,7 +431,8 @@ const STEPS=[
   ['06','Threats','STRIDE + risk rating','scroll','#card-threats','threats'],
   ['07','Attack trees','Optional · AND/OR','cmd','atree','attackTrees'],
   ['08','Countermeasures','Residual risk','scroll','#card-cms','countermeasures'],
-  ['09','Review & Report','Plausibility check','cmd','report','review']
+  ['09','Review & Report','Plausibility check','cmd','report','review'],
+  ['10','TRA versions','Assessment history','scroll','#card-versions','versions']
 ];
 function clientIssues(){
   var out=[],seen={};
@@ -419,6 +496,43 @@ function renderCms(){
       (avail?'<div style="margin-top:6px"><div class="hint">Add threat</div><div class="chips">'+avail+'</div></div>':'')+
       '</div>';
   }).join(''):'<span class="hint">No countermeasures yet — add one below.</span>';
+}
+function renderVersions(){
+  var el=$('#versions-body');
+  if(!el)return;
+  var tracker=changeTracker||{currentVersion:null,entries:[]};
+  var entries=tracker.entries||[];
+  var current=tracker.currentVersion||null;
+  var isFirst=!entries.length;
+  var reasons=isFirst?['initial']:['functional changes','new vulnerabilities','regular reassessment'];
+  var history=entries.length?entries.map(function(entry){
+    return '<div class="itemcard" style="margin:6px 0">'+
+      '<div class="row" style="gap:10px"><strong>'+esc(entry.version)+'</strong>'+
+      '<span class="badge">'+esc(entry.reason)+'</span></div>'+
+      '<div class="hint">'+esc(entry.assessedAt||'')+
+      (entry.assessors&&entry.assessors.length?' \u00b7 '+esc(entry.assessors.join(', ')):'')+'</div>'+
+      (entry.summary?'<p style="margin:4px 0 0">'+esc(entry.summary)+'</p>':'')+
+      '</div>';
+  }).join(''):'<p class="hint">No TRA versions recorded yet.</p>';
+  el.innerHTML=
+    '<div class="itemcard" style="margin-bottom:10px">'+
+      '<b>'+(current?'Current: '+esc(current):'No version tagged yet')+'</b>'+
+      '<div class="hint" style="margin-top:4px">Tags are stored in 01-project-description/change-tracker.json</div>'+
+    '</div>'+
+    '<div class="itemcard" style="margin-bottom:10px">'+
+      '<div class="grid3">'+
+        '<div class="field"><label>Reason</label><select class="inp" id="vReason">'+
+          reasons.map(function(r){return '<option value="'+esc(r)+'">'+esc(r)+'</option>';}).join('')+
+        '</select></div>'+
+        '<div class="field"><label>Assessment date</label><input class="inp" id="vDate" type="date" value="'+esc(new Date().toISOString().slice(0,10))+'"></div>'+
+        '<div class="field"><label>Assessors (comma-separated)</label><input class="inp" id="vAssessors" placeholder="Jane Doe, John Smith"></div>'+
+      '</div>'+
+      '<div class="field" style="margin-top:6px"><label>Summary note</label>'+
+        '<textarea class="inp" id="vSummary" rows=2 placeholder="Short description of what changed or was assessed."></textarea>'+
+      '</div>'+
+      '<div style="margin-top:8px"><button class="btn primary" data-act="recordVersion">Record version</button></div>'+
+    '</div>'+
+    '<div class="itemcard"><h3 style="margin:0 0 8px">History ('+entries.length+')</h3>'+history+'</div>';
 }
 function renderAssumptions(){
   var tabs=[['attacker','Attacker',(assumptions.attacker||[]).length]].concat(ASM_CATS.map(function(c){return [c[0],c[1],(assumptions[c[0]]||[]).length];}));
@@ -533,7 +647,7 @@ function toast(kind,text){var e=$('#'+kind);e.textContent=text;e.style.display='
 document.addEventListener('click',function(e){
   var tabEl=e.target.closest('[data-asmtab],[data-systab]');
   if(tabEl){if(tabEl.dataset.asmtab){asmTab=tabEl.dataset.asmtab;renderAssumptions();}else{sysTab=tabEl.dataset.systab;renderSystem();}return;}
-  var el=e.target.closest('[data-act],[data-kind],[data-cmd]');
+  var el=e.target.closest('[data-act],[data-kind],[data-cmd],[data-role]');
   if(!el)return;
   var act=el.dataset.act, kind=el.dataset.kind, cmd=el.dataset.cmd;
   if(act==='undo'){undo();return;}
@@ -576,6 +690,13 @@ document.addEventListener('click',function(e){
   else if(act==='delReq'){requirements.splice(+el.dataset.i,1);renderRequirements();}
   else if(act==='reqThreat'){var rq=requirements[+el.dataset.req];rq.derivedFromThreat=rq.derivedFromThreat||[];var rk=rq.derivedFromThreat.indexOf(el.dataset.val);if(rk>=0)rq.derivedFromThreat.splice(rk,1);else rq.derivedFromThreat.push(el.dataset.val);renderRequirements();}
   else if(act==='reqCm'){var rc=requirements[+el.dataset.req];rc.satisfiedByCM=rc.satisfiedByCM||[];var rck=rc.satisfiedByCM.indexOf(el.dataset.val);if(rck>=0)rc.satisfiedByCM.splice(rck,1);else rc.satisfiedByCM.push(el.dataset.val);renderRequirements();}
+  else if(act==='recordVersion'){
+    var assessors=String(($('#vAssessors')||{}).value||'').split(',').map(function(x){return x.trim();}).filter(Boolean);
+    if(!assessors.length){toast('err','Add at least one assessor name.');return;}
+    var vReason=($('#vReason')||{}).value||'', vDate=($('#vDate')||{}).value||'', vSummary=($('#vSummary')||{}).value||'';
+    vs.postMessage({cmd:'versionRecord',reason:vReason,assessedAt:vDate,assessors:assessors,summary:vSummary});
+    return;
+  }
   else if(el.classList.contains('chip')&&el.dataset.role){
     var i=+el.dataset.i,val=el.dataset.val,arrKey=el.dataset.role==='stride'?'stride':'components';
     var arr=threats[i][arrKey]||(threats[i][arrKey]=[]);var k=arr.indexOf(val);if(k>=0)arr.splice(k,1);else arr.push(val);
@@ -607,13 +728,14 @@ document.addEventListener('input',function(e){
 
 window.addEventListener('message',function(ev){
   var m=ev.data;
-  if(m.cmd==='init'){threats=m.data.threats||[];cms=m.data.cms||[];comps=m.data.comps||[];counts=m.data.counts||{};assumptions=m.data.assumptions||assumptions;system=m.data.system||system;requirements=m.data.requirements||[];renderProject(m.data.project);renderThreats();renderCms();renderAssumptions();renderSystem();renderRequirements();renderRail();clearHistory();}
+  if(m.cmd==='init'){threats=m.data.threats||[];cms=m.data.cms||[];comps=m.data.comps||[];counts=m.data.counts||{};changeTracker=m.data.changeTracker||changeTracker;assumptions=m.data.assumptions||assumptions;system=m.data.system||system;requirements=m.data.requirements||[];renderProject(m.data.project);renderThreats();renderCms();renderAssumptions();renderSystem();renderRequirements();renderRail();try{renderVersions();}catch(e){console.error('versions',e);}clearHistory();}
   else if(m.cmd==='threats'){threats=m.threats||[];counts=m.counts||counts;renderThreats();renderCms();renderRequirements();renderRail();toast('ok',m.text);}
   else if(m.cmd==='cms'){cms=m.cms||[];counts=m.counts||counts;renderCms();updatePills();renderRequirements();renderRail();toast('ok',m.text);}
   else if(m.cmd==='assumptions'){assumptions=m.assumptions||assumptions;counts=m.counts||counts;renderAssumptions();renderRail();toast('ok',m.text);}
   else if(m.cmd==='system'){system=m.system||system;comps=m.comps||comps;counts=m.counts||counts;renderSystem();renderThreats();renderRail();toast('ok',m.text);}
   else if(m.cmd==='requirements'){requirements=m.requirements||requirements;counts=m.counts||counts;renderRequirements();renderRail();toast('ok',m.text);}
   else if(m.cmd==='msg'){counts=m.counts||counts;renderRail();toast('ok',m.text);}
+  else if(m.cmd==='versionResult'){if(!m.ok)toast('err',m.error||'Could not record version.');else{changeTracker=m.tracker||changeTracker;counts=m.counts||counts;try{renderVersions();}catch(e){}renderRail();toast('ok',m.text);}}
   else if(m.cmd==='err'){toast('err',m.text);}
 });
 document.addEventListener('keydown',function(e){
