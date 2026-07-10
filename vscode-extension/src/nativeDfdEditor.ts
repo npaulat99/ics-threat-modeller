@@ -5,7 +5,7 @@ import * as vscode from "vscode";
 // the selected node/boundary (label, type, linked component, trust-boundary members, data flows).
 // Two-way sync with the JSON file. The schema is identical to the tra-webapp so projects interchange.
 export class NativeDfdEditor implements vscode.CustomTextEditorProvider {
-  constructor(private extUri: vscode.Uri) {}
+  constructor(private extUri: vscode.Uri) { }
 
   async resolveCustomTextEditor(doc: vscode.TextDocument, panel: vscode.WebviewPanel) {
     const media = vscode.Uri.joinPath(this.extUri, "media");
@@ -17,15 +17,49 @@ export class NativeDfdEditor implements vscode.CustomTextEditorProvider {
     const csp = `default-src 'none'; img-src ${panel.webview.cspSource}; style-src ${panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${panel.webview.cspSource};`;
 
     const projRoot = vscode.Uri.joinPath(doc.uri, "..", "..");
-    const readComponents = async () => {
+    const readSystemData = async () => {
       try {
         const sys = JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(projRoot, "03-system-assets/system.json"))).toString());
-        return (sys.components || []).map((c: any) => ({ id: c.id, name: c.name }));
-      } catch { return []; }
+        return {
+          components: (sys.components || []).map((c: any) => ({ id: c.id, name: c.name })),
+          interfaces: (sys.interfaces || []).map((itf: any) => ({
+            id: itf.id, name: itf.name, tag: itf.tag || '',
+            component: itf.component || '', exposure: itf.exposure || '',
+            protocol: itf.protocol || '', category: itf.category || '',
+          })),
+        };
+      } catch { return { components: [], interfaces: [] }; }
     };
 
     let lastText = "";
-    const post = async () => panel.webview.postMessage({ type: "load", dfd: doc.getText() || '{"nodes":[],"flows":[]}', components: await readComponents() });
+    const readRiskData = async (): Promise<Record<string, string>> => {
+      try {
+        const threats = (JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(projRoot, "06-threats/threats.json"))).toString())).threats || [];
+        const cms = (JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(projRoot, "08-countermeasures/countermeasures.json"))).toString())).countermeasures || [];
+        const BANDS = [{ min: 1, max: 5, color: '#2e7d32' }, { min: 6, max: 11, color: '#f9a825' }, { min: 12, max: 19, color: '#ef6c00' }, { min: 20, max: 25, color: '#c62828' }];
+        const getBandColor = (score: number) => (BANDS.find(b => score >= b.min && score <= b.max) || BANDS[0]).color;
+        const compWorst: Record<string, { score: number; color: string }> = {};
+        threats.forEach((t: any) => {
+          const links = cms.flatMap((c: any) => (c.addresses || []).filter((a: any) => a.threat === t.id));
+          let rl = t.likelihood, ri = t.impact;
+          if (links.length) {
+            rl = Math.min(...links.map((a: any) => a.residualLikelihood ?? t.likelihood));
+            ri = Math.min(...links.map((a: any) => a.residualImpact ?? t.impact));
+          }
+          const score = (rl || 0) * (ri || 0);
+          const color = getBandColor(score);
+          (t.components || []).forEach((cid: string) => {
+            if (!compWorst[cid] || score > compWorst[cid].score) compWorst[cid] = { score, color };
+          });
+        });
+        return Object.fromEntries(Object.entries(compWorst).map(([k, v]) => [k, v.color]));
+      } catch { return {}; }
+    };
+    const post = async () => {
+      const sys = await readSystemData();
+      const riskData = await readRiskData();
+      panel.webview.postMessage({ type: "load", dfd: doc.getText() || '{"nodes":[],"flows":[]}', components: sys.components, interfaces: sys.interfaces, riskData });
+    };
     const save = async (text: string) => {
       lastText = text;
       const ed = new vscode.WorkspaceEdit();
@@ -106,8 +140,8 @@ svg{display:block}
 <script nonce="${nonce}">
 const M=DfdModel, vs=acquireVsCodeApi();
 const TYPES=['external-entity','process','multiprocess','store','trust-boundary'];
-let dfd={nodes:[],flows:[]}, components=[], stack=[], focus=null, connect=false, connectFrom=null;
-let drag=null, dragMoved=false, dragging=false;
+let dfd={nodes:[],flows:[]}, components=[], interfaces=[], riskData={}, stack=[], focus=null, connect=false, connectFrom=null;
+let drag=null, chipDrag=null, dragMoved=false, dragging=false;
 const $=id=>document.getElementById(id);
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function cur(){return stack.length?stack[stack.length-1]:null;}
@@ -132,13 +166,58 @@ function restore(json){try{dfd=JSON.parse(json);}catch(_){return false;}if(!dfd.
 function undo(){if(!undoStack.length)return;redoStack.push(snap());var p=undoStack.pop();if(!restore(p))return;baseState=p;histKey='';focus=null;updUndo();vs.postMessage({type:'save',dfd:JSON.stringify(dfd,null,2)});draw();}
 function redo(){if(!redoStack.length)return;undoStack.push(snap());var n=redoStack.pop();if(!restore(n))return;baseState=n;histKey='';focus=null;updUndo();vs.postMessage({type:'save',dfd:JSON.stringify(dfd,null,2)});draw();}
 
+function worstRiskForNode(nodeId){
+  var BAND_ORDER={'#2e7d32':1,'#f9a825':2,'#ef6c00':3,'#c62828':4};
+  var n=node(nodeId); if(!n)return null;
+  var directColor=(n.componentRef&&riskData[n.componentRef])?riskData[n.componentRef]:null;
+  var worstScore=directColor?(BAND_ORDER[directColor]||0):0;
+  var worstColor=directColor;
+  dfd.nodes.filter(function(c){return c.parent===nodeId;}).forEach(function(c){
+    var childColor=worstRiskForNode(c.id);
+    if(childColor&&(BAND_ORDER[childColor]||0)>worstScore){worstScore=BAND_ORDER[childColor]||0;worstColor=childColor;}
+  });
+  return worstColor;
+}
+function findIfaceAnchor(componentId){
+  var visNodes=M.viewNodes(dfd,cur());
+  var direct=visNodes.find(function(n){return n.componentRef===componentId;});
+  if(direct)return direct;
+  var candidate=dfd.nodes.find(function(n){return n.componentRef===componentId;});
+  while(candidate&&candidate.parent!=null){
+    var vis=visNodes.find(function(n){return n.id===candidate.parent;});
+    if(vis)return vis;
+    candidate=dfd.nodes.find(function(n){return n.id===candidate.parent;});
+  }
+  return null;
+}
 function drawCanvas(){
-  var inner=M.render(dfd,cur(),focus);
-  var ns=M.viewNodes(dfd,cur());
+  // Build risk color map using subtree propagation so root-level nodes inherit sub-component risk
+  var nodeRisk={};
+  M.viewNodes(dfd,cur()).forEach(function(n){var c=worstRiskForNode(n.id);if(c)nodeRisk[n.id]=c;});
+  var inner=M.render(dfd,cur(),focus,nodeRisk);
+  // Render interface chips using ancestor-lookup so they appear on whatever layer is visible
+  var ifaceChips='';
+  (interfaces||[]).forEach(function(itf){
+    if(!itf.component)return;
+    var nb=findIfaceAnchor(itf.component);
+    if(!nb)return;
+    var posKey=(cur()||'root')+':'+itf.id;
+    var cp=(dfd.ifacePos||{})[posKey];
+    var cx=cp?cp.x:((nb.x||0)+4), cy=cp?cp.y:((nb.y||0)-50);
+    var lbl=esc((itf.tag||itf.name).slice(0,13));
+    var tx=(nb.x||0)+65, ty=(nb.y||0)+28; // midpoint of target node
+    var isFocus=focus==='iface:'+itf.id;
+    ifaceChips+='<g class="ifacechip" data-iface="'+esc(itf.id)+'" style="cursor:pointer">'+
+      '<line x1="'+(cx+40)+'" y1="'+(cy+14)+'" x2="'+tx+'" y2="'+ty+'" stroke="#777" stroke-dasharray="4 3" stroke-width="1.2"/>'+
+      '<rect x="'+cx+'" y="'+cy+'" width="80" height="28" rx="6" fill="var(--surface)" stroke="'+(isFocus?'#1565c0':'#5c8df6')+'" stroke-width="'+(isFocus?2:1.2)+'"/>'+
+      '<text x="'+(cx+40)+'" y="'+(cy+17)+'" text-anchor="middle" font-size="10" fill="#5c8df6">'+lbl+'</text>'+
+    '</g>';
+  });
   var maxX=600,maxY=400;
+  var ns=M.viewNodes(dfd,cur());
   ns.forEach(function(n){if(typeof n.x==='number')maxX=Math.max(maxX,n.x+220);if(typeof n.y==='number')maxY=Math.max(maxY,n.y+180);});
   var cv=$('cv');cv.setAttribute('width',maxX);cv.setAttribute('height',maxY);
-  cv.innerHTML="<defs><marker id='arrow' markerWidth='9' markerHeight='9' refX='8' refY='3' orient='auto'><path d='M0,0L8,3L0,6' fill='#888'/></marker></defs>"+inner;
+  cv.innerHTML="<defs><marker id='arrow' markerWidth='9' markerHeight='9' refX='8' refY='3' orient='auto'><path d='M0,0L8,3L0,6' fill='#888'/></marker></defs>"+inner+ifaceChips;
   $('crumb').textContent=['root'].concat(stack.map(label)).join(' / ');
   $('cbtn').className=connect?'on':'';
   $('status').textContent=connect?(connectFrom?('Connect: click the target for '+label(connectFrom)):'Connect: click the source node'):'';
@@ -146,7 +225,23 @@ function drawCanvas(){
 function chip(text,on,attrs,title){return '<span class="chip'+(on?' on':'')+'" role="button" tabindex="0" '+attrs+(title?' title="'+esc(title)+'"':'')+'>'+esc(text)+'</span>';}
 function renderInspector(){
   var n=focus?node(focus):null;
-  if(!n){$('insp').innerHTML='<h3>Inspector</h3><p class="hint">Select a node (click it, or use the arrow keys). Click a boundary label to edit its members.</p>';return;}
+  if(!n){
+    // Check if an interface chip is focused
+    var ifaceId=focus&&focus.startsWith('iface:')?focus.slice(6):null;
+    var selIface=ifaceId?(interfaces||[]).find(function(f){return f.id===ifaceId;}):null;
+    if(selIface){
+      $('insp').innerHTML='<h3>Interface chip</h3>'+
+        '<div class="field"><label>Name</label><div style="padding:4px 0">'+esc(selIface.name)+'</div></div>'+
+        (selIface.tag?'<div class="field"><label>Tag</label><div style="padding:4px 0">'+esc(selIface.tag)+'</div></div>':'')+
+        '<div class="field"><label>Component</label><div style="padding:4px 0">'+esc((components.find(function(c){return c.id===selIface.component;})||{}).name||selIface.component||'—')+'</div></div>'+
+        '<div class="field"><label>Category</label><div style="padding:4px 0">'+esc(selIface.category||'—')+'</div></div>'+
+        '<div class="field"><label>Exposure</label><div style="padding:4px 0">'+esc(selIface.exposure||'—')+'</div></div>'+
+        (selIface.protocol?'<div class="field"><label>Protocol</label><div style="padding:4px 0">'+esc(selIface.protocol)+'</div></div>':'')+
+        '<p class="hint" style="margin-top:8px">Interface chips are defined in step 03 (System &amp; Assets) and automatically appear here when their component is on this layer.</p>';
+      return;
+    }
+    $('insp').innerHTML='<h3>Inspector</h3><p class="hint">Select a node (click it, or use the arrow keys). Click a boundary label to edit its members.</p>';return;
+  }
   var isTb=n.type==='trust-boundary';
   var html='<h3>Selected '+(isTb?'trust boundary':'node')+'</h3>';
   html+='<div class="field"><label>Label</label><input class="inp" id="ins-label" value="'+esc(n.label)+'"></div>';
@@ -158,6 +253,16 @@ function renderInspector(){
   } else {
     html+='<div class="field"><label>Linked component</label><select class="inp" id="ins-comp"><option value="">&mdash; none &mdash;</option>'+
       components.map(function(c){return '<option value="'+esc(c.id)+'"'+(n.componentRef===c.id?' selected':'')+'>'+esc(c.name)+' ('+esc(c.id)+')</option>';}).join('')+'</select></div>';
+    var linkedIfaces=(interfaces||[]).filter(function(itf){return itf.component&&itf.component===n.componentRef;});
+    if(linkedIfaces.length){
+      html+='<div class="field"><label>Interfaces (from system context)</label>'+
+        '<div style="display:flex;flex-direction:column;gap:4px;margin-top:2px">'+
+        linkedIfaces.map(function(itf){
+          return '<div style="padding:3px 8px;background:var(--surface-2);border-radius:6px;border:1px solid #5c8df644;font-size:11px"><b>'+
+            esc(itf.tag||itf.name)+'</b>'+(itf.exposure?' · '+esc(itf.exposure):'')+(itf.protocol?' · '+esc(itf.protocol):'')+
+          '</div>';
+        }).join('')+'</div></div>';
+    }
     var conns=dfd.flows.filter(function(f){return f.from===n.id||f.to===n.id;});
     html+='<h3 style="margin-top:12px">Data flow</h3>';
     html+=conns.length?conns.map(function(f){var out=f.from===n.id;var other=out?f.to:f.from;
@@ -221,9 +326,34 @@ function ovCancel(){var cb=ovCb,mode=ovMode;$('ov').style.display='none';ovCb=nu
 
 /* canvas mouse: click selects, drag moves (small threshold so a click is never treated as a drag) */
 const cv=$('cv');
-cv.addEventListener('mousedown',function(e){var g=e.target.closest&&e.target.closest('[data-id]');if(!g)return;var id=g.getAttribute('data-id');var n=node(id);if(!n)return;dragMoved=false;dragging=true;drag={id:id,sx:e.clientX,sy:e.clientY,ox:typeof n.x==='number'?n.x:0,oy:typeof n.y==='number'?n.y:0};});
-window.addEventListener('mousemove',function(e){if(!dragging||!drag)return;if(!dragMoved&&Math.abs(e.clientX-drag.sx)<4&&Math.abs(e.clientY-drag.sy)<4)return;var n=node(drag.id);if(!n||n.type==='trust-boundary')return;n.x=Math.max(0,drag.ox+(e.clientX-drag.sx));n.y=Math.max(0,drag.oy+(e.clientY-drag.sy));dragMoved=true;drawCanvas();});
-window.addEventListener('mouseup',function(){if(dragging&&drag){if(dragMoved)persist('move:'+drag.id);else selectNode(drag.id);}dragging=false;drag=null;});
+cv.addEventListener('mousedown',function(e){
+  // Interface chip: start drag (also selects the chip)
+  var ic=e.target.closest&&e.target.closest('[data-iface]');
+  if(ic){
+    var ifaceId=ic.getAttribute('data-iface');
+    focus='iface:'+ifaceId;
+    var posKey=(cur()||'root')+':'+ifaceId;
+    var cp=(dfd.ifacePos||{})[posKey]||{};
+    chipDrag={id:ifaceId,key:posKey,sx:e.clientX,sy:e.clientY,ox:cp.x||0,oy:cp.y||0};
+    dragMoved=false;dragging=true;
+    draw();
+    return;
+  }
+  var g=e.target.closest&&e.target.closest('[data-id]');if(!g)return;var id=g.getAttribute('data-id');var n=node(id);if(!n)return;dragMoved=false;dragging=true;drag={id:id,sx:e.clientX,sy:e.clientY,ox:typeof n.x==='number'?n.x:0,oy:typeof n.y==='number'?n.y:0};});
+window.addEventListener('mousemove',function(e){
+  if(!dragging)return;
+  if(chipDrag){
+    if(!dragMoved&&Math.abs(e.clientX-chipDrag.sx)<4&&Math.abs(e.clientY-chipDrag.sy)<4)return;
+    dfd.ifacePos=dfd.ifacePos||{};
+    dfd.ifacePos[chipDrag.key]={x:Math.round(chipDrag.ox+(e.clientX-chipDrag.sx)),y:Math.round(chipDrag.oy+(e.clientY-chipDrag.sy))};
+    dragMoved=true;drawCanvas();return;
+  }
+  if(!drag)return;if(!dragMoved&&Math.abs(e.clientX-drag.sx)<4&&Math.abs(e.clientY-drag.sy)<4)return;var n=node(drag.id);if(!n||n.type==='trust-boundary')return;n.x=Math.max(0,drag.ox+(e.clientX-drag.sx));n.y=Math.max(0,drag.oy+(e.clientY-drag.sy));dragMoved=true;drawCanvas();});
+window.addEventListener('mouseup',function(){
+  if(dragging&&chipDrag){if(dragMoved)persist('iface:'+chipDrag.id);chipDrag=null;dragging=false;dragMoved=false;drag=null;return;}
+  if(dragging&&drag){if(dragMoved)persist('move:'+drag.id);else selectNode(drag.id);}
+  dragging=false;drag=null;
+});
 
 /* toolbar */
 $('bar').addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('button[data-act]');if(!b)return;var a=b.dataset.act;
@@ -267,7 +397,7 @@ window.addEventListener('keydown',function(e){
 });
 
 window.addEventListener('message',function(ev){var m=ev.data;
-  if(m.type==='load'){try{dfd=JSON.parse(m.dfd);}catch(_){dfd={nodes:[],flows:[]};}if(!dfd.nodes)dfd.nodes=[];if(!dfd.flows)dfd.flows=[];if(m.components)components=m.components;baseState=snap();updUndo();if(dragging)return;draw();}
+  if(m.type==='load'){try{dfd=JSON.parse(m.dfd);}catch(_){dfd={nodes:[],flows:[]};}if(!dfd.nodes)dfd.nodes=[];if(!dfd.flows)dfd.flows=[];if(m.components)components=m.components;if(m.interfaces)interfaces=m.interfaces;if(m.riskData)riskData=m.riskData;baseState=snap();updUndo();if(dragging)return;draw();}
 });
 vs.postMessage({type:'ready'});
 </script></body></html>`;

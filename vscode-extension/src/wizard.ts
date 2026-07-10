@@ -8,9 +8,25 @@ const rdRaw = async (proj: vscode.Uri, rel: string, def: any) => {
 const write = (proj: vscode.Uri, rel: string, obj: any) => vscode.workspace.fs.writeFile(vscode.Uri.joinPath(proj, rel), Buffer.from(JSON.stringify(obj, null, 2)));
 
 async function locate(): Promise<PF | undefined> {
-  const p = await vscode.workspace.findFiles("**/01-project-description/project.json", "**/node_modules/**", 1);
-  if (!p[0]) return undefined;
-  return { proj: vscode.Uri.joinPath(p[0], "..", "..") };
+  const candidates = await vscode.workspace.findFiles("**/01-project-description/project.json", "**/node_modules/**");
+  const norm = (u: vscode.Uri) => u.path.replace(/\\/g, "/");
+  const active = vscode.window.activeTextEditor?.document?.uri;
+  const activePath = active ? norm(active) : "";
+  const score = (u: vscode.Uri) => {
+    const p = norm(u);
+    if (p.includes("/.local/") || p.includes("/10-tra-versions/")) return 100;
+    if (activePath && activePath.startsWith(p.slice(0, p.lastIndexOf("/01-project-description/project.json")))) return -1;
+    if (p.includes("/projects/")) return 0;
+    if (p.includes("/webapp/projects/")) return 1;
+    return 10;
+  };
+  const filtered = candidates.filter((u) => {
+    const p = norm(u);
+    return !p.includes("/.local/") && !p.includes("/10-tra-versions/");
+  });
+  const pool = (filtered.length ? filtered : candidates).sort((a, b) => score(a) - score(b));
+  if (!pool[0]) return undefined;
+  return { proj: vscode.Uri.joinPath(pool[0], "..", "..") };
 }
 
 async function countTrees(proj: vscode.Uri): Promise<number> {
@@ -18,6 +34,33 @@ async function countTrees(proj: vscode.Uri): Promise<number> {
     const doc = JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(proj, "07-attack-trees/attack-trees.json"))).toString());
     return (doc.trees || []).length;
   } catch { return 0; }
+}
+
+async function readChangeTracker(proj: vscode.Uri) {
+  const doc = await rdRaw(proj, "01-project-description/change-tracker.json", {});
+  const entries: any[] = Array.isArray(doc.entries) ? doc.entries : [];
+  const currentVersion: string | null = doc.currentVersion || (entries.length ? (entries[entries.length - 1]?.version || null) : null);
+  return { currentVersion, entries };
+}
+
+async function writeSnapshot(proj: vscode.Uri, version: string): Promise<void> {
+  const steps: Record<string, string> = {
+    project: "01-project-description/project.json",
+    assumptions: "02-assumptions/assumptions.json",
+    system: "03-system-assets/system.json",
+    dfd: "04-dfd/dfd.json",
+    requirements: "05-requirements/requirements.json",
+    threats: "06-threats/threats.json",
+    attackTrees: "07-attack-trees/attack-trees.json",
+    countermeasures: "08-countermeasures/countermeasures.json",
+  };
+  const base = vscode.Uri.joinPath(proj, "10-tra-versions", version);
+  for (const [, rel] of Object.entries(steps)) {
+    const data = await rdRaw(proj, rel, {});
+    const dir = rel.slice(0, rel.lastIndexOf("/"));
+    await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(base, dir));
+    await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(base, rel), Buffer.from(JSON.stringify(data, null, 2)));
+  }
 }
 
 async function buildData(proj: vscode.Uri) {
@@ -28,13 +71,16 @@ async function buildData(proj: vscode.Uri) {
   const assumptions = await rdRaw(proj, "02-assumptions/assumptions.json", {});
   const dfd = await rdRaw(proj, "04-dfd/dfd.json", { nodes: [] });
   const reqs = (await rdRaw(proj, "05-requirements/requirements.json", { requirements: [] })).requirements || [];
+  const tracker = await readChangeTracker(proj);
   const comps = (system.components || []).map((c: any) => ({ id: c.id, name: c.name }));
   return {
+    changeTracker: tracker,
     project: {
       name: project.device?.name || "",
       sl: project.slTarget || "SL2",
       mode: project.scope?.mode || "graybox",
       boundary: project.scope?.boundary || "",
+      sbom: project.sbom || {},
     },
     threats, cms, comps,
     requirements: reqs,
@@ -61,6 +107,7 @@ async function buildData(proj: vscode.Uri) {
       threats: threats.length,
       attackTrees: await countTrees(proj),
       countermeasures: cms.length,
+      versions: tracker.entries.length,
     },
   };
 }
@@ -87,6 +134,7 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
       const project = await rdRaw(f.proj, "01-project-description/project.json", {});
       project.device = project.device || {}; project.device.name = m.name; project.slTarget = m.sl;
       project.scope = project.scope || {}; project.scope.mode = m.mode; project.scope.boundary = m.bnd;
+      if (m.sbom && typeof m.sbom === "object") project.sbom = m.sbom;
       await write(f.proj, "01-project-description/project.json", project);
       return panel.webview.postMessage({ cmd: "msg", text: "Project saved.", counts: await counts() });
     }
@@ -105,13 +153,26 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
       });
       if (problems.length) return panel.webview.postMessage({ cmd: "err", text: "Cannot save:\n" + problems.join("\n") });
       const prev = new Map(((await rdRaw(f.proj, "06-threats/threats.json", { threats: [] })).threats || []).map((t: any) => [t.id, t]));
-      const norm = rows.map((t) => ({
-        ...(prev.get(t.id) || { assets: [], status: "open" }),
-        id: t.id, title: t.title,
-        stride: (t.stride || []).map((s: string) => s.toUpperCase()),
-        components: t.components || [], likelihood: +t.likelihood || 3, impact: +t.impact || 3,
-        status: t.status || (prev.get(t.id) as any)?.status || "open",
-      }));
+      const norm = rows.map((t: any) => {
+        const base: any = prev.get(t.id) || {};
+        const out: any = {
+          ...base,
+          id: t.id, title: t.title,
+          stride: (t.stride || []).map((s: string) => s.toUpperCase()),
+          components: t.components || [],
+          likelihood: Math.max(1, Math.min(5, +t.likelihood || 3)),
+          impact: Math.max(1, Math.min(5, +t.impact || 3)),
+          status: t.status || base.status || "open",
+          assets: t.assets || base.assets || [],
+        };
+        // Preserve extended risk-calculator fields from the frontend
+        const pick = (k: string) => { if (t[k] != null) out[k] = t[k]; else if (base[k] != null) out[k] = base[k]; };
+        ['attackerRef', 'interfaceRefs', 'interfaceLabel',
+          'impactDimensions', 'likelihoodFactors', 'cvss',
+          'likelihoodRationale', 'impactRationale',
+          'acceptedBy', 'acceptanceRationale', 'reviewDate'].forEach(pick);
+        return out;
+      });
       await write(f.proj, "06-threats/threats.json", { threats: norm });
       return panel.webview.postMessage({ cmd: "threats", threats: norm, counts: await counts(), text: "Threats saved." });
     }
@@ -136,11 +197,30 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
       });
       if (problems.length) return panel.webview.postMessage({ cmd: "err", text: "Cannot save:\n" + problems.join("\n") });
       const prev = new Map(((await rdRaw(f.proj, "08-countermeasures/countermeasures.json", { countermeasures: [] })).countermeasures || []).map((c: any) => [c.id, c]));
-      const norm = rows.map((c) => ({
-        ...(prev.get(c.id) || { components: [] }),
-        id: c.id, title: c.title, type: c.type || "preventive", status: c.status || "proposed",
-        addresses: (c.addresses || []).map((a: any) => ({ threat: a.threat, residualLikelihood: +a.residualLikelihood || 2, residualImpact: +a.residualImpact || 2 })),
-      }));
+      const norm = rows.map((c: any) => {
+        const base: any = prev.get(c.id) || {};
+        return {
+          ...base,
+          id: c.id, title: c.title, type: c.type || "preventive", status: c.status || "proposed",
+          components: c.components || base.components || [],
+          ...(c.iec62443Ref ? { iec62443Ref: c.iec62443Ref } : base.iec62443Ref ? { iec62443Ref: base.iec62443Ref } : {}),
+          ...(c.description ? { description: c.description } : base.description ? { description: base.description } : {}),
+          ...(c.ticketUrls?.length ? { ticketUrls: c.ticketUrls.filter(Boolean) } : {}),
+          addresses: (c.addresses || []).map((a: any) => {
+            const prevA: any = ((base.addresses || []) as any[]).find((x: any) => x.threat === a.threat) || {};
+            const addr: any = {
+              ...prevA,
+              threat: a.threat,
+              residualLikelihood: Math.max(1, Math.min(5, +a.residualLikelihood || 2)),
+              residualImpact: Math.max(1, Math.min(5, +a.residualImpact || 2)),
+            };
+            const pickA = (k: string) => { if (a[k] != null) addr[k] = a[k]; else if (prevA[k] != null) addr[k] = prevA[k]; };
+            ['attackerRef', 'interfaceRefs', 'interfaceLabel',
+              'likelihoodFactors', 'impactDimensions', 'cvss'].forEach(pickA);
+            return addr;
+          }),
+        };
+      });
       await write(f.proj, "08-countermeasures/countermeasures.json", { countermeasures: norm });
       return panel.webview.postMessage({ cmd: "cms", cms: norm, counts: await counts(), text: "Countermeasures saved." });
     }
@@ -221,6 +301,68 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
       return panel.webview.postMessage({ cmd: "requirements", requirements: norm, counts: await counts(), text: "Requirements saved." });
     }
 
+    if (m.cmd === "versionRecord") {
+      const validReasons = ["initial", "functional changes", "new vulnerabilities", "regular reassessment"];
+      if (!validReasons.includes(m.reason)) {
+        return panel.webview.postMessage({ cmd: "versionResult", ok: false, error: "Invalid reason." });
+      }
+      const assessors: string[] = Array.isArray(m.assessors)
+        ? m.assessors.map((x: any) => String(x).trim()).filter(Boolean)
+        : [];
+      if (!assessors.length) {
+        return panel.webview.postMessage({ cmd: "versionResult", ok: false, error: "At least one assessor is required." });
+      }
+      const tracker = await readChangeTracker(f.proj);
+      const isFirst = tracker.entries.length === 0;
+      if (isFirst && m.reason !== "initial") {
+        return panel.webview.postMessage({ cmd: "versionResult", ok: false, error: "The first recorded version must have reason 'initial'." });
+      }
+      if (!isFirst && m.reason === "initial") {
+        return panel.webview.postMessage({ cmd: "versionResult", ok: false, error: "An initial version has already been recorded." });
+      }
+      let nextVer = "v1.0";
+      if (!isFirst && tracker.currentVersion) {
+        const mm = /^v?(\d+)\.(\d+)$/.exec(tracker.currentVersion);
+        const maj = mm ? Number(mm[1]) : 1;
+        const min = mm ? Number(mm[2]) : 0;
+        nextVer = m.reason === "functional changes" ? `v${maj + 1}.0` : `v${maj}.${min + 1}`;
+      }
+      try { await writeSnapshot(f.proj, nextVer); } catch { /* non-critical */ }
+      const entry = {
+        version: nextVer,
+        reason: m.reason,
+        assessedAt: String(m.assessedAt || new Date().toISOString().slice(0, 10)),
+        assessors,
+        summary: String(m.summary || ""),
+      };
+      const nextTracker = { currentVersion: nextVer, entries: [...tracker.entries, entry] };
+      await write(f.proj, "01-project-description/change-tracker.json", nextTracker);
+      return panel.webview.postMessage({ cmd: "versionResult", ok: true, tracker: nextTracker, counts: await counts(), text: `Recorded ${nextVer}.` });
+    }
+
+    if (m.cmd === "autoSave") {
+      try {
+        const d = m.data || {};
+        if (d.project) {
+          const proj = await rdRaw(f.proj, "01-project-description/project.json", {});
+          proj.device = proj.device || {}; proj.device.name = d.project.name;
+          proj.slTarget = d.project.sl; proj.scope = proj.scope || {};
+          proj.scope.mode = d.project.mode; proj.scope.boundary = d.project.boundary;
+          if (d.project.sbom) proj.sbom = d.project.sbom;
+          await write(f.proj, "01-project-description/project.json", proj);
+        }
+        if (Array.isArray(d.threats)) await write(f.proj, "06-threats/threats.json", { threats: d.threats });
+        if (Array.isArray(d.cms)) await write(f.proj, "08-countermeasures/countermeasures.json", { countermeasures: d.cms });
+        if (d.assumptions) await write(f.proj, "02-assumptions/assumptions.json", d.assumptions);
+        if (d.system) {
+          const prev = await rdRaw(f.proj, "03-system-assets/system.json", {});
+          await write(f.proj, "03-system-assets/system.json", { ...prev, components: d.system.components || [], interfaces: d.system.interfaces || [], trustBoundaries: d.system.trustBoundaries || [], assets: d.system.assets || [] });
+        }
+        if (Array.isArray(d.requirements)) await write(f.proj, "05-requirements/requirements.json", { requirements: d.requirements });
+        return panel.webview.postMessage({ cmd: "saved", counts: await counts() });
+      } catch { return panel.webview.postMessage({ cmd: "err", text: "Auto-save failed." }); }
+    }
+
     if (m.cmd === "openFile") {
       try { const doc = await vscode.workspace.openTextDocument(vscode.Uri.joinPath(f.proj, m.rel)); await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside); }
       catch { vscode.window.showInformationMessage(`${m.rel} does not exist yet.`); }
@@ -243,6 +385,7 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
     <span class="spacer"></span>
     <button class="btn" id="undoBtn" data-act="undo" title="Undo (Ctrl+Z)" disabled>&#8630; Undo</button>
     <button class="btn" id="redoBtn" data-act="redo" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" disabled>&#8631; Redo</button>
+    <span id="savingStatus" style="font-size:11px;margin-left:4px"></span>
     <button class="btn" data-cmd="kb">Knowledge base</button>
     <button class="btn primary" data-cmd="report">Generate report</button>
   </div>
@@ -263,7 +406,21 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
             <select class="inp" id="p-mode"><option>blackbox</option><option>graybox</option><option>whitebox</option></select></div>
         </div>
         <div class="field"><label>Boundary</label><input class="inp" id="p-bnd"></div>
-        <button class="btn primary" data-act="saveP">Save project</button>
+        <details style="margin-top:8px"><summary class="hint" style="cursor:pointer;list-style:none;padding:3px 0">&#9654; Software Bill of Materials (SBOM)</summary>
+          <div class="grid3" style="margin-top:6px">
+            <div class="field"><label>SBOM source</label>
+              <select class="inp" id="p-sbom-mode" onchange="document.getElementById('p-sbom-fmt').style.display=this.value==='in-tool'?'':'none';document.getElementById('p-sbom-url').style.display=this.value!=='in-tool'?'':'none';">
+                <option value="in-tool">In-tool (generated from components)</option>
+                <option value="external">External — link to an existing SBOM</option>
+              </select></div>
+            <div class="field" id="p-sbom-fmt"><label>Format</label>
+              <select class="inp" id="p-sbom-format"><option value="cyclonedx">CycloneDX 1.5</option><option value="spdx">SPDX 2.3</option></select></div>
+            <div class="field" id="p-sbom-url" style="display:none"><label>External SBOM URL</label>
+              <input class="inp" id="p-sbom-url-inp" placeholder="https://…/device-sbom.cdx.json"></div>
+          </div>
+          <p class="hint" style="margin:4px 0 0">In-tool SBOM is generated from the component list (version, supplier, license, CPE fields in step 03).</p>
+        </details>
+        <p class="hint" style="margin:6px 0 0">Changes are saved automatically.</p>
       </div>
 
       <div class="card" id="card-assumptions">
@@ -271,7 +428,7 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
         <div class="desc">Ground the analysis: at least one <b>attacker profile</b> is required (it grounds the likelihood), plus device / system / environment / operational assumptions.</div>
         <div class="tabs" id="asm-tabs"></div>
         <div id="asm-body"></div>
-        <div style="margin-top:10px"><button class="btn primary" data-act="saveA">Save assumptions</button></div>
+
       </div>
 
       <div class="card" id="card-system">
@@ -279,28 +436,34 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
         <div class="desc">Decompose the device into components, interfaces and trust boundaries, then list the protected assets and their Confidentiality / Integrity / Availability / Safety objectives (0–5). Components defined here feed the threats in step 06.</div>
         <div class="tabs" id="sys-tabs"></div>
         <div id="sys-body"></div>
-        <div style="margin-top:10px"><button class="btn primary" data-act="saveS">Save system &amp; assets</button></div>
+
       </div>
 
       <div class="card" id="card-requirements">
         <h2>05 · Security requirements</h2>
         <div class="desc">Derive testable requirements from the threats and link them to the controls that satisfy them — the traceable core (threat &rarr; requirement &rarr; control) that IEC 62443-4-1 / CRA expect.</div>
         <div id="req-body"></div>
-        <div style="margin-top:10px"><button class="btn" data-act="addReq">+ Requirement</button> <button class="btn primary" data-act="saveR">Save requirements</button></div>
+        <div style="margin-top:10px"><button class="btn" data-act="addReq">+ Requirement</button></div>
       </div>
 
       <div class="card" id="card-threats">
         <h2>06 · Threats &amp; risk</h2>
         <div class="desc">Each threat needs a unique ID, at least one STRIDE category and one affected component. Risk = Likelihood × Impact; the residual reflects the single most-protective countermeasure. The <b>status</b> shows how each threat is being handled.</div>
         <table class="grid"><thead><tr><th class="narrow">ID</th><th>Title</th><th>STRIDE</th><th>Components</th><th class="num">L</th><th class="num">I</th><th>Risk &rarr; residual</th><th class="stat">Status</th><th></th></tr></thead><tbody id="threats-body"></tbody></table>
-        <div style="margin-top:10px"><button class="btn" data-act="addT">+ Threat</button> <button class="btn primary" data-act="saveT">Save threats</button></div>
+        <div style="margin-top:10px"><button class="btn" data-act="addT">+ Threat</button></div>
       </div>
 
       <div class="card" id="card-cms">
         <h2>08 · Countermeasures</h2>
         <div class="desc">A countermeasure addresses one or more threats and sets the residual L/I per threat. Preventive controls should lower likelihood, not impact.</div>
         <div id="cms-list"></div>
-        <div style="margin-top:10px"><button class="btn" data-act="addC">+ Countermeasure</button> <button class="btn primary" data-act="saveC">Save countermeasures</button></div>
+        <div style="margin-top:10px"><button class="btn" data-act="addC">+ Countermeasure</button></div>
+      </div>
+
+      <div class="card" id="card-versions">
+        <h2>10 · TRA versions</h2>
+        <div class="desc">Tag assessment baselines so you can track changes across reassessments.</div>
+        <div id="versions-body"></div>
       </div>
     </div>
   </div>
@@ -308,7 +471,22 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
 <script nonce="${nonce}" src="${riskUri}"></script>
 <script nonce="${nonce}">
 (function(){
-const vs=acquireVsCodeApi(), R=window.RiskModel;
+const vs=acquireVsCodeApi(), R=window.RiskModel||{
+  bandClass:function(n){return String(n||'').toLowerCase();},
+  residual:function(t,cms){
+    var links=[];(cms||[]).forEach(function(cm){(cm.addresses||[]).forEach(function(a){if(a.threat===t.id)links.push(a);});});
+    if(!links.length)return [t.likelihood||0,t.impact||0];
+    var best=[t.likelihood||0,t.impact||0],bs=Infinity;
+    links.forEach(function(a){var rl=a.residualLikelihood==null?(t.likelihood||0):a.residualLikelihood;var ri=a.residualImpact==null?(t.impact||0):a.residualImpact;var s=(rl||0)*(ri||0);if(s<bs){bs=s;best=[rl,ri];}});
+    return best;
+  },
+  riskOf:function(t,cms){var i=(t.likelihood||0)*(t.impact||0),r=this.residual(t,cms),rs=(r[0]||0)*(r[1]||0);return {initial:i,initialBand:{name:'Medium'},residual:rs,residualBand:{name:'Medium'},residualLikelihood:r[0],residualImpact:r[1]};},
+  deriveImpact:function(d){if(!d)return null;var v=[d.confidentiality,d.integrity,d.availability,d.safety].filter(function(x){return typeof x==='number';});return v.length?Math.max.apply(null,v):null;},
+  deriveLikelihood:function(f){if(!f)return null;var has=typeof f.exposure==='number'||typeof f.exploitability==='number';if(!has)return null;var e=typeof f.exposure==='number'?f.exposure:3;var x=typeof f.exploitability==='number'?f.exploitability:3;return Math.min(5,Math.max(1,Math.round(Math.sqrt(e*x))));},
+  cvssBaseScore:function(){return null;},
+  cvssExploitability:function(){return null;},
+  exposureFromInterface:function(){return null;}
+};
 const STRIDE=[['S','Spoofing'],['T','Tampering'],['R','Repudiation'],['I','Info disclosure'],['D','Denial of service'],['E','Elevation']];
 const T_STATUS=[['open','Open'],['mitigated','Mitigated'],['accepted','Accepted'],['transferred','Transferred']];
 const ACCESS=[['remote','Remote'],['adjacent','Adjacent'],['local','Local'],['physical','Physical']];
@@ -319,7 +497,12 @@ const IF_CATS=['network','external','user'];
 const EXPOSURE=['physical','local','adjacent','remote'];
 const ASSET_TYPES=['data','function','credential','firmware','config','physical-process'];
 const OBJS=[['confidentiality','C'],['integrity','I'],['availability','A'],['safety','S']];
+const EXPOSURE_OPTS=[[1,'Physical (open enclosure)'],[2,'Local (on site)'],[3,'Adjacent / fieldbus'],[4,'Remote (authenticated)'],[5,'Remote (unauthenticated)']];
+const EXPLOIT_OPTS=[[1,'Very hard (nation-state)'],[2,'Hard (specialist)'],[3,'Moderate'],[4,'Easy'],[5,'Trivial / automated']];
+const DIM_KEYS=['confidentiality','integrity','availability','safety'];
+const DIM_LBLS=['C · Confidentiality','I · Integrity','A · Availability','S · Safety'];
 let threats=[], cms=[], comps=[], counts={};
+let changeTracker={currentVersion:null,entries:[]};
 let assumptions={attacker:[],device:[],system:[],environment:[],operational:[]};
 let system={components:[],interfaces:[],trustBoundaries:[],assets:[]};
 let requirements=[];
@@ -338,10 +521,19 @@ function pushUndo(state){undoStack.push(state);if(undoStack.length>150)undoStack
 function recordBefore(key){var now=Date.now();if(undoStack.length&&key===histKey&&(now-histTime<800)){histTime=now;return;}pushUndo(snapshot());histKey=key;histTime=now;}
 function recordChanged(before){if(before===snapshot())return;pushUndo(before);histKey='';histTime=Date.now();}
 function keyOf(t){var d=t.dataset,k=(t.id||t.tagName);for(var p in d)k+='|'+p+'='+d[p];return k;}
-function applyState(s){var d=JSON.parse(s);project=d.project||project;threats=d.threats||[];cms=d.cms||[];assumptions=d.assumptions||assumptions;system=d.system||system;requirements=d.requirements||[];comps=(system.components||[]).map(function(c){return {id:c.id,name:c.name};});renderProject(project);renderThreats();renderCms();renderAssumptions();renderSystem();renderRequirements();renderRail();}
+function applyState(s){var d=JSON.parse(s);project=d.project||project;threats=d.threats||[];cms=d.cms||[];assumptions=d.assumptions||assumptions;system=d.system||system;requirements=d.requirements||[];comps=(system.components||[]).map(function(c){return {id:c.id,name:c.name};});try{renderProject(project);}catch(e){console.error('project',e);}try{renderRail();}catch(e){console.error('rail',e);}try{renderThreats();}catch(e){console.error('threats',e);}try{renderCms();}catch(e){console.error('cms',e);}try{renderAssumptions();}catch(e){console.error('assumptions',e);}try{renderSystem();}catch(e){console.error('system',e);}try{renderRequirements();}catch(e){console.error('requirements',e);}}
 function undo(){if(!undoStack.length)return;redoStack.push(snapshot());applyState(undoStack.pop());histKey='';updUndoBtns();}
 function redo(){if(!redoStack.length)return;undoStack.push(snapshot());applyState(redoStack.pop());histKey='';updUndoBtns();}
 function clearHistory(){undoStack=[];redoStack=[];histKey='';histTime=0;updUndoBtns();}
+var autoSaveTimer=null;
+function scheduleAutoSave(){clearTimeout(autoSaveTimer);var st=$('#savingStatus');if(st){st.textContent='Saving…';st.style.color='var(--text-faint)';}autoSaveTimer=setTimeout(doAutoSave,1500);}
+function doAutoSave(){
+  var sbomMode=($('#p-sbom-mode')||{}).value||'in-tool';
+  var sbomObj={mode:sbomMode,format:($('#p-sbom-format')||{}).value||'cyclonedx'};
+  if(sbomMode!=='in-tool')sbomObj.url=($('#p-sbom-url-inp')||{}).value||'';
+  var proj=Object.assign({},project,{sbom:sbomObj});
+  vs.postMessage({cmd:'autoSave',data:{project:proj,threats:threats,cms:cms,assumptions:assumptions,system:system,requirements:requirements}});
+}
 function pill(score,band){return '<span class="pill '+R.bandClass(band.name)+'">'+score+' · '+band.name+'</span>';}
 function riskCell(t){var r=R.riskOf(t,cms);return pill(r.initial,r.initialBand)+'<span class="arrow">&rarr;</span>'+pill(r.residual,r.residualBand);}
 function chip(text,on,attrs,title){return '<span class="chip'+(on?' on':'')+'" role="button" tabindex="0" '+attrs+(title?' title="'+esc(title)+'"':'')+'>'+esc(text)+'</span>';}
@@ -355,7 +547,8 @@ const STEPS=[
   ['06','Threats','STRIDE + risk rating','scroll','#card-threats','threats'],
   ['07','Attack trees','Optional · AND/OR','cmd','atree','attackTrees'],
   ['08','Countermeasures','Residual risk','scroll','#card-cms','countermeasures'],
-  ['09','Review & Report','Plausibility check','cmd','report','review']
+  ['09','Review & Report','Plausibility check','cmd','report','review'],
+  ['10','TRA versions','Assessment history','scroll','#card-versions','versions']
 ];
 function clientIssues(){
   var out=[],seen={};
@@ -380,12 +573,111 @@ function renderRail(){
   html+='<div class="grouplabel">Views</div><button class="stepitem" data-kind="cmd" data-target="kb"><span class="num">&#128218;</span><span class="txt"><b>Knowledge base</b><span>Reusable library</span></span></button>';
   $('#rail').innerHTML=html;
 }
-function renderProject(p){p=p||{};project={name:p.name||'',sl:p.sl||'SL2',mode:p.mode||'graybox',boundary:p.boundary||''};$('#devname').textContent=project.name?('· '+project.name):'';$('#p-name').value=project.name;$('#p-sl').value=project.sl;$('#p-mode').value=project.mode;$('#p-bnd').value=project.boundary;}
+function renderProject(p){
+  p=p||{};
+  project={name:p.name||'',sl:p.sl||'SL2',mode:p.mode||'graybox',boundary:p.boundary||'',sbom:p.sbom||{}};
+  $('#devname').textContent=project.name?('· '+project.name):'';
+  $('#p-name').value=project.name;$('#p-sl').value=project.sl;$('#p-mode').value=project.mode;$('#p-bnd').value=project.boundary;
+  var sbom=project.sbom||{},sbomMode=sbom.mode||'in-tool';
+  var mSel=$('#p-sbom-mode');if(mSel)mSel.value=sbomMode;
+  var fmtEl=$('#p-sbom-fmt');if(fmtEl)fmtEl.style.display=sbomMode==='in-tool'?'':'none';
+  var fmtSel=$('#p-sbom-format');if(fmtSel)fmtSel.value=sbom.format||'cyclonedx';
+  var urlEl=$('#p-sbom-url');if(urlEl)urlEl.style.display=sbomMode!=='in-tool'?'':'none';
+  var urlInp=$('#p-sbom-url-inp');if(urlInp)urlInp.value=sbom.url||'';
+}
+function calcBlock(dims,fac,cv,dAttr,dimAttr,facAttr,cvssAttr,seedAct){
+  var derivedI=R.deriveImpact(dims),derivedL=R.deriveLikelihood(fac);
+  var autoBase=cv.vector?R.cvssBaseScore(cv.vector):null;
+  var cvssVer=cv.version||'3.1';
+  if(cv.vector&&String(cv.vector).indexOf('CVSS:4.0/')===0)cvssVer='4.0';
+  else if(cv.vector&&String(cv.vector).indexOf('CVSS:3.')===0)cvssVer='3.1';
+  var cvssPlaceholder=cvssVer==='4.0'?'CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H':'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H';
+  var suggestExp=R.cvssExploitability(cv.vector);
+  var dimSelects=DIM_KEYS.map(function(k,di){
+    return '<div class="field"><label>'+DIM_LBLS[di]+'</label>'+
+      '<select class="inp" '+dAttr+' '+dimAttr+'="'+k+'">'+
+      '<option value="">—</option>'+[1,2,3,4,5].map(function(n){return '<option'+(+dims[k]===n?' selected':'')+'>'+n+'</option>';}).join('')+
+      '</select></div>';
+  }).join('');
+  var expSel='<div class="field"><label title="How reachable is the attack surface">Exposure</label>'+
+    '<select class="inp" '+dAttr+' '+facAttr+'="exposure"><option value="">—</option>'+
+    EXPOSURE_OPTS.map(function(o){return '<option value="'+o[0]+'"'+(+fac.exposure===o[0]?' selected':'')+'>'+o[0]+' · '+o[1]+'</option>';}).join('')+
+    '</select></div>';
+  var xplSel='<div class="field"><label title="How easy to exploit once reached">Exploitability</label>'+
+    '<select class="inp" '+dAttr+' '+facAttr+'="exploitability"><option value="">—</option>'+
+    EXPLOIT_OPTS.map(function(o){return '<option value="'+o[0]+'"'+(+fac.exploitability===o[0]?' selected':'')+'>'+o[0]+' · '+o[1]+'</option>';}).join('')+
+    '</select></div>';
+  return '<details><summary class="hint" style="cursor:pointer;list-style:none;padding:4px 0">'+
+    '&#9654; Guided rating — Bug Bar · Exposure × Exploitability · CVSS</summary>'+
+    '<div style="margin-top:8px">'+
+      '<b style="font-size:11px">Bug Bar impact</b> '+
+      '<span class="hint">impact = worst dimension'+(derivedI!=null?' → <b>'+derivedI+'</b>':'')+'</span>'+
+      '<div class="grid4" style="margin-top:4px">'+dimSelects+'</div>'+
+    '</div>'+
+    '<div style="margin-top:8px">'+
+      '<b style="font-size:11px">Likelihood — Exposure × Exploitability</b> '+
+      '<span class="hint">'+(derivedL!=null?'→ <b>'+derivedL+'</b>':'set both to auto-derive likelihood')+'</span>'+
+      '<div class="grid2" style="margin-top:4px">'+expSel+xplSel+'</div>'+
+      (seedAct?'<button class="btn sm" '+seedAct+' style="margin-top:4px">Seed exposure from interface</button>':'')+
+    '</div>'+
+    '<div style="margin-top:8px">'+
+      '<b style="font-size:11px">CVSS '+esc(cvssVer)+'</b> '+
+      '<span class="hint">optional'+(suggestExp!=null?' · suggests exploitability '+suggestExp:'')+'</span>'+
+      '<div class="grid4" style="margin-top:4px">'+
+        '<div class="field"><label>Version</label>'+
+          '<select class="inp" '+dAttr+' '+cvssAttr+'="version">'+
+            ['3.1','4.0'].map(function(v){return '<option value="'+v+'"'+(cvssVer===v?' selected':'')+'>CVSS '+v+'</option>';}).join('')+
+          '</select></div>'+
+        '<div class="field"><label>Base score'+(autoBase!=null?' (calculated)':'')+'</label>'+
+          '<input class="inp" type="number" min=0 max=10 step=0.1 '+dAttr+' '+cvssAttr+'="baseScore"'+
+          ' value="'+esc(autoBase!=null?autoBase:(cv.baseScore!=null?cv.baseScore:''))+'"'+
+          (autoBase!=null?' readonly title="Auto-calculated from vector"':' title="Enter a score or paste a vector below"')+'></div>'+
+        '<div class="field" style="grid-column:span 2"><label>Vector</label>'+
+          '<input class="inp" '+dAttr+' '+cvssAttr+'="vector" value="'+esc(cv.vector||'')+'"'+
+          ' placeholder="'+esc(cvssPlaceholder)+'"></div>'+
+      '</div>'+
+    '</div>'+
+  '</details>';
+}
 function renderThreats(){
   $('#threats-body').innerHTML=threats.length?threats.map(function(t,i){
     var st=STRIDE.map(function(s){return chip(s[0],(t.stride||[]).indexOf(s[0])>=0,'data-i='+i+' data-role="stride" data-val="'+s[0]+'"',s[1]);}).join('');
     var cc=comps.length?comps.map(function(c){return chip(c.id,(t.components||[]).indexOf(c.id)>=0,'data-i='+i+' data-role="comp" data-val="'+esc(c.id)+'"',c.name);}).join(''):'<span class="hint">Add components in step 03</span>';
-    return '<tr>'+
+    var dims=t.impactDimensions||{}, fac=t.likelihoodFactors||{};
+    var hasFac=R.deriveLikelihood(fac)!=null||R.deriveImpact(dims)!=null;
+    var primaryIfaceId=(t.interfaceRefs&&t.interfaceRefs[0]);
+    var primaryIface=(system.interfaces||[]).find(function(f){return f.id===primaryIfaceId;});
+    var seedAct=primaryIface?'data-act="seedExp" data-i='+i+' title="Seed from '+esc(primaryIface.name)+'"':'';
+    var moreDetails='<div class="grid3" style="margin-top:8px">'+
+      '<div class="field"><label>Attacker profile</label>'+
+        '<select class="inp" data-i='+i+' data-k="attackerRef">'+
+        '<option value="">— none —</option>'+
+        (assumptions.attacker||[]).map(function(a){return '<option value="'+esc(a.id)+'"'+(t.attackerRef===a.id?' selected':'')+'>'+esc(a.name)+' (cap '+a.capability+', '+a.access+')</option>';}).join('')+
+        '</select></div>'+
+      '<div class="field"><label>Interfaces / vectors</label>'+
+        '<div class="chips">'+(system.interfaces||[]).map(function(itf){return chip(itf.tag||itf.name,(t.interfaceRefs||[]).indexOf(itf.id)>=0,'data-act="tIface" data-i='+i+' data-val="'+esc(itf.id)+'"',itf.protocol||itf.category||'');}).join('')+
+        (!(system.interfaces||[]).length?'<span class="hint">Define in step 03 first.</span>':'')+
+        '</div>'+
+        '<input class="inp" style="margin-top:4px" data-i='+i+' data-k="interfaceLabel" value="'+esc(t.interfaceLabel||'')+'" placeholder="Custom vector label (optional)">'+
+      '</div>'+
+      '<div class="field"><label>Assets</label>'+
+        '<div class="chips">'+(system.assets||[]).map(function(a){return chip(a.name,(t.assets||[]).indexOf(a.id)>=0,'data-act="tAsset" data-i='+i+' data-val="'+esc(a.id)+'"',a.type||'');}).join('')+
+        (!(system.assets||[]).length?'<span class="hint">Define in step 03 first.</span>':'')+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="grid2" style="margin-top:6px">'+
+      '<div class="field"><label>Likelihood rationale</label><textarea class="inp" rows=2 data-i='+i+' data-k="likelihoodRationale">'+esc(t.likelihoodRationale||'')+'</textarea></div>'+
+      '<div class="field"><label>Impact rationale</label><textarea class="inp" rows=2 data-i='+i+' data-k="impactRationale">'+esc(t.impactRationale||'')+'</textarea></div>'+
+    '</div>';
+    var acceptedFields=t.status==='accepted'?
+      '<div class="grid3" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'+
+        '<div class="field"><label>Accepted by</label><input class="inp" data-i='+i+' data-k="acceptedBy" value="'+esc(t.acceptedBy||'')+'" placeholder="name / role"></div>'+
+        '<div class="field"><label>Acceptance rationale</label><input class="inp" data-i='+i+' data-k="acceptanceRationale" value="'+esc(t.acceptanceRationale||'')+'" placeholder="compensating controls..."></div>'+
+        '<div class="field"><label>Next review date</label><input class="inp" type="date" data-i='+i+' data-k="reviewDate" value="'+esc(t.reviewDate||'')+'"></div>'+
+      '</div>':
+      '';
+    var mainRow='<tr>'+
       '<td class="narrow"><input class="inp" data-i='+i+' data-k="id" value="'+esc(t.id)+'"></td>'+
       '<td><input class="inp" data-i='+i+' data-k="title" value="'+esc(t.title)+'"></td>'+
       '<td><div class="chips">'+st+'</div></td>'+
@@ -396,6 +688,15 @@ function renderThreats(){
       '<td class="stat"><div class="statwrap"><span class="badge st-'+esc(t.status||'open')+'">'+esc(statusLabel(t.status))+'</span>'+
         '<select class="inp" data-i='+i+' data-k="status">'+T_STATUS.map(function(s){return '<option value="'+s[0]+'"'+((t.status||'open')===s[0]?' selected':'')+'>'+s[1]+'</option>';}).join('')+'</select></div></td>'+
       '<td><button class="btn sm danger" data-act="delT" data-i='+i+'>&#10005;</button></td></tr>';
+    var detailRow='<tr><td colspan="9" style="padding:0 8px 10px;border-top:none">'+
+      '<details'+(hasFac?' open':'')+'>'+
+      '<summary class="hint" style="cursor:pointer;list-style:none;padding:3px 0">&#9654; More details — attacker · interfaces · assets · guided rating</summary>'+
+      moreDetails+
+      calcBlock(dims,fac,t.cvss||{},'data-i='+i,'data-dim','data-fac','data-cvss',seedAct)+
+      acceptedFields+
+      '</details>'+
+    '</td></tr>';
+    return mainRow+detailRow;
   }).join(''):'<tr><td colspan=9 class="hint">No threats yet — add one below.</td></tr>';
 }
 function updatePills(){threats.forEach(function(t,i){var el=document.getElementById('tp-'+i);if(el)el.innerHTML=riskCell(t);});}
@@ -403,22 +704,84 @@ function renderCms(){
   $('#cms-list').innerHTML=cms.length?cms.map(function(c,i){
     var addressed=(c.addresses||[]).map(function(a){return a.threat;});
     var addrRows=(c.addresses||[]).map(function(a,j){
-      return '<div class="row" style="gap:8px;align-items:center;margin:2px 0"><span class="chip static">'+esc(a.threat)+'</span>'+
-        '<span class="hint">res L</span><input class="inp" type="number" min=1 max=5 style="width:56px" data-c='+i+' data-j='+j+' data-k="residualLikelihood" value="'+(a.residualLikelihood||2)+'">'+
-        '<span class="hint">res I</span><input class="inp" type="number" min=1 max=5 style="width:56px" data-c='+i+' data-j='+j+' data-k="residualImpact" value="'+(a.residualImpact||2)+'">'+
-        '<button class="btn sm danger" data-act="delAddr" data-c='+i+' data-j='+j+'>remove</button></div>';
+      var thr=threats.find(function(x){return x.id===a.threat;})||{};
+      var rDims=a.impactDimensions||{}, rFac=a.likelihoodFactors||{}, rCv=a.cvss||{};
+      var rBlock=calcBlock(rDims,rFac,rCv,'data-ri='+i+' data-rj='+j,'data-rdim','data-rfac','data-rcvss','');
+      return '<div class="itemcard" style="margin:6px 0">'+
+        '<div class="row" style="gap:8px;align-items:center">'+
+          '<span class="chip static">'+esc(a.threat)+'</span>'+
+          '<span class="hint" style="flex:1">'+esc(thr.title||'')+'</span>'+
+          '<span class="hint">initial '+esc(thr.likelihood||'?')+'×'+esc(thr.impact||'?')+'</span>'+
+        '</div>'+
+        '<div class="grid2" style="margin-top:6px">'+
+          '<div class="field"><label>Residual likelihood</label>'+
+            '<input class="inp" type="number" min=1 max=5 data-c='+i+' data-j='+j+' data-k="residualLikelihood" value="'+(a.residualLikelihood||2)+'"></div>'+
+          '<div class="field"><label>Residual impact</label>'+
+            '<input class="inp" type="number" min=1 max=5 data-c='+i+' data-j='+j+' data-k="residualImpact" value="'+(a.residualImpact||2)+'"></div>'+
+        '</div>'+
+        rBlock+
+        '<div style="margin-top:6px;text-align:right">'+
+          '<button class="btn sm danger" data-act="delAddr" data-c='+i+' data-j='+j+'>remove</button>'+
+        '</div>'+
+      '</div>';
     }).join('');
     var avail=threats.filter(function(t){return addressed.indexOf(t.id)<0;}).map(function(t){return chip(t.id,false,'data-act="addAddr" data-c='+i+' data-val="'+esc(t.id)+'"',t.title);}).join('');
     return '<div class="card" style="margin:10px 0;background:var(--surface-2)">'+
       '<div class="row"><div class="field narrow" style="flex:0 0 90px"><label>ID</label><input class="inp" data-ci='+i+' data-k="id" value="'+esc(c.id)+'"></div>'+
       '<div class="field" style="flex:2"><label>Title</label><input class="inp" data-ci='+i+' data-k="title" value="'+esc(c.title)+'"></div>'+
       '<div class="field"><label>Type</label><select class="inp" data-ci='+i+' data-k="type">'+['preventive','detective','corrective','organizational'].map(function(o){return '<option'+(c.type===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select></div>'+
-      '<div class="field"><label>Status</label><select class="inp" data-ci='+i+' data-k="status">'+['proposed','implemented','verified'].map(function(o){return '<option'+(c.status===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select></div>'+
+      '<div class="field"><label>Status</label><select class="inp" data-ci='+i+' data-k="status">'+['proposed','planned','implemented','verified'].map(function(o){return '<option'+(c.status===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select></div>'+
       '<button class="btn sm danger" data-act="delC" data-i='+i+' style="align-self:center">&#10005;</button></div>'+
+      (c.status==='implemented'||c.status==='verified'?
+        '<div style="margin-top:6px">'+
+          '<div class="hint" style="margin-bottom:4px">Implementation ticket URLs'+(!(c.ticketUrls||[]).filter(Boolean).length?' <span style="color:var(--warn)">(at least one required)</span>':'')+'</div>'+
+          ((c.ticketUrls&&c.ticketUrls.length?c.ticketUrls:['']).map(function(url,ti){
+            return '<div class="row" style="gap:6px;margin:3px 0"><input class="inp grow" data-ci='+i+' data-ti='+ti+' data-k="ticketUrls" value="'+esc(url||'')+'" placeholder="https://dev.azure.com/…/workitems/edit/123"'+(!url?' style="border-color:var(--warn);"':'')+'>'+
+              '<button class="btn sm danger" data-act="delTicket" data-ci='+i+' data-ti='+ti+'>✕</button></div>';
+          }).join(''))+
+          '<button class="btn sm" data-act="addTicket" data-ci='+i+' style="margin-top:4px">+ Add ticket URL</button>'+
+        '</div>':'')+
       '<div style="margin-top:6px"><div class="hint">Addresses</div>'+(addrRows||'<span class="hint">No threats addressed yet.</span>')+'</div>'+
       (avail?'<div style="margin-top:6px"><div class="hint">Add threat</div><div class="chips">'+avail+'</div></div>':'')+
       '</div>';
   }).join(''):'<span class="hint">No countermeasures yet — add one below.</span>';
+}
+function renderVersions(){
+  var el=$('#versions-body');
+  if(!el)return;
+  var tracker=changeTracker||{currentVersion:null,entries:[]};
+  var entries=tracker.entries||[];
+  var current=tracker.currentVersion||null;
+  var isFirst=!entries.length;
+  var reasons=isFirst?['initial']:['functional changes','new vulnerabilities','regular reassessment'];
+  var history=entries.length?entries.map(function(entry){
+    return '<div class="itemcard" style="margin:6px 0">'+
+      '<div class="row" style="gap:10px"><strong>'+esc(entry.version)+'</strong>'+
+      '<span class="badge">'+esc(entry.reason)+'</span></div>'+
+      '<div class="hint">'+esc(entry.assessedAt||'')+
+      (entry.assessors&&entry.assessors.length?' \u00b7 '+esc(entry.assessors.join(', ')):'')+'</div>'+
+      (entry.summary?'<p style="margin:4px 0 0">'+esc(entry.summary)+'</p>':'')+
+      '</div>';
+  }).join(''):'<p class="hint">No TRA versions recorded yet.</p>';
+  el.innerHTML=
+    '<div class="itemcard" style="margin-bottom:10px">'+
+      '<b>'+(current?'Current: '+esc(current):'No version tagged yet')+'</b>'+
+      '<div class="hint" style="margin-top:4px">Tags are stored in 01-project-description/change-tracker.json</div>'+
+    '</div>'+
+    '<div class="itemcard" style="margin-bottom:10px">'+
+      '<div class="grid3">'+
+        '<div class="field"><label>Reason</label><select class="inp" id="vReason">'+
+          reasons.map(function(r){return '<option value="'+esc(r)+'">'+esc(r)+'</option>';}).join('')+
+        '</select></div>'+
+        '<div class="field"><label>Assessment date</label><input class="inp" id="vDate" type="date" value="'+esc(new Date().toISOString().slice(0,10))+'"></div>'+
+        '<div class="field"><label>Assessors (comma-separated)</label><input class="inp" id="vAssessors" placeholder="Jane Doe, John Smith"></div>'+
+      '</div>'+
+      '<div class="field" style="margin-top:6px"><label>Summary note</label>'+
+        '<textarea class="inp" id="vSummary" rows=2 placeholder="Short description of what changed or was assessed."></textarea>'+
+      '</div>'+
+      '<div style="margin-top:8px"><button class="btn primary" data-act="recordVersion">Record version</button></div>'+
+    '</div>'+
+    '<div class="itemcard"><h3 style="margin:0 0 8px">History ('+entries.length+')</h3>'+history+'</div>';
 }
 function renderAssumptions(){
   var tabs=[['attacker','Attacker',(assumptions.attacker||[]).length]].concat(ASM_CATS.map(function(c){return [c[0],c[1],(assumptions[c[0]]||[]).length];}));
@@ -466,7 +829,15 @@ function renderSystem(){
           '<div class="field"><label>Provenance</label><select class="inp" data-comp='+i+' data-k="provenance">'+optTags(PROVENANCE,c.provenance||'own')+'</select></div>'+
           '<div class="field"><label>Layer</label><input class="inp" type="number" min=1 max=6 data-comp='+i+' data-k="layer" value="'+(+c.layer||1)+'"></div>'+
           '<div class="field"><label>Parent</label><select class="inp" data-comp='+i+' data-k="parent">'+parentSel+'</select></div>'+
-        '</div></div>';
+        '</div>'+
+        '<details style="margin-top:4px"><summary class="hint" style="cursor:pointer;list-style:none;padding:2px 0">&#9654; SBOM metadata — version · supplier · license · CPE/purl</summary>'+
+          '<div class="grid4" style="margin-top:6px">'+
+            '<div class="field"><label>Version</label><input class="inp" data-comp='+i+' data-k="version" value="'+esc(c.version||'')+'" placeholder="1.2.3"></div>'+
+            '<div class="field"><label>Supplier</label><input class="inp" data-comp='+i+' data-k="supplier" value="'+esc(c.supplier||'')+'" placeholder="Vendor name"></div>'+
+            '<div class="field"><label>License (SPDX)</label><input class="inp" data-comp='+i+' data-k="license" value="'+esc(c.license||'')+'" placeholder="MIT, GPL-2.0, ..."></div>'+
+            '<div class="field"><label>CPE / purl</label><input class="inp" data-comp='+i+' data-k="cpe" value="'+esc(c.cpe||'')+'" placeholder="cpe:2.3:a:… or pkg:..."></div>'+
+          '</div></details>'+
+        '</div>';
     }).join(''):'<p class="hint">No components yet.</p>';
     html+='<button class="btn sm" data-act="addComp">+ Component</button>';
   } else if(sysTab==='interfaces'){
@@ -533,7 +904,7 @@ function toast(kind,text){var e=$('#'+kind);e.textContent=text;e.style.display='
 document.addEventListener('click',function(e){
   var tabEl=e.target.closest('[data-asmtab],[data-systab]');
   if(tabEl){if(tabEl.dataset.asmtab){asmTab=tabEl.dataset.asmtab;renderAssumptions();}else{sysTab=tabEl.dataset.systab;renderSystem();}return;}
-  var el=e.target.closest('[data-act],[data-kind],[data-cmd]');
+  var el=e.target.closest('[data-act],[data-kind],[data-cmd],[data-role]');
   if(!el)return;
   var act=el.dataset.act, kind=el.dataset.kind, cmd=el.dataset.cmd;
   if(act==='undo'){undo();return;}
@@ -546,17 +917,14 @@ document.addEventListener('click',function(e){
   }
   if(cmd){vs.postMessage({cmd:cmd});return;}
   var before=snapshot();
-  if(act==='saveP'){vs.postMessage({cmd:'project',name:$('#p-name').value,sl:$('#p-sl').value,mode:$('#p-mode').value,bnd:$('#p-bnd').value});}
-  else if(act==='saveT'){vs.postMessage({cmd:'threats',threats:threats,compIds:comps.map(function(c){return c.id;})});}
-  else if(act==='saveC'){vs.postMessage({cmd:'cms',cms:cms});}
-  else if(act==='addT'){threats.push({id:'T'+(threats.length+1),title:'New threat',stride:['T'],components:[],likelihood:3,impact:3,status:'open'});renderThreats();renderRail();}
+  if(act==='addT'){threats.push({id:'T'+(threats.length+1),title:'New threat',stride:['T'],components:[],likelihood:3,impact:3,status:'open'});renderThreats();renderRail();}
   else if(act==='delT'){threats.splice(+el.dataset.i,1);renderThreats();renderRail();}
   else if(act==='addC'){cms.push({id:'CM'+(cms.length+1),title:'New countermeasure',type:'preventive',status:'proposed',addresses:[]});renderCms();renderRail();}
   else if(act==='delC'){cms.splice(+el.dataset.i,1);renderCms();updatePills();renderRail();}
   else if(act==='delAddr'){cms[+el.dataset.c].addresses.splice(+el.dataset.j,1);renderCms();updatePills();}
   else if(act==='addAddr'){cms[+el.dataset.c].addresses.push({threat:el.dataset.val,residualLikelihood:2,residualImpact:2});renderCms();updatePills();}
-  else if(act==='saveA'){vs.postMessage({cmd:'assumptions',assumptions:assumptions});}
-  else if(act==='saveS'){vs.postMessage({cmd:'system',system:system});}
+  else if(act==='addTicket'){var cm2=cms[+el.dataset.ci];cm2.ticketUrls=cm2.ticketUrls&&cm2.ticketUrls.length?cm2.ticketUrls:[''];cm2.ticketUrls.push('');renderCms();}
+  else if(act==='delTicket'){var cm3=cms[+el.dataset.ci],ti3=+el.dataset.ti;var urls3=cm3.ticketUrls&&cm3.ticketUrls.length?cm3.ticketUrls:[''];urls3.splice(ti3,1);cm3.ticketUrls=urls3;renderCms();}
   else if(act==='addAtk'){assumptions.attacker=assumptions.attacker||[];assumptions.attacker.push({id:uid('ATK-',assumptions.attacker.map(function(x){return x.id;})),name:'New attacker',capability:2,access:'local',motivation:'',resources:'',text:''});asmTab='attacker';renderAssumptions();}
   else if(act==='delAtk'){assumptions.attacker.splice(+el.dataset.i,1);renderAssumptions();}
   else if(act==='addAsm'){var ak=el.dataset.asm;assumptions[ak]=assumptions[ak]||[];assumptions[ak].push({id:uid('A-'+ak.charAt(0).toUpperCase()+'-',assumptions[ak].map(function(x){return x.id;})),text:''});renderAssumptions();}
@@ -571,20 +939,56 @@ document.addEventListener('click',function(e){
   else if(act==='delAs'){system.assets.splice(+el.dataset.i,1);renderSystem();}
   else if(act==='tbMem'){var bb=system.trustBoundaries[+el.dataset.tb];bb.members=bb.members||[];var mk=bb.members.indexOf(el.dataset.val);if(mk>=0)bb.members.splice(mk,1);else bb.members.push(el.dataset.val);renderSystem();}
   else if(act==='asComp'){var aa=system.assets[+el.dataset.as];aa.components=aa.components||[];var ck=aa.components.indexOf(el.dataset.val);if(ck>=0)aa.components.splice(ck,1);else aa.components.push(el.dataset.val);renderSystem();}
-  else if(act==='saveR'){vs.postMessage({cmd:'requirements',requirements:requirements});}
   else if(act==='addReq'){requirements=requirements||[];requirements.push({id:uid('R',requirements.map(function(x){return x.id;})),text:'',standardRef:'',slFr:'',derivedFromThreat:[],satisfiedByCM:[]});renderRequirements();}
   else if(act==='delReq'){requirements.splice(+el.dataset.i,1);renderRequirements();}
   else if(act==='reqThreat'){var rq=requirements[+el.dataset.req];rq.derivedFromThreat=rq.derivedFromThreat||[];var rk=rq.derivedFromThreat.indexOf(el.dataset.val);if(rk>=0)rq.derivedFromThreat.splice(rk,1);else rq.derivedFromThreat.push(el.dataset.val);renderRequirements();}
   else if(act==='reqCm'){var rc=requirements[+el.dataset.req];rc.satisfiedByCM=rc.satisfiedByCM||[];var rck=rc.satisfiedByCM.indexOf(el.dataset.val);if(rck>=0)rc.satisfiedByCM.splice(rck,1);else rc.satisfiedByCM.push(el.dataset.val);renderRequirements();}
+  else if(act==='recordVersion'){
+    var assessors=String(($('#vAssessors')||{}).value||'').split(',').map(function(x){return x.trim();}).filter(Boolean);
+    if(!assessors.length){toast('err','Add at least one assessor name.');return;}
+    var vReason=($('#vReason')||{}).value||'', vDate=($('#vDate')||{}).value||'', vSummary=($('#vSummary')||{}).value||'';
+    vs.postMessage({cmd:'versionRecord',reason:vReason,assessedAt:vDate,assessors:assessors,summary:vSummary});
+    return;
+  }
+  else if(act==='tIface'){
+    var tIfIdx=+el.dataset.i,tIfVal=el.dataset.val;
+    threats[tIfIdx].interfaceRefs=threats[tIfIdx].interfaceRefs||[];
+    var tIfK=threats[tIfIdx].interfaceRefs.indexOf(tIfVal);
+    if(tIfK>=0)threats[tIfIdx].interfaceRefs.splice(tIfK,1);else threats[tIfIdx].interfaceRefs.push(tIfVal);
+    renderThreats();
+  }
+  else if(act==='tAsset'){
+    var tAsIdx=+el.dataset.i,tAsVal=el.dataset.val;
+    threats[tAsIdx].assets=threats[tAsIdx].assets||[];
+    var tAsK=threats[tAsIdx].assets.indexOf(tAsVal);
+    if(tAsK>=0)threats[tAsIdx].assets.splice(tAsK,1);else threats[tAsIdx].assets.push(tAsVal);
+    renderThreats();
+  }
+  else if(act==='seedExp'){
+    var sIdx=+el.dataset.i,sThr=threats[sIdx];
+    var sPrimId=(sThr.interfaceRefs&&sThr.interfaceRefs[0]);
+    var sItf=(system.interfaces||[]).find(function(f){return f.id===sPrimId;});
+    if(sItf){
+      var sExp=R.exposureFromInterface(sItf.exposure);
+      if(sExp!=null){
+        sThr.likelihoodFactors=sThr.likelihoodFactors||{};sThr.likelihoodFactors.exposure=sExp;
+        var sLv=R.deriveLikelihood(sThr.likelihoodFactors);
+        if(sLv!=null){sThr.likelihood=sLv;}
+        renderThreats();
+      }
+    }
+  }
   else if(el.classList.contains('chip')&&el.dataset.role){
     var i=+el.dataset.i,val=el.dataset.val,arrKey=el.dataset.role==='stride'?'stride':'components';
     var arr=threats[i][arrKey]||(threats[i][arrKey]=[]);var k=arr.indexOf(val);if(k>=0)arr.splice(k,1);else arr.push(val);
     renderThreats();
   }
   recordChanged(before);
+  scheduleAutoSave();
 });
 document.addEventListener('input',function(e){
   var t=e.target;
+  scheduleAutoSave();
   recordBefore(keyOf(t));
   if(t.id==='p-name'){project.name=t.value;$('#devname').textContent=t.value?('· '+t.value):'';return;}
   if(t.id==='p-sl'){project.sl=t.value;return;}
@@ -594,7 +998,14 @@ document.addEventListener('input',function(e){
     if(k==='likelihood'||k==='impact'){threats[i][k]=Math.max(1,Math.min(5,+t.value||1));var el=document.getElementById('tp-'+i);if(el)el.innerHTML=riskCell(threats[i]);}
     else if(k==='status'){threats[i].status=t.value;var cell=t.closest('td');var bd=cell&&cell.querySelector('.badge');if(bd){bd.className='badge st-'+t.value;bd.textContent=statusLabel(t.value);}}
     else threats[i][k]=t.value;return;}
-  if(t.dataset.ci!==undefined&&t.dataset.k){cms[+t.dataset.ci][t.dataset.k]=t.value;return;}
+  if(t.dataset.ci!==undefined&&t.dataset.k){
+    if(t.dataset.k==='ticketUrls'&&t.dataset.ti!==undefined){
+      var cmi=cms[+t.dataset.ci];
+      cmi.ticketUrls=cmi.ticketUrls&&cmi.ticketUrls.length?cmi.ticketUrls:[''];
+      cmi.ticketUrls[+t.dataset.ti]=t.value;
+    } else {cms[+t.dataset.ci][t.dataset.k]=t.value; if(t.dataset.k==='status')renderCms();}
+    return;
+  }
   if(t.dataset.c!==undefined&&t.dataset.j!==undefined&&t.dataset.k){cms[+t.dataset.c].addresses[+t.dataset.j][t.dataset.k]=Math.max(1,Math.min(5,+t.value||1));updatePills();return;}
   if(t.dataset.atk!==undefined&&t.dataset.k){var p=assumptions.attacker[+t.dataset.atk];if(p)p[t.dataset.k]=(t.dataset.k==='capability')?(+t.value||2):t.value;return;}
   if(t.dataset.asm!==undefined&&t.dataset.ai!==undefined&&t.dataset.k){var arr=assumptions[t.dataset.asm];if(arr&&arr[+t.dataset.ai])arr[+t.dataset.ai][t.dataset.k]=t.value;return;}
@@ -603,17 +1014,86 @@ document.addEventListener('input',function(e){
   if(t.dataset.tb!==undefined&&t.dataset.k){var b=system.trustBoundaries[+t.dataset.tb];if(b)b[t.dataset.k]=t.value;return;}
   if(t.dataset.as!==undefined){var a=system.assets[+t.dataset.as];if(!a)return;if(t.dataset.obj){a.objectives=a.objectives||{};a.objectives[t.dataset.obj]=Math.max(0,Math.min(5,+t.value||0));}else if(t.dataset.k){a[t.dataset.k]=t.value;}return;}
   if(t.dataset.req!==undefined&&t.dataset.k){var rr=requirements[+t.dataset.req];if(rr)rr[t.dataset.k]=t.value;return;}
+  // Bug Bar dimension (threat)
+  if(t.dataset.dim!==undefined&&t.dataset.i!==undefined){
+    var tIdx=+t.dataset.i,tk=t.dataset.dim;
+    threats[tIdx].impactDimensions=threats[tIdx].impactDimensions||{};
+    if(t.value!=='')threats[tIdx].impactDimensions[tk]=+t.value;else delete threats[tIdx].impactDimensions[tk];
+    var dv=R.deriveImpact(threats[tIdx].impactDimensions);
+    if(dv!=null){threats[tIdx].impact=dv;var dInp=document.querySelector('[data-i="'+tIdx+'"][data-k="impact"]');if(dInp)dInp.value=dv;var dEl=document.getElementById('tp-'+tIdx);if(dEl)dEl.innerHTML=riskCell(threats[tIdx]);}
+    return;
+  }
+  // Likelihood factor (threat)
+  if(t.dataset.fac!==undefined&&t.dataset.i!==undefined){
+    var tIdx=+t.dataset.i,fk=t.dataset.fac;
+    threats[tIdx].likelihoodFactors=threats[tIdx].likelihoodFactors||{};
+    if(t.value!=='')threats[tIdx].likelihoodFactors[fk]=+t.value;else delete threats[tIdx].likelihoodFactors[fk];
+    var lv=R.deriveLikelihood(threats[tIdx].likelihoodFactors);
+    if(lv!=null){threats[tIdx].likelihood=lv;var lInp=document.querySelector('[data-i="'+tIdx+'"][data-k="likelihood"]');if(lInp)lInp.value=lv;var lEl=document.getElementById('tp-'+tIdx);if(lEl)lEl.innerHTML=riskCell(threats[tIdx]);}
+    return;
+  }
+  // CVSS field (threat)
+  if(t.dataset.cvss!==undefined&&t.dataset.i!==undefined){
+    var tIdx=+t.dataset.i,ck=t.dataset.cvss;
+    threats[tIdx].cvss=threats[tIdx].cvss||{};
+    if(ck==='baseScore')threats[tIdx].cvss.baseScore=t.value===''?undefined:+t.value;
+    else threats[tIdx].cvss[ck]=t.value||undefined;
+    if(ck==='vector'&&t.value){
+      var cbs=R.cvssBaseScore(t.value);
+      if(cbs!=null){threats[tIdx].cvss.baseScore=cbs;var bsInp=document.querySelector('[data-cvss="baseScore"][data-i="'+tIdx+'"]');if(bsInp){bsInp.value=cbs;bsInp.setAttribute('readonly','');}}
+      var cexp=R.cvssExploitability(t.value);
+      if(cexp!=null){threats[tIdx].likelihoodFactors=threats[tIdx].likelihoodFactors||{};threats[tIdx].likelihoodFactors.exploitability=cexp;var clv=R.deriveLikelihood(threats[tIdx].likelihoodFactors);if(clv!=null){threats[tIdx].likelihood=clv;var clInp=document.querySelector('[data-i="'+tIdx+'"][data-k="likelihood"]');if(clInp)clInp.value=clv;var clEl=document.getElementById('tp-'+tIdx);if(clEl)clEl.innerHTML=riskCell(threats[tIdx]);}}
+    }
+    return;
+  }
+  // Residual Bug Bar dimension (CM address)
+  if(t.dataset.rdim!==undefined&&t.dataset.ri!==undefined&&t.dataset.rj!==undefined){
+    var ri=+t.dataset.ri,rj=+t.dataset.rj,rdk=t.dataset.rdim;
+    if(!cms[ri]||!cms[ri].addresses[rj])return;
+    cms[ri].addresses[rj].impactDimensions=cms[ri].addresses[rj].impactDimensions||{};
+    if(t.value!=='')cms[ri].addresses[rj].impactDimensions[rdk]=+t.value;else delete cms[ri].addresses[rj].impactDimensions[rdk];
+    var rdv=R.deriveImpact(cms[ri].addresses[rj].impactDimensions);
+    if(rdv!=null){cms[ri].addresses[rj].residualImpact=rdv;var rdInp=document.querySelector('[data-ri="'+ri+'"][data-rj="'+rj+'"][data-k="residualImpact"]');if(rdInp)rdInp.value=rdv;updatePills();}
+    return;
+  }
+  // Residual likelihood factor (CM address)
+  if(t.dataset.rfac!==undefined&&t.dataset.ri!==undefined&&t.dataset.rj!==undefined){
+    var ri=+t.dataset.ri,rj=+t.dataset.rj,rfk=t.dataset.rfac;
+    if(!cms[ri]||!cms[ri].addresses[rj])return;
+    cms[ri].addresses[rj].likelihoodFactors=cms[ri].addresses[rj].likelihoodFactors||{};
+    if(t.value!=='')cms[ri].addresses[rj].likelihoodFactors[rfk]=+t.value;else delete cms[ri].addresses[rj].likelihoodFactors[rfk];
+    var rlv=R.deriveLikelihood(cms[ri].addresses[rj].likelihoodFactors);
+    if(rlv!=null){cms[ri].addresses[rj].residualLikelihood=rlv;var rlInp=document.querySelector('[data-ri="'+ri+'"][data-rj="'+rj+'"][data-k="residualLikelihood"]');if(rlInp)rlInp.value=rlv;updatePills();}
+    return;
+  }
+  // Residual CVSS field (CM address)
+  if(t.dataset.rcvss!==undefined&&t.dataset.ri!==undefined&&t.dataset.rj!==undefined){
+    var ri=+t.dataset.ri,rj=+t.dataset.rj,rck=t.dataset.rcvss;
+    if(!cms[ri]||!cms[ri].addresses[rj])return;
+    cms[ri].addresses[rj].cvss=cms[ri].addresses[rj].cvss||{};
+    if(rck==='baseScore')cms[ri].addresses[rj].cvss.baseScore=t.value===''?undefined:+t.value;
+    else cms[ri].addresses[rj].cvss[rck]=t.value||undefined;
+    if(rck==='vector'&&t.value){
+      var rcbs=R.cvssBaseScore(t.value);
+      if(rcbs!=null){cms[ri].addresses[rj].cvss.baseScore=rcbs;var rbsInp=document.querySelector('[data-rcvss="baseScore"][data-ri="'+ri+'"][data-rj="'+rj+'"]');if(rbsInp){rbsInp.value=rcbs;rbsInp.setAttribute('readonly','');}}
+      var rcexp=R.cvssExploitability(t.value);
+      if(rcexp!=null){cms[ri].addresses[rj].likelihoodFactors=cms[ri].addresses[rj].likelihoodFactors||{};cms[ri].addresses[rj].likelihoodFactors.exploitability=rcexp;var rclv=R.deriveLikelihood(cms[ri].addresses[rj].likelihoodFactors);if(rclv!=null){cms[ri].addresses[rj].residualLikelihood=rclv;var rclInp=document.querySelector('[data-ri="'+ri+'"][data-rj="'+rj+'"][data-k="residualLikelihood"]');if(rclInp)rclInp.value=rclv;updatePills();}}
+    }
+    return;
+  }
 });
 
 window.addEventListener('message',function(ev){
   var m=ev.data;
-  if(m.cmd==='init'){threats=m.data.threats||[];cms=m.data.cms||[];comps=m.data.comps||[];counts=m.data.counts||{};assumptions=m.data.assumptions||assumptions;system=m.data.system||system;requirements=m.data.requirements||[];renderProject(m.data.project);renderThreats();renderCms();renderAssumptions();renderSystem();renderRequirements();renderRail();clearHistory();}
+  if(m.cmd==='init'){threats=m.data.threats||[];cms=m.data.cms||[];comps=m.data.comps||[];counts=m.data.counts||{};changeTracker=m.data.changeTracker||changeTracker;assumptions=m.data.assumptions||assumptions;system=m.data.system||system;requirements=m.data.requirements||[];try{renderProject(m.data.project);}catch(e){console.error('project',e);}try{renderRail();}catch(e){console.error('rail',e);}try{renderThreats();}catch(e){console.error('threats',e);}try{renderCms();}catch(e){console.error('cms',e);}try{renderAssumptions();}catch(e){console.error('assumptions',e);}try{renderSystem();}catch(e){console.error('system',e);}try{renderRequirements();}catch(e){console.error('requirements',e);}try{renderVersions();}catch(e){console.error('versions',e);}clearHistory();}
   else if(m.cmd==='threats'){threats=m.threats||[];counts=m.counts||counts;renderThreats();renderCms();renderRequirements();renderRail();toast('ok',m.text);}
   else if(m.cmd==='cms'){cms=m.cms||[];counts=m.counts||counts;renderCms();updatePills();renderRequirements();renderRail();toast('ok',m.text);}
   else if(m.cmd==='assumptions'){assumptions=m.assumptions||assumptions;counts=m.counts||counts;renderAssumptions();renderRail();toast('ok',m.text);}
   else if(m.cmd==='system'){system=m.system||system;comps=m.comps||comps;counts=m.counts||counts;renderSystem();renderThreats();renderRail();toast('ok',m.text);}
   else if(m.cmd==='requirements'){requirements=m.requirements||requirements;counts=m.counts||counts;renderRequirements();renderRail();toast('ok',m.text);}
   else if(m.cmd==='msg'){counts=m.counts||counts;renderRail();toast('ok',m.text);}
+  else if(m.cmd==='saved'){counts=m.counts||counts;renderRail();var st=$('#savingStatus');if(st){st.textContent='Saved';st.style.color='#4caf50';setTimeout(function(){if(st&&st.textContent==='Saved')st.textContent='';},2500);}}
+  else if(m.cmd==='versionResult'){if(!m.ok)toast('err',m.error||'Could not record version.');else{changeTracker=m.tracker||changeTracker;counts=m.counts||counts;try{renderVersions();}catch(e){}renderRail();toast('ok',m.text);}}
   else if(m.cmd==='err'){toast('err',m.text);}
 });
 document.addEventListener('keydown',function(e){
