@@ -67,8 +67,10 @@
   }
 
   function shapeSvg(n, focus, riskColor) {
-    var hl = n.id === focus ? "stroke='#1565c0' stroke-width='3'" : "stroke='currentColor' stroke-width='1.5'";
-    var fill = riskColor ? "fill='" + riskColor + "' fill-opacity='0.22'" : "fill='#fff' fill-opacity='0.06'";
+    var focusStroke = n.id === focus ? "stroke='#1565c0' stroke-width='3'" : "";
+    var borderStroke = riskColor ? "stroke='" + riskColor + "' stroke-width='2.5'" : "stroke='currentColor' stroke-width='1.5'";
+    var hl = n.id === focus ? focusStroke : borderStroke;
+    var fill = riskColor ? "fill='" + riskColor + "' fill-opacity='0.18'" : "fill='#fff' fill-opacity='0.06'";
     var x = n.x, y = n.y, w = NW, h = NH, cx = x + w / 2, cy = y + h / 2, label = esc(String(n.label).slice(0, 22));
     var inner;
     if (n.type === "process" || n.type === "multiprocess") {
@@ -81,7 +83,8 @@
     } else {
       inner = "<rect x='" + x + "' y='" + y + "' width='" + w + "' height='" + h + "' " + fill + " " + hl + "/>";
     }
-    return "<g data-id='" + esc(n.id) + "' class='node' style='cursor:move'>" + inner +
+    var badge = riskColor ? "<circle cx='" + (x + w - 7) + "' cy='" + (y + 7) + "' r='5' fill='" + riskColor + "' opacity='0.95' style='pointer-events:none'/>" : "";
+    return "<g data-id='" + esc(n.id) + "' class='node' style='cursor:move'>" + inner + badge +
       "<text x='" + cx + "' y='" + (cy + 4) + "' text-anchor='middle' font-size='12' fill='currentColor' style='pointer-events:none'>" + label + "</text></g>";
   }
 

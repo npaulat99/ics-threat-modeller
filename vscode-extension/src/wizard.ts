@@ -340,6 +340,29 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
       return panel.webview.postMessage({ cmd: "versionResult", ok: true, tracker: nextTracker, counts: await counts(), text: `Recorded ${nextVer}.` });
     }
 
+    if (m.cmd === "autoSave") {
+      try {
+        const d = m.data || {};
+        if (d.project) {
+          const proj = await rdRaw(f.proj, "01-project-description/project.json", {});
+          proj.device = proj.device || {}; proj.device.name = d.project.name;
+          proj.slTarget = d.project.sl; proj.scope = proj.scope || {};
+          proj.scope.mode = d.project.mode; proj.scope.boundary = d.project.boundary;
+          if (d.project.sbom) proj.sbom = d.project.sbom;
+          await write(f.proj, "01-project-description/project.json", proj);
+        }
+        if (Array.isArray(d.threats)) await write(f.proj, "06-threats/threats.json", { threats: d.threats });
+        if (Array.isArray(d.cms)) await write(f.proj, "08-countermeasures/countermeasures.json", { countermeasures: d.cms });
+        if (d.assumptions) await write(f.proj, "02-assumptions/assumptions.json", d.assumptions);
+        if (d.system) {
+          const prev = await rdRaw(f.proj, "03-system-assets/system.json", {});
+          await write(f.proj, "03-system-assets/system.json", { ...prev, components: d.system.components || [], interfaces: d.system.interfaces || [], trustBoundaries: d.system.trustBoundaries || [], assets: d.system.assets || [] });
+        }
+        if (Array.isArray(d.requirements)) await write(f.proj, "05-requirements/requirements.json", { requirements: d.requirements });
+        return panel.webview.postMessage({ cmd: "saved", counts: await counts() });
+      } catch { return panel.webview.postMessage({ cmd: "err", text: "Auto-save failed." }); }
+    }
+
     if (m.cmd === "openFile") {
       try { const doc = await vscode.workspace.openTextDocument(vscode.Uri.joinPath(f.proj, m.rel)); await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside); }
       catch { vscode.window.showInformationMessage(`${m.rel} does not exist yet.`); }
@@ -362,6 +385,7 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
     <span class="spacer"></span>
     <button class="btn" id="undoBtn" data-act="undo" title="Undo (Ctrl+Z)" disabled>&#8630; Undo</button>
     <button class="btn" id="redoBtn" data-act="redo" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" disabled>&#8631; Redo</button>
+    <span id="savingStatus" style="font-size:11px;margin-left:4px"></span>
     <button class="btn" data-cmd="kb">Knowledge base</button>
     <button class="btn primary" data-cmd="report">Generate report</button>
   </div>
@@ -396,7 +420,7 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
           </div>
           <p class="hint" style="margin:4px 0 0">In-tool SBOM is generated from the component list (version, supplier, license, CPE fields in step 03).</p>
         </details>
-        <button class="btn primary" data-act="saveP" style="margin-top:10px">Save project</button>
+        <p class="hint" style="margin:6px 0 0">Changes are saved automatically.</p>
       </div>
 
       <div class="card" id="card-assumptions">
@@ -404,7 +428,7 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
         <div class="desc">Ground the analysis: at least one <b>attacker profile</b> is required (it grounds the likelihood), plus device / system / environment / operational assumptions.</div>
         <div class="tabs" id="asm-tabs"></div>
         <div id="asm-body"></div>
-        <div style="margin-top:10px"><button class="btn primary" data-act="saveA">Save assumptions</button></div>
+
       </div>
 
       <div class="card" id="card-system">
@@ -412,28 +436,28 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
         <div class="desc">Decompose the device into components, interfaces and trust boundaries, then list the protected assets and their Confidentiality / Integrity / Availability / Safety objectives (0–5). Components defined here feed the threats in step 06.</div>
         <div class="tabs" id="sys-tabs"></div>
         <div id="sys-body"></div>
-        <div style="margin-top:10px"><button class="btn primary" data-act="saveS">Save system &amp; assets</button></div>
+
       </div>
 
       <div class="card" id="card-requirements">
         <h2>05 · Security requirements</h2>
         <div class="desc">Derive testable requirements from the threats and link them to the controls that satisfy them — the traceable core (threat &rarr; requirement &rarr; control) that IEC 62443-4-1 / CRA expect.</div>
         <div id="req-body"></div>
-        <div style="margin-top:10px"><button class="btn" data-act="addReq">+ Requirement</button> <button class="btn primary" data-act="saveR">Save requirements</button></div>
+        <div style="margin-top:10px"><button class="btn" data-act="addReq">+ Requirement</button></div>
       </div>
 
       <div class="card" id="card-threats">
         <h2>06 · Threats &amp; risk</h2>
         <div class="desc">Each threat needs a unique ID, at least one STRIDE category and one affected component. Risk = Likelihood × Impact; the residual reflects the single most-protective countermeasure. The <b>status</b> shows how each threat is being handled.</div>
         <table class="grid"><thead><tr><th class="narrow">ID</th><th>Title</th><th>STRIDE</th><th>Components</th><th class="num">L</th><th class="num">I</th><th>Risk &rarr; residual</th><th class="stat">Status</th><th></th></tr></thead><tbody id="threats-body"></tbody></table>
-        <div style="margin-top:10px"><button class="btn" data-act="addT">+ Threat</button> <button class="btn primary" data-act="saveT">Save threats</button></div>
+        <div style="margin-top:10px"><button class="btn" data-act="addT">+ Threat</button></div>
       </div>
 
       <div class="card" id="card-cms">
         <h2>08 · Countermeasures</h2>
         <div class="desc">A countermeasure addresses one or more threats and sets the residual L/I per threat. Preventive controls should lower likelihood, not impact.</div>
         <div id="cms-list"></div>
-        <div style="margin-top:10px"><button class="btn" data-act="addC">+ Countermeasure</button> <button class="btn primary" data-act="saveC">Save countermeasures</button></div>
+        <div style="margin-top:10px"><button class="btn" data-act="addC">+ Countermeasure</button></div>
       </div>
 
       <div class="card" id="card-versions">
@@ -501,6 +525,15 @@ function applyState(s){var d=JSON.parse(s);project=d.project||project;threats=d.
 function undo(){if(!undoStack.length)return;redoStack.push(snapshot());applyState(undoStack.pop());histKey='';updUndoBtns();}
 function redo(){if(!redoStack.length)return;undoStack.push(snapshot());applyState(redoStack.pop());histKey='';updUndoBtns();}
 function clearHistory(){undoStack=[];redoStack=[];histKey='';histTime=0;updUndoBtns();}
+var autoSaveTimer=null;
+function scheduleAutoSave(){clearTimeout(autoSaveTimer);var st=$('#savingStatus');if(st){st.textContent='Saving…';st.style.color='var(--text-faint)';}autoSaveTimer=setTimeout(doAutoSave,1500);}
+function doAutoSave(){
+  var sbomMode=($('#p-sbom-mode')||{}).value||'in-tool';
+  var sbomObj={mode:sbomMode,format:($('#p-sbom-format')||{}).value||'cyclonedx'};
+  if(sbomMode!=='in-tool')sbomObj.url=($('#p-sbom-url-inp')||{}).value||'';
+  var proj=Object.assign({},project,{sbom:sbomObj});
+  vs.postMessage({cmd:'autoSave',data:{project:proj,threats:threats,cms:cms,assumptions:assumptions,system:system,requirements:requirements}});
+}
 function pill(score,band){return '<span class="pill '+R.bandClass(band.name)+'">'+score+' · '+band.name+'</span>';}
 function riskCell(t){var r=R.riskOf(t,cms);return pill(r.initial,r.initialBand)+'<span class="arrow">&rarr;</span>'+pill(r.residual,r.residualBand);}
 function chip(text,on,attrs,title){return '<span class="chip'+(on?' on':'')+'" role="button" tabindex="0" '+attrs+(title?' title="'+esc(title)+'"':'')+'>'+esc(text)+'</span>';}
@@ -884,15 +917,7 @@ document.addEventListener('click',function(e){
   }
   if(cmd){vs.postMessage({cmd:cmd});return;}
   var before=snapshot();
-  if(act==='saveP'){
-    var sbomMode2=($('#p-sbom-mode')||{}).value||'in-tool';
-    var sbomObj={mode:sbomMode2,format:($('#p-sbom-format')||{}).value||'cyclonedx'};
-    if(sbomMode2!=='in-tool'){sbomObj.url=($('#p-sbom-url-inp')||{}).value||'';}
-    vs.postMessage({cmd:'project',name:$('#p-name').value,sl:$('#p-sl').value,mode:$('#p-mode').value,bnd:$('#p-bnd').value,sbom:sbomObj});
-  }
-  else if(act==='saveT'){vs.postMessage({cmd:'threats',threats:threats,compIds:comps.map(function(c){return c.id;})});}
-  else if(act==='saveC'){vs.postMessage({cmd:'cms',cms:cms});}
-  else if(act==='addT'){threats.push({id:'T'+(threats.length+1),title:'New threat',stride:['T'],components:[],likelihood:3,impact:3,status:'open'});renderThreats();renderRail();}
+  if(act==='addT'){threats.push({id:'T'+(threats.length+1),title:'New threat',stride:['T'],components:[],likelihood:3,impact:3,status:'open'});renderThreats();renderRail();}
   else if(act==='delT'){threats.splice(+el.dataset.i,1);renderThreats();renderRail();}
   else if(act==='addC'){cms.push({id:'CM'+(cms.length+1),title:'New countermeasure',type:'preventive',status:'proposed',addresses:[]});renderCms();renderRail();}
   else if(act==='delC'){cms.splice(+el.dataset.i,1);renderCms();updatePills();renderRail();}
@@ -900,8 +925,6 @@ document.addEventListener('click',function(e){
   else if(act==='addAddr'){cms[+el.dataset.c].addresses.push({threat:el.dataset.val,residualLikelihood:2,residualImpact:2});renderCms();updatePills();}
   else if(act==='addTicket'){var cm2=cms[+el.dataset.ci];cm2.ticketUrls=cm2.ticketUrls&&cm2.ticketUrls.length?cm2.ticketUrls:[''];cm2.ticketUrls.push('');renderCms();}
   else if(act==='delTicket'){var cm3=cms[+el.dataset.ci],ti3=+el.dataset.ti;var urls3=cm3.ticketUrls&&cm3.ticketUrls.length?cm3.ticketUrls:[''];urls3.splice(ti3,1);cm3.ticketUrls=urls3;renderCms();}
-  else if(act==='saveA'){vs.postMessage({cmd:'assumptions',assumptions:assumptions});}
-  else if(act==='saveS'){vs.postMessage({cmd:'system',system:system});}
   else if(act==='addAtk'){assumptions.attacker=assumptions.attacker||[];assumptions.attacker.push({id:uid('ATK-',assumptions.attacker.map(function(x){return x.id;})),name:'New attacker',capability:2,access:'local',motivation:'',resources:'',text:''});asmTab='attacker';renderAssumptions();}
   else if(act==='delAtk'){assumptions.attacker.splice(+el.dataset.i,1);renderAssumptions();}
   else if(act==='addAsm'){var ak=el.dataset.asm;assumptions[ak]=assumptions[ak]||[];assumptions[ak].push({id:uid('A-'+ak.charAt(0).toUpperCase()+'-',assumptions[ak].map(function(x){return x.id;})),text:''});renderAssumptions();}
@@ -916,7 +939,6 @@ document.addEventListener('click',function(e){
   else if(act==='delAs'){system.assets.splice(+el.dataset.i,1);renderSystem();}
   else if(act==='tbMem'){var bb=system.trustBoundaries[+el.dataset.tb];bb.members=bb.members||[];var mk=bb.members.indexOf(el.dataset.val);if(mk>=0)bb.members.splice(mk,1);else bb.members.push(el.dataset.val);renderSystem();}
   else if(act==='asComp'){var aa=system.assets[+el.dataset.as];aa.components=aa.components||[];var ck=aa.components.indexOf(el.dataset.val);if(ck>=0)aa.components.splice(ck,1);else aa.components.push(el.dataset.val);renderSystem();}
-  else if(act==='saveR'){vs.postMessage({cmd:'requirements',requirements:requirements});}
   else if(act==='addReq'){requirements=requirements||[];requirements.push({id:uid('R',requirements.map(function(x){return x.id;})),text:'',standardRef:'',slFr:'',derivedFromThreat:[],satisfiedByCM:[]});renderRequirements();}
   else if(act==='delReq'){requirements.splice(+el.dataset.i,1);renderRequirements();}
   else if(act==='reqThreat'){var rq=requirements[+el.dataset.req];rq.derivedFromThreat=rq.derivedFromThreat||[];var rk=rq.derivedFromThreat.indexOf(el.dataset.val);if(rk>=0)rq.derivedFromThreat.splice(rk,1);else rq.derivedFromThreat.push(el.dataset.val);renderRequirements();}
@@ -962,9 +984,11 @@ document.addEventListener('click',function(e){
     renderThreats();
   }
   recordChanged(before);
+  scheduleAutoSave();
 });
 document.addEventListener('input',function(e){
   var t=e.target;
+  scheduleAutoSave();
   recordBefore(keyOf(t));
   if(t.id==='p-name'){project.name=t.value;$('#devname').textContent=t.value?('· '+t.value):'';return;}
   if(t.id==='p-sl'){project.sl=t.value;return;}
@@ -979,7 +1003,7 @@ document.addEventListener('input',function(e){
       var cmi=cms[+t.dataset.ci];
       cmi.ticketUrls=cmi.ticketUrls&&cmi.ticketUrls.length?cmi.ticketUrls:[''];
       cmi.ticketUrls[+t.dataset.ti]=t.value;
-    } else cms[+t.dataset.ci][t.dataset.k]=t.value;
+    } else {cms[+t.dataset.ci][t.dataset.k]=t.value; if(t.dataset.k==='status')renderCms();}
     return;
   }
   if(t.dataset.c!==undefined&&t.dataset.j!==undefined&&t.dataset.k){cms[+t.dataset.c].addresses[+t.dataset.j][t.dataset.k]=Math.max(1,Math.min(5,+t.value||1));updatePills();return;}
@@ -1068,6 +1092,7 @@ window.addEventListener('message',function(ev){
   else if(m.cmd==='system'){system=m.system||system;comps=m.comps||comps;counts=m.counts||counts;renderSystem();renderThreats();renderRail();toast('ok',m.text);}
   else if(m.cmd==='requirements'){requirements=m.requirements||requirements;counts=m.counts||counts;renderRequirements();renderRail();toast('ok',m.text);}
   else if(m.cmd==='msg'){counts=m.counts||counts;renderRail();toast('ok',m.text);}
+  else if(m.cmd==='saved'){counts=m.counts||counts;renderRail();var st=$('#savingStatus');if(st){st.textContent='Saved';st.style.color='#4caf50';setTimeout(function(){if(st&&st.textContent==='Saved')st.textContent='';},2500);}}
   else if(m.cmd==='versionResult'){if(!m.ok)toast('err',m.error||'Could not record version.');else{changeTracker=m.tracker||changeTracker;counts=m.counts||counts;try{renderVersions();}catch(e){}renderRail();toast('ok',m.text);}}
   else if(m.cmd==='err'){toast('err',m.text);}
 });

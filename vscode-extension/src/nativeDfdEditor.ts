@@ -166,25 +166,46 @@ function restore(json){try{dfd=JSON.parse(json);}catch(_){return false;}if(!dfd.
 function undo(){if(!undoStack.length)return;redoStack.push(snap());var p=undoStack.pop();if(!restore(p))return;baseState=p;histKey='';focus=null;updUndo();vs.postMessage({type:'save',dfd:JSON.stringify(dfd,null,2)});draw();}
 function redo(){if(!redoStack.length)return;undoStack.push(snap());var n=redoStack.pop();if(!restore(n))return;baseState=n;histKey='';focus=null;updUndo();vs.postMessage({type:'save',dfd:JSON.stringify(dfd,null,2)});draw();}
 
+function worstRiskForNode(nodeId){
+  var BAND_ORDER={'#2e7d32':1,'#f9a825':2,'#ef6c00':3,'#c62828':4};
+  var n=node(nodeId); if(!n)return null;
+  var directColor=(n.componentRef&&riskData[n.componentRef])?riskData[n.componentRef]:null;
+  var worstScore=directColor?(BAND_ORDER[directColor]||0):0;
+  var worstColor=directColor;
+  dfd.nodes.filter(function(c){return c.parent===nodeId;}).forEach(function(c){
+    var childColor=worstRiskForNode(c.id);
+    if(childColor&&(BAND_ORDER[childColor]||0)>worstScore){worstScore=BAND_ORDER[childColor]||0;worstColor=childColor;}
+  });
+  return worstColor;
+}
+function findIfaceAnchor(componentId){
+  var visNodes=M.viewNodes(dfd,cur());
+  var direct=visNodes.find(function(n){return n.componentRef===componentId;});
+  if(direct)return direct;
+  var candidate=dfd.nodes.find(function(n){return n.componentRef===componentId;});
+  while(candidate&&candidate.parent!=null){
+    var vis=visNodes.find(function(n){return n.id===candidate.parent;});
+    if(vis)return vis;
+    candidate=dfd.nodes.find(function(n){return n.id===candidate.parent;});
+  }
+  return null;
+}
 function drawCanvas(){
-  // Build component → risk color map and resolve to node IDs
+  // Build risk color map using subtree propagation so root-level nodes inherit sub-component risk
   var nodeRisk={};
-  M.viewNodes(dfd,cur()).forEach(function(n){if(n.componentRef&&riskData[n.componentRef])nodeRisk[n.id]=riskData[n.componentRef];});
+  M.viewNodes(dfd,cur()).forEach(function(n){var c=worstRiskForNode(n.id);if(c)nodeRisk[n.id]=c;});
   var inner=M.render(dfd,cur(),focus,nodeRisk);
-  // Build a map of component ID → node position for interface chip placement
-  var nodes=M.viewNodes(dfd,cur());
-  var nodeByComp={};
-  nodes.forEach(function(n){if(n.componentRef)nodeByComp[n.componentRef]={x:n.x||0,y:n.y||0};});
-  // Render interface chips — small rectangles positioned above their linked component node
+  // Render interface chips using ancestor-lookup so they appear on whatever layer is visible
   var ifaceChips='';
   (interfaces||[]).forEach(function(itf){
-    if(!itf.component||!nodeByComp[itf.component])return;
-    var nb=nodeByComp[itf.component];
+    if(!itf.component)return;
+    var nb=findIfaceAnchor(itf.component);
+    if(!nb)return;
     var posKey=(cur()||'root')+':'+itf.id;
     var cp=(dfd.ifacePos||{})[posKey];
-    var cx=cp?cp.x:(nb.x+4), cy=cp?cp.y:(nb.y-50);
+    var cx=cp?cp.x:((nb.x||0)+4), cy=cp?cp.y:((nb.y||0)-50);
     var lbl=esc((itf.tag||itf.name).slice(0,13));
-    var tx=nb.x+65, ty=nb.y+28; // midpoint of target node
+    var tx=(nb.x||0)+65, ty=(nb.y||0)+28; // midpoint of target node
     var isFocus=focus==='iface:'+itf.id;
     ifaceChips+='<g class="ifacechip" data-iface="'+esc(itf.id)+'" style="cursor:pointer">'+
       '<line x1="'+(cx+40)+'" y1="'+(cy+14)+'" x2="'+tx+'" y2="'+ty+'" stroke="#777" stroke-dasharray="4 3" stroke-width="1.2"/>'+
