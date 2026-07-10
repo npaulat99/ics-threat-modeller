@@ -66,25 +66,26 @@
     dfd.nodes.forEach(function (n) { if (n.members) n.members = n.members.filter(function (m) { return !doomed[m]; }); });
   }
 
-  function shapeSvg(n, focus) {
+  function shapeSvg(n, focus, riskColor) {
     var hl = n.id === focus ? "stroke='#1565c0' stroke-width='3'" : "stroke='currentColor' stroke-width='1.5'";
+    var fill = riskColor ? "fill='" + riskColor + "' fill-opacity='0.22'" : "fill='#fff' fill-opacity='0.06'";
     var x = n.x, y = n.y, w = NW, h = NH, cx = x + w / 2, cy = y + h / 2, label = esc(String(n.label).slice(0, 22));
     var inner;
     if (n.type === "process" || n.type === "multiprocess") {
-      inner = "<ellipse cx='" + cx + "' cy='" + cy + "' rx='" + (w / 2) + "' ry='" + (h / 2) + "' fill='#fff' fill-opacity='0.06' " + hl + "/>";
+      inner = "<ellipse cx='" + cx + "' cy='" + cy + "' rx='" + (w / 2) + "' ry='" + (h / 2) + "' " + fill + " " + hl + "/>";
       if (n.type === "multiprocess") inner += "<ellipse cx='" + cx + "' cy='" + cy + "' rx='" + (w / 2 - 6) + "' ry='" + (h / 2 - 6) + "' fill='none' " + hl + "/>";
     } else if (n.type === "store") {
-      inner = "<rect x='" + x + "' y='" + y + "' width='" + w + "' height='" + h + "' fill='#fff' fill-opacity='0.06' stroke='none'/>" +
+      inner = "<rect x='" + x + "' y='" + y + "' width='" + w + "' height='" + h + "' " + fill + " stroke='none'/>" +
         "<line x1='" + x + "' y1='" + y + "' x2='" + (x + w) + "' y2='" + y + "' " + hl + "/>" +
         "<line x1='" + x + "' y1='" + (y + h) + "' x2='" + (x + w) + "' y2='" + (y + h) + "' " + hl + "/>";
     } else {
-      inner = "<rect x='" + x + "' y='" + y + "' width='" + w + "' height='" + h + "' fill='#fff' fill-opacity='0.06' " + hl + "/>";
+      inner = "<rect x='" + x + "' y='" + y + "' width='" + w + "' height='" + h + "' " + fill + " " + hl + "/>";
     }
     return "<g data-id='" + esc(n.id) + "' class='node' style='cursor:move'>" + inner +
       "<text x='" + cx + "' y='" + (cy + 4) + "' text-anchor='middle' font-size='12' fill='currentColor' style='pointer-events:none'>" + label + "</text></g>";
   }
 
-  function render(dfd, parentId, focus) {
+  function render(dfd, parentId, focus, riskColors) {
     var view = layout(dfd, parentId);
     var nodes = view.filter(function (n) { return n.type !== "trust-boundary"; });
     var tbs = view.filter(function (n) { return n.type === "trust-boundary"; });
@@ -155,7 +156,7 @@
       parts.push("<path d='" + path + "' stroke='#666' stroke-width='1.5' fill='none' marker-end='url(#arrow)'/>" +
         (f.label ? "<text x='" + lx + "' y='" + ly + "' font-size='10' fill='#555' text-anchor='middle' dominant-baseline='middle' style='paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round'>" + esc(f.label) + "</text>" : ""));
     });
-    nodes.forEach(function (n) { parts.push(shapeSvg(n, focus)); });
+    nodes.forEach(function (n) { parts.push(shapeSvg(n, focus, riskColors && riskColors[n.id])); });
     return parts.join("");
   }
 
