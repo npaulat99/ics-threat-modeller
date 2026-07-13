@@ -120,7 +120,9 @@ jobs:
       - name: Upload SARIF to GitHub Security tab
         # Always upload even if the scan step above failed (exit-code: 1)
         # so findings appear in the Security tab before the job is marked failed.
-        if: always()
+        # Optional: requires Code Scanning/GHAS to be enabled in repository settings.
+        if: ${{ always() && vars.ENABLE_CODE_SCANNING_UPLOAD == 'true' }}
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-webapp.sarif

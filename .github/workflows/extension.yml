@@ -98,7 +98,9 @@ jobs:
           TRIVY_DB_REPOSITORY: "ghcr.io/aquasecurity/trivy-db"
 
       - name: Upload SARIF to GitHub Security tab
-        if: always()
+        # Optional: requires Code Scanning/GHAS to be enabled in repository settings.
+        if: ${{ always() && vars.ENABLE_CODE_SCANNING_UPLOAD == 'true' }}
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-extension.sarif
