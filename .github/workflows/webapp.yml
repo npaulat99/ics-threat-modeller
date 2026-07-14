@@ -29,7 +29,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
           cache-dependency-path: webapp/package-lock.json
 
@@ -52,7 +52,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
           cache-dependency-path: webapp/package-lock.json
 
@@ -74,7 +74,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
           cache-dependency-path: webapp/package-lock.json
 
@@ -97,12 +97,14 @@ jobs:
     # Run in parallel with typecheck — does not depend on the build output
     needs: audit
     permissions:
+      actions: read
+      contents: read
       security-events: write  # required to upload SARIF to GitHub Security tab
     steps:
       - uses: actions/checkout@v4
 
       - name: Run Trivy (vuln + secret, HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: "fs"
           scan-ref: "webapp"
@@ -118,8 +120,10 @@ jobs:
       - name: Upload SARIF to GitHub Security tab
         # Always upload even if the scan step above failed (exit-code: 1)
         # so findings appear in the Security tab before the job is marked failed.
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        # Optional: requires Code Scanning/GHAS to be enabled in repository settings.
+        if: ${{ always() && vars.ENABLE_CODE_SCANNING_UPLOAD == 'true' }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-webapp.sarif
           category: webapp-trivy
