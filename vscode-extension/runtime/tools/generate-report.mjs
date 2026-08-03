@@ -1,14 +1,35 @@
 #!/usr/bin/env node
 // TRA report generator: zero external dependencies. Loads a TRA project folder,
 // computes initial and residual risk, runs the plausibility checker, and writes report/index.html.
-// Usage: node tools/generate-report.mjs projects/example-radar-level-sensor
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+// Usage: node tools/generate-report.mjs <project-dir>
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
 import { isAbsolute, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const proj = process.argv[2] || "projects/example-radar-level-sensor";
-const base = isAbsolute(proj) ? proj : join(root, proj);
+const hasTraProject = (dir) => existsSync(join(dir, "01-project-description/project.json"));
+
+function resolveProjectPath() {
+  const fromArg = process.argv[2] || process.env.EMBEDRISK_PROJECT_DIR;
+  if (fromArg) {
+    const full = isAbsolute(fromArg) ? fromArg : join(root, fromArg);
+    if (!hasTraProject(full)) throw new Error(`TRA project not found at: ${full}`);
+    return { display: fromArg, base: full };
+  }
+
+  for (const searchRoot of [join(root, "projects"), join(root, "../../webapp/projects")]) {
+    if (!existsSync(searchRoot)) continue;
+    for (const entry of readdirSync(searchRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const full = join(searchRoot, entry.name);
+      if (hasTraProject(full)) return { display: full, base: full };
+    }
+  }
+
+  throw new Error("No TRA project found. Pass a project path as argv[2] or EMBEDRISK_PROJECT_DIR.");
+}
+
+const { display: proj, base } = resolveProjectPath();
 const read = (p) => JSON.parse(readFileSync(join(base, p), "utf8"));
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const scheme = JSON.parse(readFileSync(join(root, ".assets/knowledge-base/risk-scheme.json"), "utf8"));

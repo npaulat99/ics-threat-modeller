@@ -1,12 +1,32 @@
 #!/usr/bin/env python3
 """TRA report generator (zero dependencies). Mirrors tools/generate-report.mjs.
-Usage: python tools/generate_report.py projects/example-radar-level-sensor"""
+Usage: python tools/generate_report.py <project-dir>"""
 import json, os, sys
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-proj = sys.argv[1] if len(sys.argv) > 1 else "projects/example-radar-level-sensor"
-base = root / proj
+
+def has_tra_project(d: Path) -> bool:
+    return (d / "01-project-description/project.json").exists()
+
+def resolve_project_path():
+    arg = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("EMBEDRISK_PROJECT_DIR")
+    if arg:
+        p = Path(arg) if os.path.isabs(arg) else (root / arg)
+        if not has_tra_project(p):
+            raise FileNotFoundError(f"TRA project not found at: {p}")
+        return arg, p
+
+    for search_root in (root / "projects", root / "webapp" / "projects"):
+        if not search_root.exists():
+            continue
+        for entry in search_root.iterdir():
+            if entry.is_dir() and has_tra_project(entry):
+                return str(entry.relative_to(root)), entry
+
+    raise FileNotFoundError("No TRA project found. Pass a project path as argv[1] or EMBEDRISK_PROJECT_DIR.")
+
+proj, base = resolve_project_path()
 read = lambda p: json.loads((base / p).read_text(encoding="utf8"))
 scheme = json.loads((root / ".assets/knowledge-base/risk-scheme.json").read_text(encoding="utf8"))
 

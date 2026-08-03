@@ -26,7 +26,7 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
     const cmIds = new Set(cmList.map((c) => c.id));
     const threatById = new Map(threatList.map((t) => [t.id, t]));
 
-    const acceptableRisk = typeof project.acceptableRisk === 'number' ? project.acceptableRisk : DEFAULT_ACCEPTABLE_RISK;
+    const acceptableRisk = Number.isFinite(project.acceptableRisk) ? project.acceptableRisk : DEFAULT_ACCEPTABLE_RISK;
 
     if (!attackers.length) add('warning', 'No attacker assumptions (required to ground the likelihood assessment).', 'no-attacker');
     const tbIds = new Set(arr(system.trustBoundaries).map((b) => b.id));
@@ -79,8 +79,10 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
         }
         const [rl, ri] = residual(t, cmList);
         const res = (rl || 0) * (ri || 0);
-        if (res > acceptableRisk && t.status !== 'accepted')
-            add('warning', `${t.id}: residual risk ${res} exceeds the acceptable risk (${acceptableRisk}) — reduce it or accept the residual.`, `risk-over-acceptable:${t.id}`);
+        if (res > acceptableRisk && t.status !== 'accepted') {
+            const threatLabel = t.id || 'threat';
+            add('warning', `${threatLabel}: residual risk ${res} exceeds the acceptable risk (${acceptableRisk}) — reduce it or accept the residual.`, t.id ? `risk-over-acceptable:${t.id}` : undefined);
+        }
         if (project.rigorousMode) {
             if (!t.impactDimensions) add('warning', `${t.id}: rigorous mode requires the Bug Bar impact dimensions to be set.`);
             const lf = t.likelihoodFactors;

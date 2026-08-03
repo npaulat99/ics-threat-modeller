@@ -120,9 +120,8 @@ path. *Fix:* for OR, select the single child that minimises the decision attribu
 probability) and report **that child's** (skill, access, cost) bundle. *(Kordy et al. 2010/2014.)*
 
 ### P0-3 · A *preventive* control is allowed to cut **impact**
-In the shipped example, CM1 (`type: preventive`) sets T1 `residualImpact 5→2`, dropping the
-top safety threat from **Critical (25) to Low (4)** where **Medium (10)** is defensible
-([countermeasures.json](../../projects/example-radar-level-sensor/08-countermeasures/countermeasures.json#L14-L15)).
+In one sample project, CM1 (`type: preventive`) sets T1 `residualImpact 5→2`, dropping the
+top safety threat from **Critical (25) to Low (4)** where **Medium (10)** is defensible.
 A preventive control changes the *probability* of success, not the *consequence* if bypassed.
 *Fix:* restrict `residualImpact < impact` to detective/corrective/limiting controls; for preventive
 controls allow only `residualLikelihood` reduction, or at minimum warn. *(IEC 62443-3-2; ISO 27005.)*
