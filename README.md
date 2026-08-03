@@ -100,3 +100,11 @@ The risk method uses:
 ## Knowledge base
 
 The repository-level examples in [knowledge-base/](knowledge-base/) are intended as starter content. Teams should adapt and extend them with product-specific attacker assumptions, threat patterns, and approved controls.
+
+## License
+
+EmbedRisk repository-authored code is licensed under GNU GPLv3. See [LICENSE](LICENSE).
+
+This repository also ships third-party materials (notably the optional vendored draw.io webapp in `vscode-extension/media/drawio/`) that remain under their own upstream licenses.
+
+For details and distribution obligations, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

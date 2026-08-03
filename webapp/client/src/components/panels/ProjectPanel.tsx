@@ -43,11 +43,11 @@ function parseDevOpsBranchUrl(raw: string): { repoUrl: string; workBranch?: stri
 
 const DEPTH_HELP: Record<string, string> = {
     blackbox:
-        'Black-box: model the device as a single unit and analyse only its external interfaces. Fastest; suited to integrators and asset owners.',
+        'Model only external interfaces.',
     graybox:
-        'Gray-box: also model the security-relevant internal components (MCU, bootloader, communication stacks). Recommended default for component suppliers.',
+        'Add the security-relevant internals.',
     whitebox:
-        'White-box: model the full internals, including firmware and debug interfaces. Most thorough; mind the state-space explosion on complex devices.',
+        'Model the full internals, including firmware and debug access.',
 };
 
 /** Add/remove list of short free-text items shown as removable chips (type + Enter to add). */
@@ -276,15 +276,14 @@ export default function ProjectPanel() {
                 <HelpButton title="Project &amp; scope (tips)">
                     <ul>
                         <li>State the <b>boundary in one sentence</b>. Everything outside it is an external entity.</li>
-                        <li>Pick the <b>smallest modelling depth</b> that answers your question — black-box first, refine only where it adds value. Deep white-box trees of every signal cause state-space explosion.</li>
+                        <li>Pick the <b>smallest modelling depth</b> that still answers the assessment question.</li>
                         <li><b>Group assets</b> sensibly (one “measurement integrity” asset, not one per value) and reuse template TRAs for similar devices.</li>
                         <li>CRA requires the <b>intended purpose</b> and the <b>reasonably foreseeable use</b> to be documented — fill them in below.</li>
                     </ul>
                 </HelpButton>
             </div>
             <p className="lead">
-                Define <em>what</em> you are assessing and <em>how deeply</em>. A precise boundary and an appropriate
-                modelling depth keep the assessment focused, reproducible and proportionate to the device.
+                Define the device boundary and modeling depth.
             </p>
 
             <div className="card">
@@ -299,7 +298,7 @@ export default function ProjectPanel() {
                     <Field label="Device type">
                         <input value={p.device?.type || ''} onChange={(e) => setDevice({ type: e.target.value })} placeholder="radar level sensor" />
                     </Field>
-                    <Field label="Version under assessment" hint="Hardware / firmware revision.">
+                    <Field label="Version under assessment" hint="Hardware and firmware revision.">
                         <input value={p.device?.version || ''} onChange={(e) => setDevice({ version: e.target.value })} placeholder="FW 2.4 / HW B" />
                     </Field>
                 </div>
@@ -310,7 +309,7 @@ export default function ProjectPanel() {
                 <div className="row">
                     <Field
                         label="Modelling depth"
-                        hint="Sets how far inside the device you model. It guides the DFD drill-down and is recorded in the report."
+                        hint="Defines how far inside the device you model."
                     >
                         <select value={p.scope?.mode || 'graybox'} onChange={(e) => setScope({ mode: e.target.value })}>
                             <option value="blackbox">Black-box — external interfaces only</option>
@@ -318,7 +317,7 @@ export default function ProjectPanel() {
                             <option value="whitebox">White-box — full internals</option>
                         </select>
                     </Field>
-                    <Field label="Target Security Level" hint="IEC 62443-4-2 target (SL-T), e.g. SL2.">
+                    <Field label="Target Security Level" hint="IEC 62443-4-2 SL-T, for example SL2.">
                         <input value={p.slTarget || ''} onChange={(e) => set({ slTarget: e.target.value })} placeholder="SL2" />
                     </Field>
                     <Field label="Status">
@@ -331,11 +330,11 @@ export default function ProjectPanel() {
                 </div>
                 <p className="depthnote">{DEPTH_HELP[p.scope?.mode || 'graybox']}</p>
                 <p className="hint" style={{ margin: '2px 0 8px' }}>
-                    Rigorous mode and the acceptable residual-risk threshold live in <b>⚙ Settings</b> (top bar).
+                    Rigorous mode and the residual-risk threshold are in <b>⚙ Settings</b>.
                 </p>
                 <Field
                     label="System boundary"
-                    hint="One sentence: what is the device under assessment and where does it end? Surfaced in the report."
+                    hint="One sentence: what is included, and where does it end?"
                 >
                     <textarea
                         value={p.scope?.boundary || ''}
@@ -344,10 +343,10 @@ export default function ProjectPanel() {
                     />
                 </Field>
                 <div className="grid2">
-                    <Field label="In scope" hint="Listed in the report. Type an item and press Enter.">
+                    <Field label="In scope" hint="Type an item and press Enter.">
                         <ScopeList items={p.scope?.inScope || []} onChange={(v) => setScope({ inScope: v })} placeholder="e.g. sensor firmware" />
                     </Field>
-                    <Field label="Out of scope" hint="Listed in the report. Type an item and press Enter.">
+                    <Field label="Out of scope" hint="Type an item and press Enter.">
                         <ScopeList items={p.scope?.outOfScope || []} onChange={(v) => setScope({ outOfScope: v })} placeholder="e.g. plant DCS" />
                     </Field>
                 </div>
@@ -356,8 +355,7 @@ export default function ProjectPanel() {
             <div className="card">
                 <h3>Software Bill of Materials (SBOM)</h3>
                 <p className="hint" style={{ marginTop: 0 }}>
-                    Choose how the SBOM is provided. In-tool generation builds it from the component metadata (version,
-                    supplier, license, CPE) recorded on the System page.
+                    In-tool SBOMs use component metadata from the System step.
                 </p>
                 <div className="row">
                     <Field label="SBOM source">
@@ -367,14 +365,14 @@ export default function ProjectPanel() {
                         </select>
                     </Field>
                     {(p.sbom?.mode || 'in-tool') === 'in-tool' ? (
-                        <Field label="Format" hint="Included in the report and available as an export.">
+                        <Field label="Format">
                             <select value={p.sbom?.format || 'cyclonedx'} onChange={(e) => setSbom({ format: e.target.value })}>
                                 <option value="cyclonedx">CycloneDX 1.5 (JSON)</option>
                                 <option value="spdx">SPDX 2.3 (JSON)</option>
                             </select>
                         </Field>
                     ) : (
-                        <Field label="External SBOM URL" hint="The report links here; in-tool generation is disabled.">
+                        <Field label="External SBOM URL" hint="Used instead of an in-tool SBOM.">
                             <input value={p.sbom?.url || ''} onChange={(e) => setSbom({ url: e.target.value })} placeholder="https://…/device-sbom.cdx.json" />
                         </Field>
                     )}
@@ -392,7 +390,7 @@ export default function ProjectPanel() {
                 </Field>
                 <div className="field">
                     <label>
-                        Reasonably foreseeable use <span className="hint">— one box per scenario; required by the CRA risk assessment</span>
+                        Reasonably foreseeable use <span className="hint">one scenario per box</span>
                     </label>
                     <div className="list">
                         {(p.foreseeableUse || []).map((m, i) => (
@@ -417,7 +415,7 @@ export default function ProjectPanel() {
                                 </button>
                             </div>
                         ))}
-                        {!(p.foreseeableUse || []).length && <p className="hint">No use scenarios yet — add the first one.</p>}
+                        {!(p.foreseeableUse || []).length && <p className="hint">No scenarios yet.</p>}
                     </div>
                     <button className="btn sm" style={{ marginTop: 6 }} onClick={() => set({ foreseeableUse: [...(p.foreseeableUse || []), ''] })}>
                         + Add scenario

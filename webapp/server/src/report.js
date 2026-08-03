@@ -224,7 +224,7 @@ export function buildTraceability({ system, threats, requirements, countermeasur
     return (threats || []).map((t) => {
         const [rl, ri] = residual(t, countermeasures);
         const rqs = (requirements || []).filter((r) => (r.derivedFromThreat || []).includes(t.id));
-        const ctrls = (countermeasures || []).filter((c) => (c.addresses || []).some((a) => a.threat === t.id));
+        const ctrls = (countermeasures || []).filter((c) => c.selected !== false && (c.addresses || []).some((a) => a.threat === t.id));
         const initial = (t.likelihood || 0) * (t.impact || 0);
         const res = (rl || 0) * (ri || 0);
         return {
@@ -337,6 +337,95 @@ export function buildStrideCoverage(system, threats) {
     });
 }
 
+const STRIDE_LABELS = { S: 'Spoofing', T: 'Tampering', R: 'Repudiation', I: 'Information disclosure', D: 'Denial of service', E: 'Elevation of privilege' };
+
+/** The distinct pairs of entities that communicate across a boundary, derived from the DFD node
+ *  hierarchy — NOT from flow.crossesBoundary (stale/unreliable). A flow crosses the boundary when
+ *  exactly one of its endpoints is in the DFD member set (or a nested descendant). */
+export function boundaryPairs(system = {}, dfd = {}, tbId) {
+    const tbDfdNode = (dfd.nodes || []).find((n) => n.id === tbId && n.type === 'trust-boundary');
+    if (!tbDfdNode) return [];
+    const insideNodeIds = new Set(tbDfdNode.members || []);
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const n of dfd.nodes || []) {
+            if (n.parent && insideNodeIds.has(n.parent) && !insideNodeIds.has(n.id)) {
+                insideNodeIds.add(n.id);
+                changed = true;
+            }
+        }
+    }
+    const nodeById = new Map((dfd.nodes || []).map((n) => [n.id, n]));
+    const ifaceById = new Map((system.interfaces || []).map((i) => [i.id, i]));
+    const dfdNodeForComp = (compId) => (dfd.nodes || []).find((n) => n.componentRef === compId);
+    const isInsideEndpoint = (ep) => {
+        if (insideNodeIds.has(ep)) return true;
+        const iface = ifaceById.get(ep);
+        if (iface?.component) {
+            const compNode = dfdNodeForComp(iface.component);
+            if (compNode && insideNodeIds.has(compNode.id)) return true;
+        }
+        return false;
+    };
+    const endpointLabel = (ep) => nodeById.get(ep)?.label ?? ifaceById.get(ep)?.name ?? ep;
+    const seen = new Map();
+    for (const f of dfd.flows || []) {
+        if (!f.from || !f.to) continue;
+        const fromIn = isInsideEndpoint(f.from);
+        const toIn = isInsideEndpoint(f.to);
+        if (fromIn === toIn) continue;
+        const key = [f.from, f.to].sort().join('~');
+        if (seen.has(key)) continue;
+        const [insideEp, outsideEp] = fromIn ? [f.from, f.to] : [f.to, f.from];
+        seen.set(key, { key, inside: { id: insideEp, label: endpointLabel(insideEp) }, outside: { id: outsideEp, label: endpointLabel(outsideEp) } });
+    }
+    return [...seen.values()];
+}
+
+const cellHasContent = (cell) => !!cell && ((cell.strengths || []).some((x) => x && x.trim()) || (cell.weaknesses || []).some((x) => x && x.trim()));
+// Analysis is stored flat by pair key; an entry has content when any endpoint cell has text.
+const analysisHasContent = (a) => !!a?.endpoints && Object.values(a.endpoints).some((side) => side && Object.values(side.cells || {}).some(cellHasContent));
+
+/** Render one strengths/weaknesses list into HTML (or an em-dash placeholder when empty). */
+const swList = (items) => {
+    const list = (items || []).map((x) => String(x || '').trim()).filter(Boolean);
+    return list.length ? `<ul style='margin:0;padding-left:16px'>${list.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<span style="color:#8a93a2">—</span>';
+};
+
+/** The per-trust-boundary STRIDE strengths/weaknesses tables — one per communicating entity pair.
+ *  Analysis is stored flat by pair key (shared across boundaries), so the inside/outside role is
+ *  determined by the boundary being rendered, not by how the data was authored. */
+function strideBoundaryTablesHtml(system = {}, dfd = {}) {
+    const analyses = system.strideAnalyses || {}; // flat: pairKey -> StridePairAnalysis
+    const sections = (system.trustBoundaries || [])
+        .map((b) => {
+            const tables = boundaryPairs(system, dfd, b.id)
+                .filter((pair) => analysisHasContent(analyses[pair.key]))
+                .map((pair) => {
+                    const a = analyses[pair.key] || {};
+                    // inside/outside determined by this boundary's perspective, not the storage order
+                    const aLabel = a.endpoints?.[pair.inside.id]?.label || pair.inside.label;
+                    const bLabel = a.endpoints?.[pair.outside.id]?.label || pair.outside.label;
+                    const aCells = (k) => a.endpoints?.[pair.inside.id]?.cells?.[k] || {};
+                    const bCells = (k) => a.endpoints?.[pair.outside.id]?.cells?.[k] || {};
+                    const rows = STRIDE_ORDER.map((s) => (
+                        `<tr><th style='white-space:nowrap'>${esc(s)} · ${esc(STRIDE_LABELS[s] || '')}</th>` +
+                        `<td>${swList(aCells(s).strengths)}</td><td>${swList(aCells(s).weaknesses)}</td>` +
+                        `<td>${swList(bCells(s).strengths)}</td><td>${swList(bCells(s).weaknesses)}</td></tr>`
+                    )).join('');
+                    return (
+                        `<h4>${esc(pair.inside.label)} ⇄ ${esc(pair.outside.label)}</h4>` +
+                        `<table><tr><th rowspan='2'>STRIDE</th><th colspan='2'>${esc(aLabel)}</th><th colspan='2'>${esc(bLabel)}</th></tr>` +
+                        `<tr><th>Strengths</th><th>Weaknesses</th><th>Strengths</th><th>Weaknesses</th></tr>${rows}</table>`
+                    );
+                });
+            return tables.length ? `<h3>${esc(b.id)} · ${esc(b.name)}</h3>${tables.join('')}` : '';
+        })
+        .filter(Boolean);
+    return sections.length ? `<h2>STRIDE analysis per trust boundary</h2>${sections.join('')}` : '';
+}
+
 const csvCell = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
 function traceabilityCsv(rows) {
     const head = ['Asset', 'C/I/A/S', 'Threat', 'Title', 'STRIDE', 'Initial', 'InitialBand', 'Requirement', 'Control', 'Residual', 'ResidualBand', 'Evidence', 'Status', 'RatedBy', 'SignOff'];
@@ -364,6 +453,10 @@ export async function buildReport(id) {
     const sbomFormat = project.sbom?.format || 'cyclonedx';
     const sbomFile = sbomMode !== 'in-tool' ? project.sbom?.url || '(external, no URL)' : sbomFormat === 'spdx' ? 'report/sbom.spdx.json' : 'report/sbom.cdx.json';
     const strideCov = buildStrideCoverage(system, threats);
+    const strideTbSection = project.reportOptions?.includeStrideBoundaryAnalysis ? strideBoundaryTablesHtml(system, dfd) : '';
+    const acceptedNotices = new Set(project.acceptedNotices || []);
+    const openIssueList = issues.filter((i) => !(i.severity === 'notice' && acceptedNotices.has(i.key)));
+    const acceptedIssueList = issues.filter((i) => i.severity === 'notice' && acceptedNotices.has(i.key));
     const kbv = await kbVersion().catch(() => null);
 
     const parents = [null, ...dfd.nodes.filter((n) => dfd.nodes.some((m) => m.parent === n.id)).map((n) => n.id)];
@@ -411,9 +504,10 @@ export async function buildReport(id) {
         )
         .join('');
     const cmrows = cms
+        .filter((c) => c.selected !== false)
         .map(
             (c) =>
-                `<li><b>${esc(c.id)}</b> ${esc(c.title)} <i>(${esc(c.type || '')}, ${esc(c.status || '')})</i> &rarr; ${esc((c.addresses || []).map((a) => a.threat).join(', '))}${[...(c.ticketUrls || []), c.ticketUrl].filter(Boolean).map((u, i) => ` · <a href='${esc(u)}'>ticket ${i + 1}</a>`).join('')}${c.verificationUrl ? ` · <a href='${esc(c.verificationUrl)}'>verification</a>` : ''}</li>`,
+                `<li><b>${esc(c.id)}</b> ${esc(c.title)} <i>(${esc(c.type || '')}, ${esc(c.status || '')})</i> &rarr; ${esc((c.addresses || []).map((a) => a.threat).join(', '))}${[...(c.ticketUrls || []), c.ticketUrl].filter(Boolean).map((u, i) => ` · <a href='${esc(u)}'>ticket ${i + 1}</a>`).join('')}${c.verificationUrl ? ` · <a href='${esc(c.verificationUrl)}'>verification</a>` : ''}${(c.negativeEffects || []).filter(Boolean).length ? `<br><span style='color:#8a6d3b;font-size:11px'>Trade-offs: ${esc((c.negativeEffects || []).filter(Boolean).join('; '))}</span>` : ''}</li>`,
         )
         .join('');
     const sbomRows = sbom.components
@@ -440,7 +534,12 @@ export async function buildReport(id) {
     const tbSection = (system.trustBoundaries || []).length
         ? `<h2>Trust boundaries</h2><table><tr><th>Boundary</th><th>Members</th><th>Crossing flows</th></tr>${tbRows}</table>`
         : '';
-    const warn = issues.length ? `<ul class=warn>${issues.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>` : '<p>No issues found.</p>';
+    const warn = openIssueList.length
+        ? `<ul class=warn>${openIssueList.map((i) => `<li>${i.severity === 'error' ? '⛔' : i.severity === 'notice' ? 'ℹ' : '⚠'} ${esc(i.message)}</li>`).join('')}</ul>`
+        : '<p>No open issues found.</p>';
+    const acceptedNoticeSection = acceptedIssueList.length
+        ? `<h3>Accepted notices</h3><ul>${acceptedIssueList.map((i) => `<li>${esc(i.message)}</li>`).join('')}</ul>`
+        : '';
     const sbomSection =
         sbomMode !== 'in-tool'
             ? project.sbom?.url
@@ -463,6 +562,7 @@ export async function buildReport(id) {
         `<h2>Data flow diagram (all layers)</h2>${dfdHtml}` +
         tbSection +
         strideSection +
+        strideTbSection +
         `<h2>Attacker profiles</h2><ul>${atk}</ul>` +
         (assumptionSection ? `<h2>Assumptions</h2>${assumptionSection}` : '') +
         `<h2>Assets</h2><ul>${assets}</ul>` +
@@ -471,7 +571,7 @@ export async function buildReport(id) {
         `<h2>Countermeasures</h2><ul>${cmrows}</ul>` +
         sbomSection +
         (treeList ? `<h2>Attack trees</h2><ul>${treeList}</ul>` : '') +
-        `<h2>Plausibility check</h2>${warn}`;
+        `<h2>Plausibility check</h2>${warn}${acceptedNoticeSection}`;
 
     return {
         html,

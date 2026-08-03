@@ -44,8 +44,8 @@ export default function DashboardPanel() {
                 <h1>Compliance dashboard</h1>
                 <HelpButton title="IEC 62443-4-1 / CRA overview">
                     <ul>
-                        <li>One traceable view of the secure-development evidence: assets, interfaces, third-party software, threats and control status.</li>
-                        <li>Every <b>implemented / verified</b> countermeasure must carry a ticket link (proof) — missing ones are flagged red.</li>
+                        <li>One traceable view of assets, interfaces, third-party software, threats, and controls.</li>
+                        <li><b>Implemented / verified</b> countermeasures should include a ticket link.</li>
                         <li>Click any ID to jump to its full record.</li>
                     </ul>
                 </HelpButton>
@@ -120,7 +120,7 @@ export default function DashboardPanel() {
                         ))}
                         {!interfaces.length && (
                             <tr>
-                                <td colSpan={5} className="hint">No interfaces.</td>
+                                <td colSpan={5} className="hint">No interfaces yet.</td>
                             </tr>
                         )}
                     </tbody>
@@ -190,7 +190,7 @@ export default function DashboardPanel() {
                         })}
                         {!threats.length && (
                             <tr>
-                                <td colSpan={6} className="hint">No threats.</td>
+                                <td colSpan={6} className="hint">No threats yet.</td>
                             </tr>
                         )}
                     </tbody>
@@ -253,7 +253,7 @@ export default function DashboardPanel() {
                         })}
                         {!implementedCms.length && (
                             <tr>
-                                <td colSpan={6} className="hint">No countermeasures.</td>
+                                <td colSpan={6} className="hint">No countermeasures yet.</td>
                             </tr>
                         )}
                     </tbody>

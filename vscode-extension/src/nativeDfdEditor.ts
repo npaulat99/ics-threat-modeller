@@ -129,7 +129,7 @@ svg{display:block}
   <button id="undo" data-act="undo" title="Undo (Ctrl+Z)" disabled>&#8630; Undo</button>
   <button id="redo" data-act="redo" title="Redo (Ctrl+Shift+Z)" disabled>&#8631; Redo</button>
   <span id="status"></span>
-  <span id="hint">&larr;&rarr; select &middot; Enter in &middot; Backspace up &middot; t connect &middot; drag to move &middot; Ctrl+Z undo</span>
+  <span id="hint">&larr;&rarr; select &middot; Enter in &middot; Backspace up &middot; t connect</span>
 </div>
 <div id="body">
   <div id="wrap"><svg id="cv" xmlns="http://www.w3.org/2000/svg"></svg></div>

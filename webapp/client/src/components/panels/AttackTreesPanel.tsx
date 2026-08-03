@@ -223,19 +223,13 @@ export default function AttackTreesPanel() {
                 <h1>Attack trees</h1>
                 <HelpButton title="Attack-defence trees (thesis tip)">
                     <p>
-                        Decompose a high-risk threat into attacker steps joined by gates. The tool derives metrics
-                        bottom-up (Kordy et al. semantics): <b>AND</b>/<b>SAND</b> take the <i>maximum</i> required
-                        access &amp; skill and the <i>sum</i> of cost; <b>OR</b> takes the <i>minimum</i> (the cheapest,
-                        easiest path the attacker will actually pick). <b>SAND</b> additionally fixes an order (Jhawar et
-                        al.), used when one step must precede another.
+                        Decompose a high-risk threat into attacker steps joined by gates. <b>AND</b>/<b>SAND</b> require every child; <b>OR</b> takes the easiest path; <b>SAND</b> also fixes the order.
                     </p>
-                    <p className="muted">Only build trees for your highest-risk threats — they are optional evidence, not required for every threat.</p>
+                    <p className="muted">Use trees for the highest-risk threats only.</p>
                 </HelpButton>
             </div>
             <p className="lead">
-                <strong>Optional.</strong> For an important threat, decompose how it could be achieved: combine attacker
-                steps with AND / OR / SAND (sequential) gates, record each step's required access, skill and cost factors,
-                and attach defences to turn it into an attack-defence tree. Metrics are derived deterministically.
+                Optional analysis for high-risk threats.
             </p>
 
             <div className="toolbar">
@@ -250,13 +244,13 @@ export default function AttackTreesPanel() {
                         ≣ List
                     </button>
                 </span>
-                <span className="hint">Gates: AND = all needed · OR = any path · SAND = ordered sequence.</span>
+                <span className="hint">AND = all needed · OR = any path · SAND = ordered sequence.</span>
             </div>
 
             {trees.length ? (
                 trees.map((t) => <TreeCard key={t.id} tree={t} view={view} />)
             ) : (
-                <p className="hint">No attack trees yet. They are optional — add one for the highest-risk threats.</p>
+                <p className="hint">No attack trees yet.</p>
             )}
         </div>
     );

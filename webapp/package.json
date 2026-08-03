@@ -2,6 +2,7 @@
     "name": "tra-webapp",
     "version": "0.1.0",
     "private": true,
+    "license": "GPL-3.0-only",
     "description": "Web application for the Threat & Risk Assessment (TRA) methodology: a layered DFD-centric UI with live, bidirectional JSON synchronisation.",
     "type": "module",
     "workspaces": [

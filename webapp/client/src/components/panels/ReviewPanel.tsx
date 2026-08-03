@@ -56,8 +56,7 @@ export default function ReviewPanel() {
         <div className="panel">
             <h1>Review &amp; report</h1>
             <p className="lead">
-                The plausibility check runs continuously. Resolve any issues, then generate the standalone HTML report (also
-                written, together with the machine-readable exports, into the <code>report/</code> folder in the project).
+                Resolve open issues, then generate the report.
             </p>
 
             <div className="toolbar">
@@ -96,8 +95,8 @@ export default function ReviewPanel() {
                 <label className="inline" style={{ gap: 8, alignItems: 'flex-start', margin: 0 }}>
                     <input type="checkbox" checked={includeStride} onChange={(e) => setIncludeStride(e.target.checked)} style={{ marginTop: 3 }} />
                     <span className="hint">
-                        <b>Include the STRIDE-per-trust-boundary analysis</b> in the report — the strengths/weaknesses tables authored per boundary.
-                        {!hasStrideAnalysis && ' (No boundary analyses have been filled in yet — add them from the DFD or the System step.)'}
+                        <b>Include STRIDE-per-trust-boundary analysis</b> in the report.
+                        {!hasStrideAnalysis && ' No boundary analyses added yet.'}
                     </span>
                 </label>
             </div>
@@ -125,7 +124,7 @@ export default function ReviewPanel() {
                 <h3>Plausibility check</h3>
                 <ul className="issues">
                     {open.length === 0 ? (
-                        <li className="ok">✓ No open issues — assumptions, references and ratings are consistent.</li>
+                        <li className="ok">✓ No open issues.</li>
                     ) : (
                         open.map((it, i) => {
                             const tgt = issueTarget(data, it.message);

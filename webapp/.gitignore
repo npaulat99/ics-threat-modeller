@@ -1,10 +1,6 @@
 node_modules/
 client/dist/
-projects/*
-!projects/example-radar-level-sensor/
-!projects/example-radar-level-sensor/**
-projects/**/.git/
-projects/**/report/
+projects/
 .assets/knowledge-base/imported/
 .local/
 .env

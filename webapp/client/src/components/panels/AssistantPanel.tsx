@@ -62,14 +62,13 @@ export default function AssistantPanel() {
                 <HelpButton title="Assistive workflow (tips)">
                     <ul>
                         <li>Drop specifications, manuals or requirements into <code>projects/&lt;id&gt;/documents/</code>.</li>
-                        <li>The assistant matches the shared knowledge base against your model and documents and <b>proposes</b> threats.</li>
-                        <li>Nothing is applied automatically — you review and accept each suggestion (PR-03: AI assists, the engineer decides).</li>
+                        <li>Suggestions come from your model, documents, and the shared knowledge base.</li>
+                        <li>Nothing is added automatically.</li>
                     </ul>
                 </HelpButton>
             </div>
             <p className="lead">
-                Rule-based, human-reviewed suggestions from the shared knowledge base and your project documents. This is the
-                seam where future AI agents can plug in; today it uses transparent keyword matching.
+                Review suggested threats from project documents and the knowledge base.
             </p>
 
             <div className="card">
@@ -94,7 +93,7 @@ export default function AssistantPanel() {
                     </ul>
                 ) : (
                     <p className="hint">
-                        No documents found. Add files under <code>projects/{activeId}/documents/</code> and rescan.
+                        No documents found. Add files to <code>projects/{activeId}/documents/</code> and rescan.
                     </p>
                 )}
             </div>
@@ -127,10 +126,10 @@ export default function AssistantPanel() {
                         </tbody>
                     </table>
                 ) : (
-                    <p className="hint">No new suggestions — your threats already cover the matched knowledge-base entries.</p>
+                    <p className="hint">No new suggestions.</p>
                 )}
                 <p className="hint" style={{ marginTop: 8 }}>
-                    Added threats start unrated — open{' '}
+                    Added threats start unrated. Open{' '}
                     <button className="btn sm ghost" onClick={() => setView('threats')}>
                         Threats
                     </button>{' '}

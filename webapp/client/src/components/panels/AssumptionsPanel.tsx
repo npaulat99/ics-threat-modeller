@@ -41,7 +41,7 @@ export default function AssumptionsPanel() {
                     </button>
                 </div>
             </div>
-            {!(a.attacker || []).length && <p className="hint">At least one attacker profile is required — it grounds the likelihood.</p>}
+            {!(a.attacker || []).length && <p className="hint">At least one attacker profile is required.</p>}
             <div className="list">
                 {(a.attacker || []).map((p, i) => {
                     const upd = (patch: any) => setAttacker(a.attacker.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -111,7 +111,7 @@ export default function AssumptionsPanel() {
                         </div>
                     );
                 })}
-                {!(a[cat.key] || []).length && <p className="hint">None yet.</p>}
+                {!(a[cat.key] || []).length && <p className="hint">No assumptions yet.</p>}
             </div>
         </div>
     );
@@ -129,15 +129,14 @@ export default function AssumptionsPanel() {
                 <h1>Assumptions</h1>
                 <HelpButton title="Assumptions (tips)">
                     <ul>
-                        <li><b>Attacker profiles are mandatory</b> — capability (novice → nation-state) and access (remote → physical) feed the likelihood rubric directly.</li>
+                        <li><b>Attacker profiles are mandatory</b> — capability and access feed the likelihood rubric.</li>
                         <li>Be explicit about the awkward truths: default passwords left in place, 15–20 year lifetime, rare firmware updates.</li>
                         <li>Separate <b>device</b> (what the product guarantees), <b>system</b> (its role in the plant/safety chain), <b>environment</b> (physical/network exposure) and <b>operational</b> (how it is run).</li>
                     </ul>
                 </HelpButton>
             </div>
             <p className="lead">
-                Document what you take for granted. <strong>Attacker profiles are mandatory</strong> — they ground the likelihood
-                assessment in later steps. Use the tabs to focus on one category at a time.
+                Record the assumptions behind the assessment.
             </p>
 
             <div className="tabs">

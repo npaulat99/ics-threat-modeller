@@ -155,3 +155,9 @@ The canonical scheme is `.assets/knowledge-base/risk-scheme.json`.
 > **Integrations roadmap.** Connecting countermeasures to Jira / Azure DevOps / Polarion is
 > documented as a **plan only** in [`docs/integration-api-plan.md`](docs/integration-api-plan.md);
 > no tracker connector is implemented yet.
+
+## License
+
+Unless a file states otherwise, repository-authored webapp code is part of the GPLv3-licensed EmbedRisk project. See [`../LICENSE`](../LICENSE).
+
+Third-party bundled materials in this repository keep their original licenses. See [`../THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).

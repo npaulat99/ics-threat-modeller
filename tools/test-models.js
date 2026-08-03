@@ -7,11 +7,45 @@ const root = path.resolve(__dirname, "..");
 const DfdModel = require(path.join(root, "vscode-extension/media/dfd-model.js"));
 const AtModel = require(path.join(root, "vscode-extension/media/attacktree-model.js"));
 
+function hasTraFixtures(projectDir) {
+  return fs.existsSync(path.join(projectDir, "04-dfd/dfd.json")) && fs.existsSync(path.join(projectDir, "07-attack-trees/attack-trees.json"));
+}
+
+function discoverProjectDir() {
+  const candidates = [
+    process.argv[2],
+    process.env.EMBEDRISK_PROJECT_DIR,
+  ].filter(Boolean).map((p) => (path.isAbsolute(p) ? p : path.join(root, p)));
+
+  for (const c of candidates) {
+    if (hasTraFixtures(c)) return c;
+  }
+
+  const searchRoots = [
+    path.join(root, "projects"),
+    path.join(root, "webapp", "projects"),
+  ];
+  for (const dir of searchRoots) {
+    if (!fs.existsSync(dir)) continue;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const full = path.join(dir, entry.name);
+      if (hasTraFixtures(full)) return full;
+    }
+  }
+
+  throw new Error(
+    "No TRA project fixture found. Pass a project directory as argv[2] or EMBEDRISK_PROJECT_DIR."
+  );
+}
+
+const projectDir = discoverProjectDir();
+
 let passed = 0;
 function ok(name, cond) { assert.ok(cond, "FAIL: " + name); passed++; }
 
 /* ---------- DFD model ---------- */
-const dfd = JSON.parse(fs.readFileSync(path.join(root, "projects/example-radar-level-sensor/04-dfd/dfd.json"), "utf8"));
+const dfd = JSON.parse(fs.readFileSync(path.join(projectDir, "04-dfd/dfd.json"), "utf8"));
 
 const rootSibs = DfdModel.siblings(dfd, null).map((n) => n.id);
 ok("root siblings exclude trust boundary", JSON.stringify(rootSibs) === JSON.stringify(["N-DCS", "N-PHONE", "N-DEV"]));
@@ -53,7 +87,7 @@ ok("delete removes flows touching removed nodes", !d3.flows.some((f) => ["N-DEV"
 ok("delete cleans trust-boundary members", d3.nodes.filter((n) => n.id === "TB-ENC").every((tb) => !(tb.members || []).includes("N-DEV")));
 
 /* ---------- Attack-defense tree model (schema-identical to the webapp) ---------- */
-const atreeDoc = JSON.parse(fs.readFileSync(path.join(root, "projects/example-radar-level-sensor/07-attack-trees/attack-trees.json"), "utf8"));
+const atreeDoc = JSON.parse(fs.readFileSync(path.join(projectDir, "07-attack-trees/attack-trees.json"), "utf8"));
 const tree = atreeDoc.trees[0];
 
 ok("attack-trees.json holds a trees array", Array.isArray(atreeDoc.trees) && !!tree.root);

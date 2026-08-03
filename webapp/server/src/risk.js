@@ -10,12 +10,13 @@ export async function loadScheme() {
 }
 
 export function band(s, r) {
+    if (r <= 0) return { name: 'None', min: 0, max: 0, color: '#6b7280' };
     return s.matrix.bands.find((b) => r >= b.min && r <= b.max) || s.matrix.bands[0];
 }
 
-/** Residual [likelihood, impact] for a threat given all countermeasures. */
+/** Residual [likelihood, impact] for a threat given all selected countermeasures. */
 export function residual(threat, cms) {
-    const links = cms.flatMap((c) => (c.addresses || []).filter((a) => a.threat === threat.id));
+    const links = cms.filter((c) => c.selected !== false).flatMap((c) => (c.addresses || []).filter((a) => a.threat === threat.id));
     if (!links.length) return [threat.likelihood, threat.impact];
     // All applied controls are in effect simultaneously, so an attacker must overcome the strongest
     // one on each axis: the residual likelihood is the lowest residual likelihood any single control
