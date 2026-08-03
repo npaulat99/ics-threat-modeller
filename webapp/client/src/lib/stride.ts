@@ -77,13 +77,13 @@ export function boundaryPairs(system: SystemDef, dfd: Dfd, tbId: string): Stride
 const hasText = (items?: string[]) => (items || []).some((x) => x && x.trim());
 const cellHasContent = (cell?: StrideCategoryCell) => !!cell && (hasText(cell.strengths) || hasText(cell.weaknesses));
 
-/** True when a pair analysis has any authored strength/weakness on either side. */
+/** True when a pair analysis has any authored strength/weakness for either endpoint. */
 export function analysisHasContent(a?: StridePairAnalysis): boolean {
-    if (!a) return false;
-    return [a.sideA, a.sideB].some((side) => side && Object.values(side.cells || {}).some((c) => cellHasContent(c as StrideCategoryCell)));
+    if (!a?.endpoints) return false;
+    return Object.values(a.endpoints).some((side) => side && Object.values(side.cells || {}).some((c) => cellHasContent(c as StrideCategoryCell)));
 }
 
-/** True when any pair on a boundary has authored content. */
-export function boundaryHasContent(map?: Record<string, StridePairAnalysis>): boolean {
-    return !!map && Object.values(map).some((a) => analysisHasContent(a));
+/** True when any pair in the project-wide analyses map has authored content. */
+export function anyPairHasContent(analyses?: Record<string, StridePairAnalysis>): boolean {
+    return !!analyses && Object.values(analyses).some((a) => analysisHasContent(a));
 }

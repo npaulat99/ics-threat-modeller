@@ -517,13 +517,16 @@ export const useStore = create<Store>((set, get) => ({
         histSuppress = true;
         const m = (id: any) => (id === oldId ? newId : id);
         const arr = (a?: any[]) => (Array.isArray(a) ? a.map(m) : a);
-        const remapStride = (obj?: Record<string, Record<string, any>>) => {
+        const remapStride = (obj?: Record<string, any>) => {
             if (!obj) return obj;
-            const out: Record<string, Record<string, any>> = {};
-            for (const [tb, pairs] of Object.entries(obj)) {
-                const inner: Record<string, any> = {};
-                for (const [pk, v] of Object.entries(pairs || {})) inner[pk.split('~').map((p) => (p === oldId ? newId : p)).join('~')] = v;
-                out[tb === oldId ? newId : tb] = inner;
+            const out: Record<string, any> = {};
+            for (const [pk, v] of Object.entries(obj)) {
+                // Remap any occurrence of oldId in the pair key (which is two endpoint IDs sorted and joined).
+                const newPk = pk.split('~').map((p: string) => (p === oldId ? newId : p)).sort().join('~');
+                const endpoints: Record<string, any> = {};
+                for (const [eid, e] of Object.entries((v as any)?.endpoints || {}))
+                    endpoints[eid === oldId ? newId : eid] = e;
+                out[newPk] = { ...(v as any), endpoints };
             }
             return out;
         };

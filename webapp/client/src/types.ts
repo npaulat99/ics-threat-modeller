@@ -160,12 +160,13 @@ export interface StrideCategoryCell {
     weaknesses?: string[];
 }
 export interface StrideSideAnalysis {
-    label?: string; // optional override of the auto-derived entity name for this side
+    label?: string; // optional override of the auto-derived entity name for this endpoint
     cells?: Partial<Record<Stride, StrideCategoryCell>>;
 }
 export interface StridePairAnalysis {
-    sideA?: StrideSideAnalysis; // the entity inside the boundary
-    sideB?: StrideSideAnalysis; // the entity across the boundary
+    // Keyed by endpoint id (boundary-independent). The inside/outside role depends on which
+    // boundary is being viewed, but the security properties of each endpoint are always shared.
+    endpoints?: Record<string, StrideSideAnalysis>;
 }
 export interface Objectives {
     confidentiality?: number;
@@ -186,7 +187,9 @@ export interface SystemDef {
     interfaces: Interface[];
     trustBoundaries: TrustBoundary[];
     assets: Asset[];
-    strideAnalyses?: Record<string, Record<string, StridePairAnalysis>>; // boundaryId -> pairKey -> per-pair STRIDE analysis
+    // pairKey -> analysis; shared across every boundary that the pair's flow crosses, because
+    // the channel's security properties are the same regardless of which boundary you view it from.
+    strideAnalyses?: Record<string, StridePairAnalysis>;
 }
 
 export type DfdNodeType = 'external-entity' | 'process' | 'multiprocess' | 'store' | 'trust-boundary';

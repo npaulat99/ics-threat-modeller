@@ -1,16 +1,12 @@
-// Modal editor for the per-trust-boundary STRIDE strengths/weaknesses analysis (a structured
-// brainstorming aid). Opened from the DFD (a selected trust boundary) or the System step, via the
-// store's `strideBoundaryId`. Shows one table per pair of entities that communicate across the
-// boundary (each crossing data flow), since different protocols (e.g. HART vs. Bluetooth) give
-// different security properties. Auto-fills the entity name on each side; the analyst then fills
-// strengths and weaknesses (one per line) per STRIDE category, per side.
+// Modal editor for the per-trust-boundary STRIDE strengths/weaknesses analysis.
+// One table per communicating pair. Analysis data is stored globally by pair key (not per
+// boundary), so the same channel's properties appear consistently in every boundary that the
+// flow crosses — editing here updates all views simultaneously.
 import { useEffect } from 'react';
 import { useStore } from '../state/store';
 import { boundaryPairs, STRIDE_KEYS, STRIDE_LABEL } from '../lib/stride';
 import type { StridePair } from '../lib/stride';
 import type { StridePairAnalysis, StrideSideAnalysis, Stride } from '../types';
-
-type SideKey = 'sideA' | 'sideB';
 
 export default function StrideBoundaryEditor() {
     const data = useStore((s) => s.data);
@@ -31,56 +27,64 @@ export default function StrideBoundaryEditor() {
     const nodeName = (data.dfd.nodes || []).find((n) => n.id === tbId && n.type === 'trust-boundary')?.label;
     const name = tb?.name || nodeName || tbId;
     const pairs = boundaryPairs(system, data.dfd, tbId);
-    const analysesForTb: Record<string, StridePairAnalysis> = system.strideAnalyses?.[tbId] || {};
 
-    const writePair = (pairKey: string, next: StridePairAnalysis) => {
-        const all = { ...(system.strideAnalyses || {}) };
-        const forTb = { ...(all[tbId] || {}) };
-        forTb[pairKey] = next;
-        all[tbId] = forTb;
-        save('system', { ...system, strideAnalyses: all });
-    };
+    // Analysis is stored flat by pair key (not nested per boundary) so every boundary that
+    // a flow crosses shares the same entry — the channel's security properties don't change.
+    const writeAnalysis = (pairKey: string, next: StridePairAnalysis) =>
+        save('system', { ...system, strideAnalyses: { ...(system.strideAnalyses || {}), [pairKey]: next } });
 
     const renderPairTable = (pair: StridePair) => {
-        const analysis: StridePairAnalysis = analysesForTb[pair.key] || {};
-        const setLabel = (side: SideKey, v: string) => {
-            const sideObj: StrideSideAnalysis = { ...(analysis[side] || {}), label: v.trim() || undefined };
-            writePair(pair.key, { ...analysis, [side]: sideObj });
+        const analysis: StridePairAnalysis = system.strideAnalyses?.[pair.key] || {};
+        const epId = (side: 'inside' | 'outside') => side === 'inside' ? pair.inside.id : pair.outside.id;
+
+        const setLabel = (side: 'inside' | 'outside', v: string) => {
+            const id = epId(side);
+            const endpoints = { ...(analysis.endpoints || {}) };
+            endpoints[id] = { ...(endpoints[id] || {}), label: v.trim() || undefined };
+            writeAnalysis(pair.key, { ...analysis, endpoints });
         };
-        const setCell = (side: SideKey, k: Stride, field: 'strengths' | 'weaknesses', text: string) => {
-            const sideObj: StrideSideAnalysis = { ...(analysis[side] || {}) };
-            const cells = { ...(sideObj.cells || {}) };
+        const setCell = (side: 'inside' | 'outside', k: Stride, field: 'strengths' | 'weaknesses', text: string) => {
+            const id = epId(side);
+            const endpoints = { ...(analysis.endpoints || {}) };
+            const ep: StrideSideAnalysis = { ...(endpoints[id] || {}) };
+            const cells = { ...(ep.cells || {}) };
             const cell = { ...(cells[k] || {}) };
             const lines = text.split('\n');
             cell[field] = lines.length === 1 && lines[0] === '' ? [] : lines;
             cells[k] = cell;
-            writePair(pair.key, { ...analysis, [side]: { ...sideObj, cells } });
+            endpoints[id] = { ...ep, cells };
+            writeAnalysis(pair.key, { ...analysis, endpoints });
         };
-        const cellText = (side: SideKey, k: Stride, field: 'strengths' | 'weaknesses') => (analysis[side]?.cells?.[k]?.[field] || []).join('\n');
-        const cell = (side: SideKey, k: Stride, field: 'strengths' | 'weaknesses') => (
+        const cellText = (side: 'inside' | 'outside', k: Stride, field: 'strengths' | 'weaknesses') =>
+            (analysis.endpoints?.[epId(side)]?.cells?.[k]?.[field] || []).join('\n');
+        const getLabel = (side: 'inside' | 'outside') => {
+            const ep = side === 'inside' ? pair.inside : pair.outside;
+            return analysis.endpoints?.[ep.id]?.label ?? ep.label;
+        };
+        const cell = (side: 'inside' | 'outside', k: Stride, field: 'strengths' | 'weaknesses') => (
             <td style={{ verticalAlign: 'top', padding: 4 }}>
                 <textarea
                     className="inp"
                     style={{ width: '100%', minHeight: 54, resize: 'vertical', fontSize: 12 }}
                     value={cellText(side, k, field)}
                     placeholder="one per line"
-                    aria-label={`${side === 'sideA' ? 'Side A' : 'Side B'} ${STRIDE_LABEL[k]} ${field}`}
+                    aria-label={`${side} ${STRIDE_LABEL[k]} ${field}`}
                     onChange={(e) => setCell(side, k, field, e.target.value)}
                 />
             </td>
         );
-        const aLabel = analysis.sideA?.label ?? pair.inside.label;
-        const bLabel = analysis.sideB?.label ?? pair.outside.label;
+        const aLabel = getLabel('inside');
+        const bLabel = getLabel('outside');
         return (
             <div className="card" key={pair.key} style={{ marginBottom: 14 }}>
                 <div className="grid2" style={{ marginBottom: 8 }}>
                     <div className="field">
-                        <label>Side A — {pair.inside.label} (inside the boundary)</label>
-                        <input className="inp" value={aLabel} onChange={(e) => setLabel('sideA', e.target.value)} />
+                        <label>Side A — {pair.inside.label} (inside this boundary)</label>
+                        <input className="inp" value={aLabel} onChange={(e) => setLabel('inside', e.target.value)} />
                     </div>
                     <div className="field">
-                        <label>Side B — {pair.outside.label} (across the boundary)</label>
-                        <input className="inp" value={bLabel} onChange={(e) => setLabel('sideB', e.target.value)} />
+                        <label>Side B — {pair.outside.label} (across this boundary)</label>
+                        <input className="inp" value={bLabel} onChange={(e) => setLabel('outside', e.target.value)} />
                     </div>
                 </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -109,10 +113,10 @@ export default function StrideBoundaryEditor() {
                                 <th style={{ padding: 6, textAlign: 'left', whiteSpace: 'nowrap', verticalAlign: 'top' }}>
                                     <span className="mono">{k}</span> · {STRIDE_LABEL[k]}
                                 </th>
-                                {cell('sideA', k, 'strengths')}
-                                {cell('sideA', k, 'weaknesses')}
-                                {cell('sideB', k, 'strengths')}
-                                {cell('sideB', k, 'weaknesses')}
+                                {cell('inside', k, 'strengths')}
+                                {cell('inside', k, 'weaknesses')}
+                                {cell('outside', k, 'strengths')}
+                                {cell('outside', k, 'weaknesses')}
                             </tr>
                         ))}
                     </tbody>
@@ -133,9 +137,9 @@ export default function StrideBoundaryEditor() {
                     </button>
                 </div>
                 <p className="hint" style={{ marginTop: 0 }}>
-                    One table per pair of entities that communicate across this boundary (each crossing data flow). For each STRIDE
-                    category, note the <b>strengths and weaknesses from each side</b> (one point per line). The side labels are
-                    auto-filled from the model; edit them if needed.
+                    One table per communicating pair. Analyses are <b>shared across all boundaries</b> — a communication channel's
+                    security properties are the same regardless of which boundary you view it from, so edits here also appear
+                    in any other boundary that this pair's flow crosses.
                 </p>
                 {pairs.length ? (
                     pairs.map((pair) => (
