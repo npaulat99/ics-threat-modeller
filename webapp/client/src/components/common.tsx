@@ -149,8 +149,9 @@ export function SelectedChips({ options, value, empty }: { options: { value: str
 }
 
 /** Descriptive 1-5 / 0-5 scales used across the risk model, so raters pick a level with a label
- *  instead of a bare number. */
+ *  instead of a bare number. A 0 on either axis means the threat is not possible (risk 0). */
 export const LIKELIHOOD_LEVELS: [number, string][] = [
+    [0, 'None — not possible'],
     [1, 'Very low'],
     [2, 'Low'],
     [3, 'Medium'],
@@ -158,6 +159,7 @@ export const LIKELIHOOD_LEVELS: [number, string][] = [
     [5, 'Very high'],
 ];
 export const IMPACT_LEVELS: [number, string][] = [
+    [0, 'None — no impact'],
     [1, 'Negligible'],
     [2, 'Minor'],
     [3, 'Moderate'],

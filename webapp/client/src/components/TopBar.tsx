@@ -17,6 +17,7 @@ export default function TopBar() {
     const redo = useStore((s) => s.redo);
     const undoDepth = useStore((s) => s.undoDepth);
     const redoDepth = useStore((s) => s.redoDepth);
+    const setSettings = useStore((s) => s.openSettings);
 
     // Global Ctrl/Cmd+Z (undo) and Ctrl+Y / Ctrl+Shift+Z (redo). We defer to the browser's native
     // undo while a text field is focused so typing corrections still work as expected.
@@ -87,6 +88,9 @@ export default function TopBar() {
             </span>
             <button className="btn sm" title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
                 {theme === 'dark' ? '☀ Light' : '☾ Dark'}
+            </button>
+            <button className="btn sm iconbtn" title="Project settings" aria-label="Project settings" onClick={() => setSettings(true)}>
+                ⚙
             </button>
             <button className="btn" onClick={() => setView('review')}>
                 Generate report

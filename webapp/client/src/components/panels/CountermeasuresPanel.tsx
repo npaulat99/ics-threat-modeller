@@ -1,15 +1,19 @@
+import { useState } from 'react';
 import { useStore, uid } from '../../state/store';
-import { Field, Chips, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, Jump, HelpButton, confirmDelete, IdInput } from '../common';
+import { Field, Chips, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, RiskPill, Jump, HelpButton, confirmDelete, IdInput } from '../common';
+import { band } from '../../lib/risk';
 import RiskCalculator from './RiskCalculator';
-import type { Countermeasure } from '../../types';
+import type { Countermeasure, Requirement } from '../../types';
 
 export default function CountermeasuresPanel() {
     const data = useStore((s) => s.data)!;
     const kb = useStore((s) => s.kb);
+    const scheme = useStore((s) => s.scheme);
     const save = useStore((s) => s.save);
 
     const cms = data.countermeasures.countermeasures || [];
     const threats = data.threats.threats || [];
+    const reqs = data.requirements?.requirements || [];
     const attackers = data.assumptions.attacker || [];
     const ifaceOpts = (data.system.interfaces || []).map((itf) => ({ value: itf.id, label: `${itf.name}${itf.protocol ? ` (${itf.protocol})` : ''}` }));
     const attackerOpts = attackers.map((a) => ({ value: a.id, label: `${a.name} (cap ${a.capability}, ${a.access})` }));
@@ -17,19 +21,70 @@ export default function CountermeasuresPanel() {
     const { editingId, setEditingId } = useEditMode(focusId);
     const threatOpts = threats.map((t) => ({ value: t.id, label: `${t.id} · ${t.title}` }));
     const compOpts = (data.system.components || []).map((c) => ({ value: c.id, label: c.name }));
+    const threatById = new Map(threats.map((t) => [t.id, t]));
+
+    // A countermeasure is "selected" (chosen to be implemented) unless explicitly unchecked. Older
+    // projects without the flag are treated as selected, so nothing disappears from the overview.
+    const isSelected = (c: Countermeasure) => c.selected !== false;
+    const selectedCms = cms.filter(isSelected);
+    const candidateCms = cms.filter((c) => !isSelected(c));
+
+    // "Compare & choose" (brainstorming) mode: pick a threat, see every candidate control side by side.
+    const [mode, setMode] = useState<'selected' | 'compare'>('selected');
+    const [compareThreatId, setCompareThreatId] = useState<string>('');
+    const openCompare = () => {
+        if (!compareThreatId && threats.length) setCompareThreatId(threats[0].id);
+        setMode('compare');
+    };
 
     const setCms = (list: Countermeasure[]) => save('countermeasures', { countermeasures: list });
+    const updCm = (cmId: string, patch: Partial<Countermeasure>) => setCms(cms.map((x) => (x.id === cmId ? { ...x, ...patch } : x)));
+    const updCmAddr = (cmId: string, tid: string, patch: any) => {
+        const c = cms.find((x) => x.id === cmId);
+        if (!c) return;
+        updCm(cmId, { addresses: (c.addresses || []).map((a) => (a.threat === tid ? { ...a, ...patch } : a)) });
+    };
+
+    // Every countermeasure must be backed by a security requirement (the "is CM" requirement). Create
+    // one automatically when a control is chosen for implementation, if it does not already have one.
+    const writeReqs = (list: Requirement[]) => save('requirements', { requirements: list });
+    const reqForCm = (cmId: string) => reqs.find((r) => (r.satisfiedByCM || []).includes(cmId));
+    const ensureReqForCm = (c: Countermeasure) => {
+        if (reqForCm(c.id)) return;
+        const id = uid('R', reqs.map((r) => r.id));
+        writeReqs([...reqs, { id, text: `The system shall implement: ${c.title}`, fromCountermeasure: true, derivedFromThreat: (c.addresses || []).map((a) => a.threat), satisfiedByCM: [c.id] }]);
+    };
+    const toggleSelected = (c: Countermeasure, on: boolean) => {
+        updCm(c.id, { selected: on });
+        if (on) ensureReqForCm({ ...c, selected: on });
+    };
+
     const add = () => {
         const id = uid('CM', cms.map((c) => c.id));
-        setCms([...cms, { id, title: 'New countermeasure', type: 'preventive', addresses: [], components: [], status: 'proposed' }]);
+        const cm: Countermeasure = { id, title: 'New countermeasure', type: 'preventive', addresses: [], components: [], status: 'proposed', selected: true };
+        setCms([...cms, cm]);
+        ensureReqForCm(cm);
         setEditingId(id);
+    };
+    const addCandidateForThreat = (tid: string) => {
+        const id = uid('CM', cms.map((c) => c.id));
+        const cm: Countermeasure = { id, title: 'New candidate control', type: 'preventive', addresses: [{ threat: tid, ...seedResidualFromThreat(threatById.get(tid)) }], components: [], status: 'proposed', selected: false };
+        setCms([...cms, cm]);
     };
     const importKb = (key: string) => {
         const k = (kb?.countermeasures || []).find((x: any) => x.key === key);
         if (!k) return;
         const id = uid('CM', cms.map((c) => c.id));
-        setCms([...cms, { id, title: k.title, type: 'preventive', addresses: [], components: [], status: 'proposed' }]);
+        const cm: Countermeasure = { id, title: k.title, type: 'preventive', addresses: [], components: [], status: 'proposed', selected: true };
+        setCms([...cms, cm]);
+        ensureReqForCm(cm);
         setEditingId(id);
+    };
+    const removeCm = (id: string) => {
+        setCms(cms.filter((x) => x.id !== id));
+        // Keep the requirement chain consistent: drop the deleted control from any requirement it satisfied.
+        if (reqs.some((r) => (r.satisfiedByCM || []).includes(id)))
+            writeReqs(reqs.map((r) => ((r.satisfiedByCM || []).includes(id) ? { ...r, satisfiedByCM: (r.satisfiedByCM || []).filter((c) => c !== id) } : r)));
     };
     const editing = cms.find((c) => c.id === editingId) || null;
     const ticketList = (c: Countermeasure) => (c.ticketUrls?.length ? c.ticketUrls : c.ticketUrl ? [c.ticketUrl] : ['']);
@@ -75,7 +130,11 @@ export default function CountermeasuresPanel() {
                             <option key={o}>{o}</option>
                         ))}
                     </select>
-                    <button className="btn sm danger" aria-label={`Delete countermeasure ${c.id}`} onClick={() => confirmDelete(`countermeasure ${c.id}`) && (setCms(cms.filter((x) => x.id !== c.id)), setEditingId(null))}>
+                    <label className="inline" style={{ gap: 5, whiteSpace: 'nowrap' }} title="Chosen to be implemented — only selected controls appear in the main overview">
+                        <input type="checkbox" checked={isSelected(c)} onChange={(e) => toggleSelected(c, e.target.checked)} />
+                        <span className="hint">Implement</span>
+                    </label>
+                    <button className="btn sm danger" aria-label={`Delete countermeasure ${c.id}`} onClick={() => confirmDelete(`countermeasure ${c.id}`) && (removeCm(c.id), setEditingId(null))}>
                         ✕
                     </button>
                 </div>
@@ -176,6 +235,35 @@ export default function CountermeasuresPanel() {
                 <Field label="Description">
                     <textarea value={c.description || ''} onChange={(e) => upd({ description: e.target.value })} />
                 </Field>
+                <Field label="Negative effects / trade-offs" hint="Consequences of adopting this control — one per line (e.g. extra implementation effort, higher compute, reduced throughput).">
+                    <textarea
+                        value={(c.negativeEffects || []).join('\n')}
+                        placeholder={'e.g. additional implementation effort\nhigher computation time'}
+                        onChange={(e) => {
+                            const lines = e.target.value.split('\n');
+                            upd({ negativeEffects: lines.length === 1 && lines[0] === '' ? [] : lines });
+                        }}
+                    />
+                </Field>
+                <Field label="Associated security requirement" hint="Every countermeasure realises a security requirement (the 'is CM' requirement) that reduces the threat's risk.">
+                    {(() => {
+                        const linkedReqs = reqs.filter((r) => (r.satisfiedByCM || []).includes(c.id));
+                        return linkedReqs.length ? (
+                            <div className="summary-links">
+                                {linkedReqs.map((r) => (
+                                    <Jump key={r.id} view="requirements" id={r.id} label={`${r.id} · ${r.text}`} />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="inline">
+                                <span className="hint">No requirement is linked to this control yet.</span>
+                                <button className="btn sm" type="button" onClick={() => ensureReqForCm(c)}>
+                                    + Create linked requirement
+                                </button>
+                            </div>
+                        );
+                    })()}
+                </Field>
                 {(c.status === 'implemented' || c.status === 'verified') && (
                     <div className="grid2">
                         <Field
@@ -221,6 +309,132 @@ export default function CountermeasuresPanel() {
         );
     };
 
+    // Brainstorming comparison: for one threat, list every candidate control side by side with its
+    // residual risk, negative effects and an "implement" checkbox, so alternatives can be weighed.
+    const renderCompare = () => {
+        const t = threatById.get(compareThreatId);
+        const forThreat = t ? cms.filter((c) => (c.addresses || []).some((a) => a.threat === t.id)) : [];
+        const initial = t ? (t.likelihood || 0) * (t.impact || 0) : 0;
+        const negOf = (c: Countermeasure) => (c.negativeEffects || []).join('\n');
+        const setNeg = (cmId: string, text: string) => {
+            const lines = text.split('\n');
+            updCm(cmId, { negativeEffects: lines.length === 1 && lines[0] === '' ? [] : lines });
+        };
+        return (
+            <>
+                <EditBackBar label="Compare &amp; choose countermeasures" onBack={() => setMode('selected')} />
+                <div className="card">
+                    <div className="toolbar" style={{ alignItems: 'flex-end' }}>
+                        <Field label="Threat to compare">
+                            <select className="inp" style={{ minWidth: 260 }} value={compareThreatId} onChange={(e) => setCompareThreatId(e.target.value)}>
+                                <option value="">Select a threat…</option>
+                                {threats.map((x) => (
+                                    <option key={x.id} value={x.id}>
+                                        {x.id} · {x.title}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+                        {t && (
+                            <span className="hint" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                Initial risk <RiskPill score={initial} band={band(initial, scheme)} /> (L {t.likelihood} × I {t.impact})
+                            </span>
+                        )}
+                    </div>
+                    {t ? (
+                        <>
+                            <table className="cmp-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr style={{ textAlign: 'left', color: 'var(--text-dim)', fontSize: 12 }}>
+                                        <th style={{ padding: 6 }}>Countermeasure</th>
+                                        <th style={{ padding: 6, width: 260 }}>Residual (L × I)</th>
+                                        <th style={{ padding: 6 }}>Negative effects</th>
+                                        <th style={{ padding: 6, width: 70 }} />
+                                        <th style={{ padding: 6, width: 90, textAlign: 'center' }}>Implement</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {forThreat.map((c) => {
+                                        const a = (c.addresses || []).find((x) => x.threat === t.id);
+                                        const rl = a?.residualLikelihood ?? t.likelihood;
+                                        const ri = a?.residualImpact ?? t.impact;
+                                        const risk = (rl || 0) * (ri || 0);
+                                        return (
+                                            <tr key={c.id} style={{ borderTop: '1px solid var(--border)' }}>
+                                                <td style={{ padding: 6 }}>
+                                                    <input className="inp" value={c.title} onChange={(e) => updCm(c.id, { title: e.target.value })} />
+                                                    <span className="hint mono">{c.id} · {c.type || 'preventive'}</span>
+                                                </td>
+                                                <td style={{ padding: 6 }}>
+                                                    <div className="inline" style={{ gap: 4, alignItems: 'center' }}>
+                                                        <ScaleSelect value={rl} levels={LIKELIHOOD_LEVELS} onChange={(n) => updCmAddr(c.id, t.id, { residualLikelihood: Math.min(n, t.likelihood) })} style={{ width: 96 }} />
+                                                        <span>×</span>
+                                                        <ScaleSelect value={ri} levels={IMPACT_LEVELS} onChange={(n) => updCmAddr(c.id, t.id, { residualImpact: Math.min(n, t.impact) })} style={{ width: 96 }} />
+                                                        <RiskPill score={risk} band={band(risk, scheme)} />
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: 6 }}>
+                                                    <textarea className="inp" style={{ minHeight: 48, fontSize: 12 }} value={negOf(c)} placeholder="one per line" onChange={(e) => setNeg(c.id, e.target.value)} />
+                                                </td>
+                                                <td style={{ padding: 6, whiteSpace: 'nowrap' }}>
+                                                    <button className="btn sm" onClick={() => setEditingId(c.id)}>Edit</button>
+                                                    <button className="btn sm danger" aria-label={`Delete countermeasure ${c.id}`} onClick={() => confirmDelete(`countermeasure ${c.id}`) && removeCm(c.id)}>✕</button>
+                                                </td>
+                                                <td style={{ padding: 6, textAlign: 'center' }}>
+                                                    <input type="checkbox" checked={isSelected(c)} onChange={(e) => toggleSelected(c, e.target.checked)} aria-label={`Implement ${c.id}`} />
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {!forThreat.length && (
+                                        <tr>
+                                            <td colSpan={5} className="hint" style={{ padding: 10 }}>
+                                                No countermeasures address this threat yet — add a candidate to start comparing.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                            <button className="btn sm primary" style={{ marginTop: 8 }} onClick={() => addCandidateForThreat(t.id)}>
+                                + Add candidate for this threat
+                            </button>
+                        </>
+                    ) : (
+                        <p className="hint">Pick a threat above to compare candidate controls side by side.</p>
+                    )}
+                </div>
+
+                {candidateCms.length > 0 && (
+                    <div className="card">
+                        <h3>Not-yet-implemented candidates</h3>
+                        <p className="hint" style={{ marginTop: 0 }}>Controls modelled but not selected for implementation — still fully editable here.</p>
+                        <div className="list">
+                            {candidateCms.map((c) => (
+                                <div className="itemcard collapsed" key={c.id}>
+                                    <div className="head">
+                                        <span className="summary-id">{c.id}</span>
+                                        <span className="summary-title">{c.title}</span>
+                                        <span className="tag">{c.type || 'preventive'}</span>
+                                        <label className="inline" style={{ gap: 5 }} title="Choose to implement">
+                                            <input type="checkbox" checked={isSelected(c)} onChange={(e) => toggleSelected(c, e.target.checked)} />
+                                            <span className="hint">Implement</span>
+                                        </label>
+                                        <button className="btn sm" onClick={() => setEditingId(c.id)}>Edit</button>
+                                        <button className="btn sm danger" aria-label={`Delete countermeasure ${c.id}`} onClick={() => confirmDelete(`countermeasure ${c.id}`) && removeCm(c.id)}>✕</button>
+                                    </div>
+                                    <div className="summary-links">
+                                        <span className="lbl">Addresses:</span>
+                                        {(c.addresses || []).length ? (c.addresses || []).map((a) => <Jump key={a.threat} view="threats" id={a.threat} />) : <span className="hint">no threat yet</span>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </>
+        );
+    };
+
     return (
         <div className="panel">
             <div className="panelhead">
@@ -243,6 +457,8 @@ export default function CountermeasuresPanel() {
                     <EditBackBar label={`Editing ${editing.id}`} onBack={() => setEditingId(null)} />
                     {renderEditor(editing)}
                 </>
+            ) : mode === 'compare' ? (
+                renderCompare()
             ) : (
                 <>
                     <div className="toolbar">
@@ -267,10 +483,18 @@ export default function CountermeasuresPanel() {
                                 ))}
                             </select>
                         ) : null}
+                        <button className="btn sm" onClick={openCompare} title="Brainstorm and compare candidate controls per threat, then tick the ones to implement">
+                            ⚖ Compare &amp; choose
+                        </button>
+                        {candidateCms.length > 0 && (
+                            <button className="btn sm right" onClick={openCompare} title="Countermeasures modelled but not selected for implementation — reachable here">
+                                {candidateCms.length} candidate{candidateCms.length > 1 ? 's' : ''} not implemented
+                            </button>
+                        )}
                     </div>
 
                     <div className="list">
-                        {cms.map((c) => {
+                        {selectedCms.map((c) => {
                             const addr = c.addresses || [];
                             return (
                                 <div id={`f-countermeasures-${c.id}`} className={'itemcard collapsed' + (focusId === c.id ? ' focused' : '')} key={c.id} style={!addr.length ? { borderColor: '#f0c9a8' } : undefined}>
@@ -282,7 +506,7 @@ export default function CountermeasuresPanel() {
                                         <button className="btn sm" onClick={() => setEditingId(c.id)}>
                                             Edit
                                         </button>
-                                        <button className="btn sm danger" aria-label={`Delete countermeasure ${c.id}`} onClick={() => confirmDelete(`countermeasure ${c.id}`) && setCms(cms.filter((x) => x.id !== c.id))}>
+                                        <button className="btn sm danger" aria-label={`Delete countermeasure ${c.id}`} onClick={() => confirmDelete(`countermeasure ${c.id}`) && removeCm(c.id)}>
                                             ✕
                                         </button>
                                     </div>
@@ -290,10 +514,21 @@ export default function CountermeasuresPanel() {
                                         <span className="lbl">Addresses:</span>
                                         {addr.length ? addr.map((a) => <Jump key={a.threat} view="threats" id={a.threat} />) : <span className="hint">no threat yet</span>}
                                     </div>
+                                    {(c.negativeEffects || []).filter(Boolean).length > 0 && (
+                                        <div className="summary-links">
+                                            <span className="lbl">Trade-offs:</span>
+                                            <span className="hint">{(c.negativeEffects || []).filter(Boolean).join('; ')}</span>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
-                        {!cms.length && <p className="hint">No countermeasures yet.</p>}
+                        {!selectedCms.length && (
+                            <p className="hint">
+                                No implemented countermeasures yet.{candidateCms.length ? ' ' : ' '}
+                                Use <b>⚖ Compare &amp; choose</b> to brainstorm candidates and tick the ones to implement.
+                            </p>
+                        )}
                     </div>
                 </>
             )}

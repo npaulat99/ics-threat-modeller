@@ -17,6 +17,8 @@ import DashboardPanel from './components/panels/DashboardPanel';
 import DefectsPanel from './components/panels/DefectsPanel';
 import AssistantPanel from './components/panels/AssistantPanel';
 import KbPanel from './components/panels/KbPanel';
+import SettingsModal from './components/SettingsModal';
+import StrideBoundaryEditor from './components/StrideBoundaryEditor';
 
 export default function App() {
     const data = useStore((s) => s.data);
@@ -84,6 +86,8 @@ export default function App() {
                     </div>
                 </div>
             )}
+            <SettingsModal />
+            <StrideBoundaryEditor />
         </div>
     );
 }

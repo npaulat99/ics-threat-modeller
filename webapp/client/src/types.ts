@@ -78,9 +78,19 @@ export interface Project {
     repo?: RepoLinks;
     sbom?: SbomConfig;
     rigorousMode?: boolean; // when on, the structured Bug Bar + factor rubric is mandatory per threat
+    acceptableRisk?: number; // residual risk at or below this value is acceptable; above it the checker warns (default 12)
+    acceptedNotices?: string[]; // keys of plausibility notices the user has explicitly accepted (no longer open points)
+    reportOptions?: ReportOptions;
     steps?: Record<string, string>;
     status?: 'draft' | 'in-progress' | 'review' | 'released';
 }
+
+/** Report-generation toggles (Settings) — what optional sections to include in the HTML report. */
+export interface ReportOptions {
+    includeStrideBoundaryAnalysis?: boolean; // include the per-trust-boundary STRIDE strengths/weaknesses tables
+}
+
+export const DEFAULT_ACCEPTABLE_RISK = 12;
 
 export interface Assumption {
     id: string;
@@ -136,6 +146,28 @@ export interface TrustBoundary {
     name: string;
     members?: string[];
 }
+
+// ---- Per-trust-boundary STRIDE strengths/weaknesses analysis (a structured brainstorming aid) ----
+// One table per *pair of entities* that communicate across a trust boundary (e.g. HART ⇄ Plant DCS
+// vs. Bluetooth ⇄ maintenance app on the device-housing boundary), because different protocols give
+// different security properties, so each pair may be analysed differently. For both sides of the
+// pair and each STRIDE category, the strengths and weaknesses seen from that side's perspective.
+// Stored in `system.strideAnalyses` keyed by trust-boundary id, then by a pair key derived from the
+// two communicating endpoints; the side labels (entity names) are auto-derived and can be
+// overridden. Only user-authored text is persisted, so it survives DFD/system reconciliation.
+export interface StrideCategoryCell {
+    strengths?: string[];
+    weaknesses?: string[];
+}
+export interface StrideSideAnalysis {
+    label?: string; // optional override of the auto-derived entity name for this endpoint
+    cells?: Partial<Record<Stride, StrideCategoryCell>>;
+}
+export interface StridePairAnalysis {
+    // Keyed by endpoint id (boundary-independent). The inside/outside role depends on which
+    // boundary is being viewed, but the security properties of each endpoint are always shared.
+    endpoints?: Record<string, StrideSideAnalysis>;
+}
 export interface Objectives {
     confidentiality?: number;
     integrity?: number;
@@ -155,6 +187,9 @@ export interface SystemDef {
     interfaces: Interface[];
     trustBoundaries: TrustBoundary[];
     assets: Asset[];
+    // pairKey -> analysis; shared across every boundary that the pair's flow crosses, because
+    // the channel's security properties are the same regardless of which boundary you view it from.
+    strideAnalyses?: Record<string, StridePairAnalysis>;
 }
 
 export type DfdNodeType = 'external-entity' | 'process' | 'multiprocess' | 'store' | 'trust-boundary';
@@ -249,6 +284,8 @@ export interface Countermeasure {
     components?: string[];
     iec62443Ref?: string;
     status?: 'proposed' | 'planned' | 'implemented' | 'verified';
+    selected?: boolean; // chosen to be implemented — only selected controls appear in the main overview (undefined = selected, for backward compatibility)
+    negativeEffects?: string[]; // consequences of adopting this control (e.g. extra implementation effort, higher compute, reduced throughput)
     ticketUrl?: string; // required once status is implemented/verified — proof of implementation
     ticketUrls?: string[]; // optional additional implementation tickets linked to the same control
     verificationUrl?: string; // link to the verification/test evidence
@@ -313,6 +350,7 @@ export interface Requirement {
     standardRef?: string; // e.g. IEC 62443-4-2 CR 1.2, ETSI EN 303 645 provision
     derivedFromThreat?: string[]; // threats that motivate this requirement
     satisfiedByCM?: string[]; // countermeasures that satisfy it
+    fromCountermeasure?: boolean; // "is CM": this requirement realises a countermeasure and therefore reduces a threat's risk
     slFr?: string; // SL / Foundational Requirement reference (e.g. FR1 SL2)
 }
 export interface RequirementsDoc {
