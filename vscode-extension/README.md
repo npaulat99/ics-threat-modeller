@@ -118,3 +118,11 @@ npm run compile   # type-check + bundle to dist/extension.js
 Press F5 to launch the Extension Development Host. The DFD and attack-tree models live in
 `media/dfd-model.js` and `media/attacktree-model.js` (shared by the webviews and by the repository test
 script in `tools/test-models.js`).
+
+## License
+
+The EmbedRisk extension code is GPLv3-licensed. See [`LICENSE`](LICENSE) and [`../LICENSE`](../LICENSE).
+
+The optional draw.io editor mode uses a vendored upstream draw.io webapp subtree in `media/drawio/`. That third-party subtree and its bundled dependencies remain under their own upstream licenses.
+
+See [`../THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) for details.
