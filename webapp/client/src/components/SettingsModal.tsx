@@ -39,7 +39,7 @@ export default function SettingsModal() {
                     <h3 style={{ marginTop: 0 }}>Risk acceptance</h3>
                     <Field
                         label="Acceptable residual risk"
-                        hint="Residual risk (Likelihood × Impact, 0–25) at or below this value is acceptable. The plausibility checker warns for any non-accepted residual above it. Default 12 (the start of the High band)."
+                        hint="Warnings appear above this residual-risk threshold. Default: 12."
                     >
                         <input
                             className="inp"
@@ -61,8 +61,7 @@ export default function SettingsModal() {
                     <label className="inline" style={{ gap: 7, margin: 0, alignItems: 'flex-start' }}>
                         <input type="checkbox" checked={!!p.rigorousMode} onChange={(e) => set({ rigorousMode: e.target.checked })} style={{ marginTop: 3 }} />
                         <span className="hint">
-                            <b>Rigorous mode</b> — require the Bug Bar impact dimensions, the exposure / exploitability factors and a
-                            named rater on every threat (improves reproducibility &amp; inter-rater reliability).
+                            <b>Rigorous mode</b> requires Bug Bar dimensions, exposure/exploitability, and a named rater on every threat.
                         </span>
                     </label>
                 </div>
@@ -77,7 +76,7 @@ export default function SettingsModal() {
                             style={{ marginTop: 3 }}
                         />
                         <span className="hint">
-                            Include the <b>STRIDE-per-trust-boundary analysis</b> tables in the generated report.
+                            Include <b>STRIDE-per-trust-boundary</b> tables.
                         </span>
                     </label>
                 </div>

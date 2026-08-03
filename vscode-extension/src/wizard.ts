@@ -397,7 +397,7 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
 
       <div class="card" id="card-project">
         <h2>01 · Project</h2>
-        <div class="desc">Device, scope and target security level.</div>
+        <div class="desc">Device, scope, and target security level.</div>
         <div class="row">
           <div class="field" style="flex:2"><label>Device name</label><input class="inp" id="p-name"></div>
           <div class="field"><label>SL target</label>
@@ -410,22 +410,21 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
           <div class="grid3" style="margin-top:6px">
             <div class="field"><label>SBOM source</label>
               <select class="inp" id="p-sbom-mode" onchange="document.getElementById('p-sbom-fmt').style.display=this.value==='in-tool'?'':'none';document.getElementById('p-sbom-url').style.display=this.value!=='in-tool'?'':'none';">
-                <option value="in-tool">In-tool (generated from components)</option>
-                <option value="external">External — link to an existing SBOM</option>
+                <option value="in-tool">In-tool</option>
+                <option value="external">External</option>
               </select></div>
             <div class="field" id="p-sbom-fmt"><label>Format</label>
               <select class="inp" id="p-sbom-format"><option value="cyclonedx">CycloneDX 1.5</option><option value="spdx">SPDX 2.3</option></select></div>
             <div class="field" id="p-sbom-url" style="display:none"><label>External SBOM URL</label>
               <input class="inp" id="p-sbom-url-inp" placeholder="https://…/device-sbom.cdx.json"></div>
           </div>
-          <p class="hint" style="margin:4px 0 0">In-tool SBOM is generated from the component list (version, supplier, license, CPE fields in step 03).</p>
         </details>
-        <p class="hint" style="margin:6px 0 0">Changes are saved automatically.</p>
+        <p class="hint" style="margin:6px 0 0">Changes save automatically.</p>
       </div>
 
       <div class="card" id="card-assumptions">
         <h2>02 · Assumptions</h2>
-        <div class="desc">Ground the analysis: at least one <b>attacker profile</b> is required (it grounds the likelihood), plus device / system / environment / operational assumptions.</div>
+        <div class="desc">Attacker profiles and device, system, environment, and operational assumptions.</div>
         <div class="tabs" id="asm-tabs"></div>
         <div id="asm-body"></div>
 
@@ -433,7 +432,7 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
 
       <div class="card" id="card-system">
         <h2>03 · System &amp; assets</h2>
-        <div class="desc">Decompose the device into components, interfaces and trust boundaries, then list the protected assets and their Confidentiality / Integrity / Availability / Safety objectives (0–5). Components defined here feed the threats in step 06.</div>
+        <div class="desc">Components, interfaces, trust boundaries, and protected assets.</div>
         <div class="tabs" id="sys-tabs"></div>
         <div id="sys-body"></div>
 
@@ -441,21 +440,21 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
 
       <div class="card" id="card-requirements">
         <h2>05 · Security requirements</h2>
-        <div class="desc">Derive testable requirements from the threats and link them to the controls that satisfy them — the traceable core (threat &rarr; requirement &rarr; control) that IEC 62443-4-1 / CRA expect.</div>
+        <div class="desc">Testable requirements linked to threats and controls.</div>
         <div id="req-body"></div>
         <div style="margin-top:10px"><button class="btn" data-act="addReq">+ Requirement</button></div>
       </div>
 
       <div class="card" id="card-threats">
         <h2>06 · Threats &amp; risk</h2>
-        <div class="desc">Each threat needs a unique ID, at least one STRIDE category and one affected component. Risk = Likelihood × Impact; the residual reflects the single most-protective countermeasure. The <b>status</b> shows how each threat is being handled.</div>
+        <div class="desc">Each threat needs a unique ID, STRIDE category, and affected component.</div>
         <table class="grid"><thead><tr><th class="narrow">ID</th><th>Title</th><th>STRIDE</th><th>Components</th><th class="num">L</th><th class="num">I</th><th>Risk &rarr; residual</th><th class="stat">Status</th><th></th></tr></thead><tbody id="threats-body"></tbody></table>
         <div style="margin-top:10px"><button class="btn" data-act="addT">+ Threat</button></div>
       </div>
 
       <div class="card" id="card-cms">
         <h2>08 · Countermeasures</h2>
-        <div class="desc">A countermeasure addresses one or more threats and sets the residual L/I per threat. Preventive controls should lower likelihood, not impact.</div>
+        <div class="desc">Countermeasures set residual L/I per threat.</div>
         <div id="cms-list"></div>
         <div style="margin-top:10px"><button class="btn" data-act="addC">+ Countermeasure</button></div>
       </div>
@@ -697,7 +696,7 @@ function renderThreats(){
       '</details>'+
     '</td></tr>';
     return mainRow+detailRow;
-  }).join(''):'<tr><td colspan=9 class="hint">No threats yet — add one below.</td></tr>';
+  }).join(''):'<tr><td colspan=9 class="hint">No threats yet.</td></tr>';
 }
 function updatePills(){threats.forEach(function(t,i){var el=document.getElementById('tp-'+i);if(el)el.innerHTML=riskCell(t);});}
 function renderCms(){
@@ -744,7 +743,7 @@ function renderCms(){
       '<div style="margin-top:6px"><div class="hint">Addresses</div>'+(addrRows||'<span class="hint">No threats addressed yet.</span>')+'</div>'+
       (avail?'<div style="margin-top:6px"><div class="hint">Add threat</div><div class="chips">'+avail+'</div></div>':'')+
       '</div>';
-  }).join(''):'<span class="hint">No countermeasures yet — add one below.</span>';
+  }).join(''):'<span class="hint">No countermeasures yet.</span>';
 }
 function renderVersions(){
   var el=$('#versions-body');
@@ -762,11 +761,10 @@ function renderVersions(){
       (entry.assessors&&entry.assessors.length?' \u00b7 '+esc(entry.assessors.join(', ')):'')+'</div>'+
       (entry.summary?'<p style="margin:4px 0 0">'+esc(entry.summary)+'</p>':'')+
       '</div>';
-  }).join(''):'<p class="hint">No TRA versions recorded yet.</p>';
+  }).join(''):'<p class="hint">No TRA versions yet.</p>';
   el.innerHTML=
     '<div class="itemcard" style="margin-bottom:10px">'+
       '<b>'+(current?'Current: '+esc(current):'No version tagged yet')+'</b>'+
-      '<div class="hint" style="margin-top:4px">Tags are stored in 01-project-description/change-tracker.json</div>'+
     '</div>'+
     '<div class="itemcard" style="margin-bottom:10px">'+
       '<div class="grid3">'+
@@ -800,7 +798,7 @@ function renderAssumptions(){
           '<div class="field"><label>Resources</label><input class="inp" data-atk='+i+' data-k="resources" value="'+esc(p.resources||'')+'"></div>'+
         '</div>'+
         '<div class="field"><label>Description</label><textarea class="inp" rows=2 data-atk='+i+' data-k="text">'+esc(p.text||'')+'</textarea></div></div>';
-    }).join(''):'<p class="hint">No attacker profiles yet — at least one is required.</p>';
+    }).join(''):'<p class="hint">No attacker profiles yet.</p>';
     html+='<button class="btn sm primary" data-act="addAtk">+ Attacker profile</button>';
   } else {
     var key=asmTab, arr=assumptions[key]||[];
@@ -809,7 +807,7 @@ function renderAssumptions(){
         '<textarea class="inp grow" rows=2 data-asm="'+key+'" data-ai='+i+' data-k="text" placeholder="Assumption text">'+esc(item.text||'')+'</textarea>'+
         '<select class="inp" style="width:120px" data-asm="'+key+'" data-ai='+i+' data-k="confidence">'+['','low','medium','high'].map(function(c){return '<option value="'+c+'"'+((item.confidence||'')===c?' selected':'')+'>'+(c||'confidence…')+'</option>';}).join('')+'</select>'+
         '<button class="btn sm danger" data-act="delAsm" data-asm="'+key+'" data-i='+i+'>&#10005;</button></div></div>';
-    }).join(''):'<p class="hint">None yet.</p>';
+    }).join(''):'<p class="hint">No assumptions yet.</p>';
     html+='<button class="btn sm" data-act="addAsm" data-asm="'+key+'">+ Add</button>';
   }
   $('#asm-body').innerHTML=html;
@@ -830,7 +828,7 @@ function renderSystem(){
           '<div class="field"><label>Layer</label><input class="inp" type="number" min=1 max=6 data-comp='+i+' data-k="layer" value="'+(+c.layer||1)+'"></div>'+
           '<div class="field"><label>Parent</label><select class="inp" data-comp='+i+' data-k="parent">'+parentSel+'</select></div>'+
         '</div>'+
-        '<details style="margin-top:4px"><summary class="hint" style="cursor:pointer;list-style:none;padding:2px 0">&#9654; SBOM metadata — version · supplier · license · CPE/purl</summary>'+
+        '<details style="margin-top:4px"><summary class="hint" style="cursor:pointer;list-style:none;padding:2px 0">&#9654; SBOM metadata</summary>'+
           '<div class="grid4" style="margin-top:6px">'+
             '<div class="field"><label>Version</label><input class="inp" data-comp='+i+' data-k="version" value="'+esc(c.version||'')+'" placeholder="1.2.3"></div>'+
             '<div class="field"><label>Supplier</label><input class="inp" data-comp='+i+' data-k="supplier" value="'+esc(c.supplier||'')+'" placeholder="Vendor name"></div>'+
@@ -861,7 +859,7 @@ function renderSystem(){
       return '<div class="itemcard"><div class="head"><span class="idtag">'+esc(b.id||('TB-'+(i+1)))+'</span>'+
         '<input class="inp grow" data-tb='+i+' data-k="name" value="'+esc(b.name||'')+'">'+
         '<button class="btn sm danger" data-act="delTb" data-i='+i+'>&#10005;</button></div>'+
-        '<div class="hint">Members — components enclosed by this boundary</div><div class="chips">'+mem+'</div></div>';
+        '<div class="hint">Members</div><div class="chips">'+mem+'</div></div>';
     }).join(''):'<p class="hint">No trust boundaries yet.</p>';
     html+='<button class="btn sm" data-act="addTb">+ Trust boundary</button>';
   } else {
@@ -876,7 +874,7 @@ function renderSystem(){
         '<div class="grid3"><div class="field"><label>Type</label><select class="inp" data-as='+i+' data-k="type">'+optTags(ASSET_TYPES,a.type||'function')+'</select></div>'+
           '<div class="field" style="grid-column:span 2"><label>Storage</label><input class="inp" data-as='+i+' data-k="storage" value="'+esc(a.storage||'')+'"></div></div>'+
         '<div class="hint" style="margin-top:6px">Components</div><div class="chips">'+comp+'</div>'+
-        '<div class="hint" style="margin-top:6px">Security objectives (0–5; impact later defaults to the worst dimension — Bug Bar)</div><div class="objgrid">'+objs+'</div></div>';
+        '<div class="hint" style="margin-top:6px">Security objectives (0–5)</div><div class="objgrid">'+objs+'</div></div>';
     }).join(''):'<p class="hint">No assets yet.</p>';
     html+='<button class="btn sm" data-act="addAs">+ Asset</button>';
   }
@@ -896,7 +894,7 @@ function renderRequirements(){
       '</div>'+
       '<div class="hint" style="margin-top:6px">Derived from threats</div><div class="chips">'+th+'</div>'+
       '<div class="hint" style="margin-top:6px">Satisfied by countermeasures</div><div class="chips">'+cc+'</div></div>';
-  }).join(''):'<p class="hint">No requirements yet — derive them from your rated threats.</p>';
+  }).join(''):'<p class="hint">No requirements yet.</p>';
   $('#req-body').innerHTML=html;
 }
 function toast(kind,text){var e=$('#'+kind);e.textContent=text;e.style.display='block';var o=$(kind==='err'?'#ok':'#err');o.style.display='none';if(kind==='ok')setTimeout(function(){e.style.display='none';},2500);}

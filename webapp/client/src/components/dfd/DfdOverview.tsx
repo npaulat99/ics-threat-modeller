@@ -96,7 +96,7 @@ export default function DfdOverview({ onOpen }: { onOpen: (nodeId: string, path:
                     ) : (
                         <ul>
                             <li>
-                                <span className="hint">No nodes yet — add entities in the standard view.</span>
+                                <span className="hint">No nodes yet.</span>
                             </li>
                         </ul>
                     )}

@@ -90,15 +90,14 @@ export default function SystemPanel() {
                 <HelpButton title="System &amp; assets (tips)">
                     <ul>
                         <li>Mark third-party components (OSS / commercial) with <b>provenance</b> — they drive SBOM and supply-chain scope.</li>
-                        <li><b>Group assets</b> at the right level: model one "measurement integrity" asset, not one per signal. Over-detailed asset/component trees cause state-space explosion.</li>
+                        <li><b>Group assets</b> at the right level: model one "measurement integrity" asset, not one per signal.</li>
                         <li>Categorise interfaces (network / external / user) and record where each asset is <b>stored</b> (internal/external flash, secure element…) — storage location changes the attacker's required access.</li>
                         <li>Rate each asset's C / I / A / Safety (0–5); impact later defaults to the worst dimension (Bug Bar).</li>
                     </ul>
                 </HelpButton>
             </div>
             <p className="lead">
-                Decompose the device into components, interfaces and trust boundaries, then list the protected assets and their
-                Confidentiality / Integrity / Availability / Safety objectives (0–5). Use the tabs to work through one part at a time.
+                Define components, interfaces, trust boundaries, and protected assets.
             </p>
 
             <div className="tabs">
@@ -197,7 +196,7 @@ export default function SystemPanel() {
                                         <Field label="Category">
                                             <ComboInput value={c.category} onChange={(v) => upd({ category: v || undefined })} options={CATEGORY_OPTS} placeholder="network…" />
                                         </Field>
-                                        <Field label="Chip tag" hint="Short text shown on the DFD chip.">
+                                        <Field label="Chip tag" hint="Shown on the DFD node.">
                                             <input value={c.tag || ''} onChange={(e) => upd({ tag: e.target.value })} placeholder="BLE, HMI, JTAG…" />
                                         </Field>
                                         <Field label="On component">
@@ -288,7 +287,7 @@ export default function SystemPanel() {
                                         </div>
                                     </div>
                                 ))}
-                                {!(sys.trustBoundaries || []).length && <p className="hint">None yet.</p>}
+                                {!(sys.trustBoundaries || []).length && <p className="hint">No trust boundaries yet.</p>}
                             </div>
                         </>
                     )}
@@ -328,12 +327,12 @@ export default function SystemPanel() {
                                             ))}
                                         </div>
                                         <div className="grid2">
-                                            <Field label="Asset type" hint="Pick the closest business or technical asset class so later threat/risk text stays concrete.">
+                                            <Field label="Asset type" hint="Pick the closest business or technical class.">
                                                 <ComboInput value={c.type || 'function'} onChange={(v) => upd({ type: v })} options={ASSET_TYPE_OPTS} placeholder="function, data, credential…" />
                                             </Field>
                                         </div>
                                         <div className="grid2">
-                                            <Field label="Stored in" hint="Where the data / asset physically lives.">
+                                            <Field label="Stored in" hint="Physical storage location.">
                                                 <input list="storages" value={c.storage || ''} onChange={(e) => upd({ storage: e.target.value })} placeholder="internal flash, secure element…" />
                                             </Field>
                                             <Field label="Held by components">
@@ -396,7 +395,7 @@ export default function SystemPanel() {
                                         </div>
                                     );
                                 })}
-                                {!(sys.assets || []).length && <p className="hint">None yet.</p>}
+                                {!(sys.assets || []).length && <p className="hint">No assets yet.</p>}
                             </div>
                         </>
                     )}

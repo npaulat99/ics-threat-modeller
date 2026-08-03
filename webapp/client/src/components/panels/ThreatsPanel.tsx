@@ -122,7 +122,7 @@ export default function ThreatsPanel() {
                         <Field label="Affected assets">
                             <Chips options={assetOpts} value={t.assets || []} onChange={(v) => upd({ assets: v })} empty="No assets yet." />
                         </Field>
-                        <Field label="Attacker profile (grounds likelihood)">
+                        <Field label="Attacker profile" hint="Used to ground likelihood.">
                             <select value={t.attackerRef || ''} onChange={(e) => upd({ attackerRef: e.target.value })}>
                                 <option value="">— none —</option>
                                 {attackers.map((a) => (
@@ -132,7 +132,7 @@ export default function ThreatsPanel() {
                                 ))}
                             </select>
                         </Field>
-                        <Field label="Affected interfaces / vectors" hint="Assess several interfaces together, or split them into one threat per interface.">
+                        <Field label="Affected interfaces / vectors" hint="Split by interface if the risk differs.">
                             <Chips options={ifaceOpts} value={interfaceRefs} onChange={setInterfaces} empty="No interfaces defined in step 03 yet." />
                             <input
                                 className="inp"
@@ -160,13 +160,13 @@ export default function ThreatsPanel() {
                 <RiskCalculator t={t} upd={upd} />
                 {t.status === 'accepted' && (
                     <div className="grid3" style={{ marginTop: 8 }}>
-                        <Field label="Accepted by" hint="Residual-risk sign-off owner (required).">
+                        <Field label="Accepted by" hint="Residual-risk sign-off owner.">
                             <input value={t.acceptedBy || ''} onChange={(e) => upd({ acceptedBy: e.target.value })} placeholder="name / role" />
                         </Field>
-                        <Field label="Acceptance rationale" hint="Why the residual risk is acceptable (required).">
+                        <Field label="Acceptance rationale" hint="Why the residual risk is acceptable.">
                             <input value={t.acceptanceRationale || ''} onChange={(e) => upd({ acceptanceRationale: e.target.value })} placeholder="e.g. compensating controls in the plant" />
                         </Field>
-                        <Field label="Next review date" hint="Lifecycle re-assessment (YYYY-MM-DD).">
+                        <Field label="Next review date" hint="Next reassessment date.">
                             <input type="date" value={t.reviewDate || ''} onChange={(e) => upd({ reviewDate: e.target.value })} />
                         </Field>
                     </div>
@@ -179,7 +179,7 @@ export default function ThreatsPanel() {
                     {cmsFor(t.id).length ? (
                         cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} label={`${c.id} · ${c.title}`.slice(0, 26)} />)
                     ) : (
-                        <span className="hint">no countermeasure yet</span>
+                        <span className="hint">none</span>
                     )}
                 </div>
             </div>
@@ -193,15 +193,14 @@ export default function ThreatsPanel() {
                 <HelpButton title="Threat identification (tips)">
                     <ul>
                         <li>Walk each <b>interface and trust-boundary crossing</b> with STRIDE; flows that cross a boundary are the hot-spots.</li>
-                        <li>Keep it proportionate: aim for roughly <b>~5 substantive threats per interface</b> — more than ~20 is usually noise.</li>
+                        <li>Keep it proportionate: around <b>~5 substantive threats per interface</b> is usually enough.</li>
                         <li>Prefer the <b>knowledge base</b> for common OT threats; write attack trees only for the few complex multi-step paths.</li>
                         <li>Attach every threat to at least one component, set the <b>primary interface</b>, and ground likelihood in an attacker profile.</li>
                     </ul>
                 </HelpButton>
             </div>
             <p className="lead">
-                Enumerate STRIDE threats and attach each to the components (and assets) it affects. Likelihood × Impact gives the
-                initial risk; the residual updates automatically once countermeasures address it.
+                Enumerate STRIDE threats and link each one to the affected components and assets.
             </p>
 
             {editing ? (
@@ -257,7 +256,7 @@ export default function ThreatsPanel() {
                                     <div className="summary-links">
                                         {(t.stride || []).length ? <span className="tag stride">{sortStride(t.stride).join(' ')}</span> : null}
                                         <span className="lbl">Mitigated by:</span>
-                                        {cmsFor(t.id).length ? cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} />) : <span className="hint">no countermeasure yet</span>}
+                                        {cmsFor(t.id).length ? cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} />) : <span className="hint">none</span>}
                                         {(t.assets || []).length ? (
                                             <>
                                                 <span className="lbl">Assets:</span>
@@ -270,7 +269,7 @@ export default function ThreatsPanel() {
                                 </div>
                             );
                         })}
-                        {!threats.length && <p className="hint">No threats yet. Add one, or import from the knowledge base.</p>}
+                        {!threats.length && <p className="hint">No threats yet.</p>}
                     </div>
                 </>
             )}

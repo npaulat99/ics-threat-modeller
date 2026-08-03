@@ -48,7 +48,7 @@ export async function openKbBrowser(ctx: vscode.ExtensionContext) {
   panel.webview.html = `<!doctype html><html><head><meta charset="utf8"><meta http-equiv="Content-Security-Policy" content="${csp}"><link rel="stylesheet" href="${cssUri}"></head><body>
   <div class="topbar"><div class="brand"><img class="logo" src="${logoUri}" alt="" width="22" height="22"><span>EmbedRisk <small>· Knowledge base</small></span></div></div>
   <div class="main">
-  <p class="hint">Reusable, device-class threats and countermeasures. Imported items are added to the active project; you still assign affected components / links in the wizard, where plausibility is enforced.</p>
+  <p class="hint">Reusable threats and countermeasures for the active project.</p>
   <div class="card"><h2>Threats</h2><table class="grid"><thead><tr><th>Key</th><th>Title</th><th>STRIDE</th><th>Applies to</th><th>Impact</th><th></th></tr></thead><tbody>${tRows || "<tr><td colspan=6 class=hint>No catalogue found.</td></tr>"}</tbody></table></div>
   <div class="card"><h2>Countermeasures</h2><table class="grid"><thead><tr><th>Key</th><th>Title</th><th>For</th><th></th></tr></thead><tbody>${cRows || "<tr><td colspan=4 class=hint>No catalogue found.</td></tr>"}</tbody></table></div>
   </div>
@@ -68,7 +68,7 @@ export async function openKbBrowser(ctx: vscode.ExtensionContext) {
       doc.threats = doc.threats || [];
       doc.threats.push({ id, title: src.title, stride: src.stride || [], components: [], assets: [], likelihood: 3, impact: src.typicalImpact || 3, status: "open", source: "knowledge-base:" + src.key });
       await vscode.workspace.fs.writeFile(u, Buffer.from(JSON.stringify(doc, null, 2)));
-      vscode.window.showInformationMessage(`Imported threat ${id}. Assign affected components in the wizard before saving.`);
+      vscode.window.showInformationMessage(`Imported threat ${id}. Assign affected components in the wizard.`);
     } else {
       const src = cms[m.i];
       const u = vscode.Uri.joinPath(proj, "08-countermeasures/countermeasures.json");

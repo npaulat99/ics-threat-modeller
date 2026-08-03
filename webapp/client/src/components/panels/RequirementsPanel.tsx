@@ -28,16 +28,14 @@ export default function RequirementsPanel() {
                 <h1>Security requirements</h1>
                 <HelpButton title="Security requirements (tips)">
                     <ul>
-                        <li>A requirement is the missing link in the audit chain <b>threat → risk → requirement → control</b> (IEC 62443-4-1 SR).</li>
+                        <li>Requirements complete the audit chain <b>threat → risk → requirement → control</b>.</li>
                         <li>Cite the standard clause (e.g. IEC 62443-4-2 CR 1.2) and the SL / Foundational Requirement it satisfies.</li>
                         <li>Every high/critical threat should derive at least one requirement; every requirement should be satisfied by a countermeasure.</li>
                     </ul>
                 </HelpButton>
             </div>
             <p className="lead">
-                Derive testable security requirements from the threats and link them to the controls that satisfy them — this is the
-                traceable core of a 62443-4-1 / CRA assessment. You may also add <b>standalone</b> requirements that are not tied to a
-                specific threat or countermeasure; the plausibility check flags those only as an acceptable notice.
+                Derive testable requirements from threats and link them to the controls that satisfy them.
             </p>
 
             {editing ? (
@@ -72,8 +70,7 @@ export default function RequirementsPanel() {
                                 <label className="inline" style={{ gap: 7, alignItems: 'flex-start', marginTop: 4 }}>
                                     <input type="checkbox" checked={!!r.fromCountermeasure || (r.satisfiedByCM || []).length > 0} disabled={(r.satisfiedByCM || []).length > 0} onChange={(e) => upd({ fromCountermeasure: e.target.checked })} style={{ marginTop: 3 }} />
                                     <span className="hint">
-                                        <b>Is CM</b> — this requirement realises a countermeasure and therefore reduces a threat's risk
-                                        (set automatically when a countermeasure satisfies it).
+                                        <b>Is CM</b> means this requirement is realized by a countermeasure.
                                     </span>
                                 </label>
                             </div>
@@ -116,7 +113,7 @@ export default function RequirementsPanel() {
                             ))}
                         </div>
                     ) : (
-                        <p className="hint">No requirements yet. Derive them from your rated threats.</p>
+                        <p className="hint">No requirements yet.</p>
                     )}
                 </>
             )}

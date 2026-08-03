@@ -235,7 +235,7 @@ export default function CountermeasuresPanel() {
                 <Field label="Description">
                     <textarea value={c.description || ''} onChange={(e) => upd({ description: e.target.value })} />
                 </Field>
-                <Field label="Negative effects / trade-offs" hint="Consequences of adopting this control — one per line (e.g. extra implementation effort, higher compute, reduced throughput).">
+                <Field label="Negative effects / trade-offs" hint="One per line.">
                     <textarea
                         value={(c.negativeEffects || []).join('\n')}
                         placeholder={'e.g. additional implementation effort\nhigher computation time'}
@@ -245,7 +245,7 @@ export default function CountermeasuresPanel() {
                         }}
                     />
                 </Field>
-                <Field label="Associated security requirement" hint="Every countermeasure realises a security requirement (the 'is CM' requirement) that reduces the threat's risk.">
+                <Field label="Associated security requirement" hint="Required for traceability.">
                     {(() => {
                         const linkedReqs = reqs.filter((r) => (r.satisfiedByCM || []).includes(c.id));
                         return linkedReqs.length ? (
@@ -256,7 +256,7 @@ export default function CountermeasuresPanel() {
                             </div>
                         ) : (
                             <div className="inline">
-                                <span className="hint">No requirement is linked to this control yet.</span>
+                                <span className="hint">No linked requirement.</span>
                                 <button className="btn sm" type="button" onClick={() => ensureReqForCm(c)}>
                                     + Create linked requirement
                                 </button>
@@ -268,7 +268,7 @@ export default function CountermeasuresPanel() {
                     <div className="grid2">
                         <Field
                             label="Implementation tickets (at least one required)"
-                            hint={!ticketList(c).some((t) => t.trim()) ? 'At least one ticketing-system link is required to prove this control was implemented.' : undefined}
+                            hint={!ticketList(c).some((t) => t.trim()) ? 'Add at least one ticket link.' : undefined}
                         >
                             <div className="list" style={{ gap: 6 }}>
                                 {ticketList(c).map((ticket, idx) => (
@@ -389,7 +389,7 @@ export default function CountermeasuresPanel() {
                                     {!forThreat.length && (
                                         <tr>
                                             <td colSpan={5} className="hint" style={{ padding: 10 }}>
-                                                No countermeasures address this threat yet — add a candidate to start comparing.
+                                                No countermeasures address this threat yet.
                                             </td>
                                         </tr>
                                     )}
@@ -424,7 +424,7 @@ export default function CountermeasuresPanel() {
                                     </div>
                                     <div className="summary-links">
                                         <span className="lbl">Addresses:</span>
-                                        {(c.addresses || []).length ? (c.addresses || []).map((a) => <Jump key={a.threat} view="threats" id={a.threat} />) : <span className="hint">no threat yet</span>}
+                                        {(c.addresses || []).length ? (c.addresses || []).map((a) => <Jump key={a.threat} view="threats" id={a.threat} />) : <span className="hint">none</span>}
                                     </div>
                                 </div>
                             ))}
@@ -442,14 +442,13 @@ export default function CountermeasuresPanel() {
                 <HelpButton title="Countermeasures (tips)">
                     <ul>
                         <li>Use <b>object references, not copies</b> — link one countermeasure to many threats rather than duplicating text.</li>
-                        <li>Record the residual L/I each control achieves; the residual risk is the <b>lowest</b> reached across applied controls.</li>
-                        <li>Once a control is <b>implemented or verified</b>, attach the <b>ticket link</b> (proof) and a verification/test link — this is the IEC 62443-4-1 traceability evidence.</li>
+                        <li>Record the residual L/I each control achieves; the residual risk uses the <b>lowest</b> result across applied controls.</li>
+                        <li>Implemented or verified controls should include ticket and verification links.</li>
                     </ul>
                 </HelpButton>
             </div>
             <p className="lead">
-                Each countermeasure may address several threats (many-to-many). For every addressed threat, record the residual
-                likelihood and impact it brings about — the residual risk is the minimum across all applied countermeasures.
+                Link each countermeasure to the threats it reduces and record the residual L/I per threat.
             </p>
 
             {editing ? (
@@ -483,11 +482,11 @@ export default function CountermeasuresPanel() {
                                 ))}
                             </select>
                         ) : null}
-                        <button className="btn sm" onClick={openCompare} title="Brainstorm and compare candidate controls per threat, then tick the ones to implement">
+                        <button className="btn sm" onClick={openCompare} title="Compare candidate controls for a threat">
                             ⚖ Compare &amp; choose
                         </button>
                         {candidateCms.length > 0 && (
-                            <button className="btn sm right" onClick={openCompare} title="Countermeasures modelled but not selected for implementation — reachable here">
+                            <button className="btn sm right" onClick={openCompare} title="Candidate controls not selected for implementation">
                                 {candidateCms.length} candidate{candidateCms.length > 1 ? 's' : ''} not implemented
                             </button>
                         )}
@@ -512,7 +511,7 @@ export default function CountermeasuresPanel() {
                                     </div>
                                     <div className="summary-links">
                                         <span className="lbl">Addresses:</span>
-                                        {addr.length ? addr.map((a) => <Jump key={a.threat} view="threats" id={a.threat} />) : <span className="hint">no threat yet</span>}
+                                        {addr.length ? addr.map((a) => <Jump key={a.threat} view="threats" id={a.threat} />) : <span className="hint">none</span>}
                                     </div>
                                     {(c.negativeEffects || []).filter(Boolean).length > 0 && (
                                         <div className="summary-links">
@@ -525,8 +524,7 @@ export default function CountermeasuresPanel() {
                         })}
                         {!selectedCms.length && (
                             <p className="hint">
-                                No implemented countermeasures yet.{candidateCms.length ? ' ' : ' '}
-                                Use <b>⚖ Compare &amp; choose</b> to brainstorm candidates and tick the ones to implement.
+                                No implemented countermeasures yet. Use <b>⚖ Compare &amp; choose</b> to review candidates.
                             </p>
                         )}
                     </div>

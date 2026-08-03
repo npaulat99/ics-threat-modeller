@@ -6,7 +6,7 @@ import * as vscode from "vscode";
 // defence/vulnerability nodes. Deterministic metrics are derived bottom-up. Two-way file sync.
 export class AttackTreeEditor implements vscode.CustomTextEditorProvider {
   public pendingTreeId: string | undefined;
-  constructor(private extUri: vscode.Uri) {}
+  constructor(private extUri: vscode.Uri) { }
 
   async resolveCustomTextEditor(doc: vscode.TextDocument, panel: vscode.WebviewPanel) {
     const media = vscode.Uri.joinPath(this.extUri, "media");
@@ -83,7 +83,7 @@ body{display:flex;flex-direction:column}
   <button id="undo" data-act="undo" title="Undo (Ctrl+Z)" disabled>&#8630; Undo</button>
   <button id="redo" data-act="redo" title="Redo (Ctrl+Shift+Z)" disabled>&#8631; Redo</button>
   <span id="metrics"></span>
-  <span id="hint">&larr;&rarr; siblings &middot; &uarr;&darr; parent/child &middot; Enter child &middot; Insert sibling &middot; t/click gate &middot; e edit &middot; d delete</span>
+  <span id="hint">&larr;&rarr; siblings &middot; &uarr;&darr; parent/child &middot; Enter child &middot; e edit &middot; d delete</span>
 </div>
 <div id="body">
   <div id="wrap"><svg id="cv" xmlns="http://www.w3.org/2000/svg"></svg></div>

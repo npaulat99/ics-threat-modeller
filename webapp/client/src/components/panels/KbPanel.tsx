@@ -24,13 +24,13 @@ export default function KbPanel() {
                 <h1>Knowledge base</h1>
                 <HelpButton title="Knowledge base">
                     <ul>
-                        <li>Shared, security-unit-owned reference data. The app <b>pulls</b> it from git but never pushes — only the security unit changes it.</li>
+                        <li>Shared reference data owned by the security team.</li>
                         <li>Add the KB git URL and pull it from <b>Project → Repository</b>.</li>
                         <li>Reusable threats/countermeasures can be imported into a project from the Threats / Countermeasures steps.</li>
                     </ul>
                 </HelpButton>
             </div>
-            <p className="lead">Browse the company-shared knowledge base used to rate and enumerate consistently across the department.</p>
+            <p className="lead">Browse the shared threat, countermeasure, and risk references.</p>
 
             <div className="tabs">
                 <button className={'tab' + (tab === 'bugbar' ? ' active' : '')} onClick={() => setTab('bugbar')}>
@@ -135,7 +135,7 @@ export default function KbPanel() {
                         </div>
                     ))
                 ) : (
-                    <p className="hint">No imported catalogues. Add a knowledge-base git URL on the Project page and pull it.</p>
+                    <p className="hint">No imported catalogues.</p>
                 ))}
         </div>
     );

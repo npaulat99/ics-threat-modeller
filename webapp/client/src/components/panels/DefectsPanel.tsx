@@ -40,14 +40,13 @@ export default function DefectsPanel() {
                 <h1>Defect &amp; vulnerability register</h1>
                 <HelpButton title="Defect register (tips)">
                     <ul>
-                        <li>IEC 62443-4-1 <b>DM</b> (defect management) and <b>SUM</b> (updates) require known weaknesses to be tracked and resolved over the lifecycle.</li>
-                        <li>Record third-party CVEs against the SBOM component they affect; set a <b>fixed-in</b> version and re-assess the linked threats after the fix.</li>
+                        <li>Track known weaknesses through the product lifecycle.</li>
+                        <li>Record third-party CVEs against the affected SBOM component and re-assess linked threats after the fix.</li>
                     </ul>
                 </HelpButton>
             </div>
             <p className="lead">
-                Track known defects and CVEs per component across the lifecycle, so the assessment can be kept current per release
-                (continuous maintenance).
+                Track known defects and CVEs per component.
             </p>
             <div className="toolbar">
                 <button className="btn primary sm" onClick={add}>
@@ -99,7 +98,7 @@ export default function DefectsPanel() {
                                 <Field label="Fixed in (version)">
                                     <input value={d.fixedIn || ''} onChange={(e) => upd(d.id, { fixedIn: e.target.value })} placeholder="FW 2.5" />
                                 </Field>
-                                <Field label="Re-assess threat" hint="An open high/critical defect flags this threat for re-assessment.">
+                                <Field label="Re-assess threat" hint="Open high/critical defects flag this threat for reassessment.">
                                     <ComboInput value={d.threatRef} onChange={(v) => upd(d.id, { threatRef: v || undefined })} options={threatOpts} placeholder="threat…" />
                                     {d.threatRef && (
                                         <div style={{ marginTop: 4 }}>
@@ -115,7 +114,7 @@ export default function DefectsPanel() {
                     );
                 })
             ) : (
-                <p className="hint">No defects recorded yet.</p>
+                <p className="hint">No defects yet.</p>
             )}
         </div>
     );

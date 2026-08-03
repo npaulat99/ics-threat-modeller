@@ -40,7 +40,7 @@ export function IdInput({ id, onRename }: { id: string; onRename?: (newId: strin
         <input
             className={cx('inp', 'idtag', err && 'invalid')}
             value={val}
-            title={err || 'Unique ID — letters, digits, space and - _ : . Renaming updates all references.'}
+            title={err || 'Unique ID. Renaming updates all references.'}
             onChange={(e) => {
                 setVal(e.target.value);
                 setErr(idError(data, e.target.value, id));
