@@ -36,7 +36,8 @@ export default function RequirementsPanel() {
             </div>
             <p className="lead">
                 Derive testable security requirements from the threats and link them to the controls that satisfy them — this is the
-                traceable core of a 62443-4-1 / CRA assessment.
+                traceable core of a 62443-4-1 / CRA assessment. You may also add <b>standalone</b> requirements that are not tied to a
+                specific threat or countermeasure; the plausibility check flags those only as an acceptable notice.
             </p>
 
             {editing ? (
@@ -66,8 +67,15 @@ export default function RequirementsPanel() {
                                     <Chips options={threatOpts} value={r.derivedFromThreat || []} onChange={(v) => upd({ derivedFromThreat: v })} empty="No threats yet." />
                                 </Field>
                                 <Field label="Satisfied by countermeasures">
-                                    <Chips options={cmOpts} value={r.satisfiedByCM || []} onChange={(v) => upd({ satisfiedByCM: v })} empty="No countermeasures yet." />
+                                    <Chips options={cmOpts} value={r.satisfiedByCM || []} onChange={(v) => upd({ satisfiedByCM: v, fromCountermeasure: v.length ? true : r.fromCountermeasure })} empty="No countermeasures yet." />
                                 </Field>
+                                <label className="inline" style={{ gap: 7, alignItems: 'flex-start', marginTop: 4 }}>
+                                    <input type="checkbox" checked={!!r.fromCountermeasure || (r.satisfiedByCM || []).length > 0} disabled={(r.satisfiedByCM || []).length > 0} onChange={(e) => upd({ fromCountermeasure: e.target.checked })} style={{ marginTop: 3 }} />
+                                    <span className="hint">
+                                        <b>Is CM</b> — this requirement realises a countermeasure and therefore reduces a threat's risk
+                                        (set automatically when a countermeasure satisfies it).
+                                    </span>
+                                </label>
                             </div>
                         );
                     })()}
@@ -86,6 +94,11 @@ export default function RequirementsPanel() {
                                     <div className="head">
                                         <span className="summary-id">{r.id}</span>
                                         <span className="summary-title">{r.text || '(untitled requirement)'}</span>
+                                        {r.fromCountermeasure || (r.satisfiedByCM || []).length ? (
+                                            <span className="tag" title="Realises a countermeasure that reduces a threat's risk">is CM</span>
+                                        ) : !(r.derivedFromThreat || []).length ? (
+                                            <span className="tag" title="Not derived from a threat or countermeasure">standalone</span>
+                                        ) : null}
                                         <button className="btn sm" onClick={() => setEditingId(r.id)}>
                                             Edit
                                         </button>

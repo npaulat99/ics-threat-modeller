@@ -35,18 +35,22 @@ export const DEFAULT_BANDS: RiskBand[] = [
     { name: 'Critical', min: 20, max: 25, color: '#c62828' },
 ];
 
+/** A zero likelihood or impact means the threat is not possible — risk 0, its own band. */
+export const NONE_BAND: RiskBand = { name: 'None', min: 0, max: 0, color: '#6b7280' };
+
 export function bandsOf(scheme: RiskScheme | null): RiskBand[] {
     return scheme?.matrix?.bands?.length ? scheme.matrix.bands : DEFAULT_BANDS;
 }
 
 export function band(score: number, scheme: RiskScheme | null): RiskBand {
+    if (score <= 0) return NONE_BAND;
     const bands = bandsOf(scheme);
     return bands.find((b) => score >= b.min && score <= b.max) || bands[0];
 }
 
-/** Residual [likelihood, impact] for a threat across all countermeasure links. */
+/** Residual [likelihood, impact] for a threat across all selected countermeasure links. */
 export function residual(threat: Threat, cms: Countermeasure[]): [number, number] {
-    const links = cms.flatMap((c) => (c.addresses || []).filter((a) => a.threat === threat.id));
+    const links = cms.filter((c) => c.selected !== false).flatMap((c) => (c.addresses || []).filter((a) => a.threat === threat.id));
     if (!links.length) return [threat.likelihood, threat.impact];
     // All applied controls are in effect simultaneously, so an attacker must overcome the strongest
     // one on each axis. The residual likelihood is therefore the LOWEST residual likelihood any

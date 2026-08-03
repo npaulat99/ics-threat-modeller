@@ -29,6 +29,7 @@ type Tab = 'components' | 'interfaces' | 'boundaries' | 'assets';
 export default function SystemPanel() {
     const data = useStore((s) => s.data)!;
     const save = useStore((s) => s.save);
+    const openStrideBoundary = useStore((s) => s.openStrideBoundary);
     const sys = data.system;
     const set = (patch: any) => save('system', { ...sys, ...patch });
     const compOpts = (sys.components || []).map((c) => ({ value: c.id, label: `${c.name} (${c.id})` }));
@@ -248,6 +249,9 @@ export default function SystemPanel() {
                                         <Field label="Members">
                                             <Chips options={compOpts} value={c.members || []} onChange={(v) => upd({ members: v })} />
                                         </Field>
+                                        <button className="btn sm" onClick={() => openStrideBoundary(c.id)}>
+                                            STRIDE strengths / weaknesses
+                                        </button>
                                     </div>
                                 </>
                             );
@@ -268,6 +272,9 @@ export default function SystemPanel() {
                                         <div className="head">
                                             <span className="summary-id">{c.id}</span>
                                             <span className="summary-title">{c.name}</span>
+                                            <button className="btn sm" onClick={() => openStrideBoundary(c.id)} title="Edit the STRIDE strengths/weaknesses analysis for this boundary">
+                                                STRIDE
+                                            </button>
                                             <button className="btn sm" onClick={() => setEditingId(c.id)}>
                                                 Edit
                                             </button>

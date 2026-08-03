@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useStore } from '../state/store';
-import { validate } from '../lib/validate';
+import { validate, openIssues } from '../lib/validate';
 import type { ViewKey } from '../types';
 
 interface StepDef {
@@ -28,14 +28,14 @@ export default function StepNav() {
     const setView = useStore((s) => s.setView);
     if (!data) return <nav className="stepnav" />;
 
-    const issues = validate(data);
+    const issues = openIssues(validate(data), data.project?.acceptedNotices);
     const counts: Record<string, number> = {
         assumptions: data.assumptions.attacker?.length || 0,
         system: data.system.components?.length || 0,
         dfd: data.dfd.nodes?.length || 0,
         threats: data.threats.threats?.length || 0,
         requirements: data.requirements?.requirements?.length || 0,
-        countermeasures: data.countermeasures.countermeasures?.length || 0,
+        countermeasures: (data.countermeasures.countermeasures || []).filter((c) => c.selected !== false).length,
         attackTrees: data.attackTrees?.trees?.length || 0,
         defects: data.defects?.defects?.length || 0,
     };
@@ -46,7 +46,7 @@ export default function StepNav() {
         dfd: (data.dfd.nodes?.length || 0) > 0,
         threats: (data.threats.threats?.length || 0) > 0,
         requirements: (data.requirements?.requirements?.length || 0) > 0,
-        countermeasures: (data.countermeasures.countermeasures?.length || 0) > 0,
+        countermeasures: (data.countermeasures.countermeasures || []).some((c) => c.selected !== false),
         review: issues.length === 0,
         versions: (data.changeTracker?.entries?.length || 0) > 0,
     };

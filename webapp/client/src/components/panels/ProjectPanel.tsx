@@ -330,13 +330,9 @@ export default function ProjectPanel() {
                     </Field>
                 </div>
                 <p className="depthnote">{DEPTH_HELP[p.scope?.mode || 'graybox']}</p>
-                <label className="inline" style={{ gap: 7, margin: '2px 0 8px', alignItems: 'flex-start' }}>
-                    <input type="checkbox" checked={!!p.rigorousMode} onChange={(e) => set({ rigorousMode: e.target.checked })} style={{ marginTop: 3 }} />
-                    <span className="hint">
-                        <b>Rigorous mode</b> — require the Bug Bar impact dimensions, the exposure / exploitability factors and a
-                        named rater on every threat (improves reproducibility &amp; inter-rater reliability).
-                    </span>
-                </label>
+                <p className="hint" style={{ margin: '2px 0 8px' }}>
+                    Rigorous mode and the acceptable residual-risk threshold live in <b>⚙ Settings</b> (top bar).
+                </p>
                 <Field
                     label="System boundary"
                     hint="One sentence: what is the device under assessment and where does it end? Surfaced in the report."

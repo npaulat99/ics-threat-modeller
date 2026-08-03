@@ -339,6 +339,8 @@ interface Store {
     dfdPath: string[];
     selectedNodeId: string | null;
     selectedEdgeId: string | null;
+    strideBoundaryId: string | null;
+    settingsOpen: boolean;
     focus: { view: string; id: string } | null;
     lastSavedAt: number;
     saveState: 'idle' | 'saving' | 'saved' | 'offline';
@@ -354,6 +356,8 @@ interface Store {
     setDfdPath(path: string[]): void;
     selectNode(id: string | null): void;
     selectEdge(id: string | null): void;
+    openStrideBoundary(id: string | null): void;
+    openSettings(v: boolean): void;
     drillInto(id: string): void;
     save(step: StepKey, value: any): void;
     renameId(oldId: string, newId: string): void;
@@ -362,7 +366,7 @@ interface Store {
     redo(): void;
     undoDepth: number;
     redoDepth: number;
-    report(): Promise<{ html: string; issues: string[] } | null>;
+    report(): Promise<{ html: string; issues: { key: string; message: string; severity: string }[] } | null>;
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -378,6 +382,8 @@ export const useStore = create<Store>((set, get) => ({
     dfdPath: [],
     selectedNodeId: null,
     selectedEdgeId: null,
+    strideBoundaryId: null,
+    settingsOpen: false,
     focus: null,
     lastSavedAt: 0,
     saveState: 'idle',
@@ -453,6 +459,12 @@ export const useStore = create<Store>((set, get) => ({
     selectEdge(id) {
         set({ selectedEdgeId: id, selectedNodeId: null });
     },
+    openStrideBoundary(id) {
+        set({ strideBoundaryId: id });
+    },
+    openSettings(v) {
+        set({ settingsOpen: v });
+    },
     drillInto(id) {
         const { data, dfdPath } = get();
         if (!data) return;
@@ -505,6 +517,16 @@ export const useStore = create<Store>((set, get) => ({
         histSuppress = true;
         const m = (id: any) => (id === oldId ? newId : id);
         const arr = (a?: any[]) => (Array.isArray(a) ? a.map(m) : a);
+        const remapStride = (obj?: Record<string, Record<string, any>>) => {
+            if (!obj) return obj;
+            const out: Record<string, Record<string, any>> = {};
+            for (const [tb, pairs] of Object.entries(obj)) {
+                const inner: Record<string, any> = {};
+                for (const [pk, v] of Object.entries(pairs || {})) inner[pk.split('~').map((p) => (p === oldId ? newId : p)).join('~')] = v;
+                out[tb === oldId ? newId : tb] = inner;
+            }
+            return out;
+        };
         const mapNode = (n: any): any => ({ ...n, countermeasureRef: n.countermeasureRef === oldId ? newId : n.countermeasureRef, children: (n.children || []).map(mapNode) });
         const next: Record<string, any> = {
             system: {
@@ -513,6 +535,7 @@ export const useStore = create<Store>((set, get) => ({
                 interfaces: (data.system.interfaces || []).map((i) => ({ ...i, id: m(i.id), component: i.component === oldId ? newId : i.component })),
                 trustBoundaries: (data.system.trustBoundaries || []).map((b) => ({ ...b, id: m(b.id), members: arr(b.members) })),
                 assets: (data.system.assets || []).map((a) => ({ ...a, id: m(a.id), components: arr(a.components) })),
+                strideAnalyses: remapStride(data.system.strideAnalyses),
             },
             threats: {
                 threats: (data.threats.threats || []).map((t) => ({ ...t, id: m(t.id), components: arr(t.components), assets: arr(t.assets), attackerRef: t.attackerRef === oldId ? newId : t.attackerRef, interfaceRef: t.interfaceRef === oldId ? newId : t.interfaceRef, interfaceRefs: arr(t.interfaceRefs), countermeasures: arr(t.countermeasures) })),
@@ -571,7 +594,7 @@ export const useStore = create<Store>((set, get) => ({
     async report() {
         const id = get().activeId;
         if (!id) return null;
-        return postJSON<{ html: string; issues: string[] }>(`/api/projects/${id}/report`, {});
+        return postJSON<{ html: string; issues: { key: string; message: string; severity: string }[] }>(`/api/projects/${id}/report`, {});
     },
 }));
 

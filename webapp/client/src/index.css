@@ -1050,6 +1050,21 @@ textarea {
     color: var(--text);
 }
 
+/* Severity variants (error/warning/notice). Warning uses the default (warn) styling. */
+.issues li.error {
+    background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+    border-color: color-mix(in srgb, var(--danger) 38%, var(--border));
+}
+
+.issues li.notice {
+    background: color-mix(in srgb, #3b82f6 11%, var(--surface));
+    border-color: color-mix(in srgb, #3b82f6 32%, var(--border));
+}
+
+.issues li .grow {
+    flex: 1;
+}
+
 .issuelink {
     background: none;
     border: none;

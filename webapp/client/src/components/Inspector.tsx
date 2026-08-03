@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore, uid } from '../state/store';
-import { validate } from '../lib/validate';
+import { validate, openIssues } from '../lib/validate';
 import { riskOf, descendantComponentIds } from '../lib/risk';
 import RiskMatrix from './RiskMatrix';
 import { RiskPill, Chips, IdInput } from './common';
@@ -24,6 +24,7 @@ function NodeInspector() {
     const scheme = useStore((s) => s.scheme);
     const save = useStore((s) => s.save);
     const setView = useStore((s) => s.setView);
+    const openStrideBoundary = useStore((s) => s.openStrideBoundary);
     const selectedNodeId = useStore((s) => s.selectedNodeId);
     const dfdPath = useStore((s) => s.dfdPath);
     const [target, setTarget] = useState('');
@@ -94,7 +95,10 @@ function NodeInspector() {
                         onChange={(v) => updNode({ members: v })}
                         empty="No nodes on this layer yet."
                     />
-                    <button className="btn sm danger" style={{ marginTop: 8 }} onClick={deleteNode}>
+                    <button className="btn sm" style={{ marginTop: 8 }} onClick={() => openStrideBoundary(node.id)}>
+                        STRIDE strengths / weaknesses
+                    </button>
+                    <button className="btn sm danger" style={{ marginTop: 8, marginLeft: 8 }} onClick={deleteNode}>
                         Delete trust boundary
                     </button>
                 </div>
@@ -372,7 +376,7 @@ export default function Inspector() {
     const selectedNodeId = useStore((s) => s.selectedNodeId);
     const selectedEdgeId = useStore((s) => s.selectedEdgeId);
     if (!data) return <aside className="inspector" />;
-    const issues = validate(data);
+    const issues = openIssues(validate(data), data.project?.acceptedNotices);
     const isIface = !!selectedNodeId?.startsWith('iface:');
     const selNode = view === 'dfd' && selectedNodeId && !isIface ? data.dfd.nodes.find((n) => n.id === selectedNodeId) : null;
     const matrixRef = selNode?.componentRef;
@@ -395,7 +399,9 @@ export default function Inspector() {
                 ) : (
                     <ul className="issues">
                         {issues.slice(0, 6).map((it, i) => (
-                            <li key={i}>⚠ {it}</li>
+                            <li key={i} className={it.severity}>
+                                {it.severity === 'error' ? '⛔' : it.severity === 'notice' ? 'ℹ' : '⚠'} {it.message}
+                            </li>
                         ))}
                         {issues.length > 6 && <li className="ok">+{issues.length - 6} more — see Review.</li>}
                     </ul>

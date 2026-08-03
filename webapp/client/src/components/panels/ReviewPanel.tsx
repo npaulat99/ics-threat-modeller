@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
-import { validate } from '../../lib/validate';
+import { validate, openIssues, isAccepted } from '../../lib/validate';
 import { issueTarget } from '../../lib/ids';
 import { riskOf } from '../../lib/risk';
 import { RiskPill, sortStride } from '../common';
@@ -9,9 +9,18 @@ export default function ReviewPanel() {
     const data = useStore((s) => s.data)!;
     const scheme = useStore((s) => s.scheme);
     const report = useStore((s) => s.report);
+    const save = useStore((s) => s.save);
     const activeId = useStore((s) => s.activeId);
     const goto = useStore((s) => s.goto);
-    const issues = validate(data);
+    const allIssues = validate(data);
+    const accepted = data.project?.acceptedNotices || [];
+    const open = openIssues(allIssues, accepted);
+    const acceptedList = allIssues.filter((i) => isAccepted(i, accepted));
+    const acceptNotice = (key: string) => save('project', { ...data.project, acceptedNotices: [...new Set([...accepted, key])] });
+    const reopenNotice = (key: string) => save('project', { ...data.project, acceptedNotices: accepted.filter((k) => k !== key) });
+    const includeStride = !!data.project?.reportOptions?.includeStrideBoundaryAnalysis;
+    const setIncludeStride = (v: boolean) => save('project', { ...data.project, reportOptions: { ...(data.project?.reportOptions || {}), includeStrideBoundaryAnalysis: v } });
+    const hasStrideAnalysis = Object.keys(data.system?.strideAnalyses || {}).length > 0;
     const sbomMode = data.project?.sbom?.mode || 'in-tool';
     const sbomFormat = data.project?.sbom?.format || 'cyclonedx';
     const sbomUrl = data.project?.sbom?.url;
@@ -80,7 +89,17 @@ export default function ReviewPanel() {
                         )}
                     </span>
                 )}
-                <span className={'tag ' + (issues.length ? 'warnmark' : '')}>{issues.length ? `${issues.length} open issue(s)` : 'No issues'}</span>
+                <span className={'tag ' + (open.length ? 'warnmark' : '')}>{open.length ? `${open.length} open issue(s)` : 'No issues'}</span>
+            </div>
+
+            <div className="card" style={{ paddingTop: 12, paddingBottom: 12 }}>
+                <label className="inline" style={{ gap: 8, alignItems: 'flex-start', margin: 0 }}>
+                    <input type="checkbox" checked={includeStride} onChange={(e) => setIncludeStride(e.target.checked)} style={{ marginTop: 3 }} />
+                    <span className="hint">
+                        <b>Include the STRIDE-per-trust-boundary analysis</b> in the report — the strengths/weaknesses tables authored per boundary.
+                        {!hasStrideAnalysis && ' (No boundary analyses have been filled in yet — add them from the DFD or the System step.)'}
+                    </span>
+                </label>
             </div>
 
             {html && (
@@ -105,26 +124,47 @@ export default function ReviewPanel() {
             <div className="card">
                 <h3>Plausibility check</h3>
                 <ul className="issues">
-                    {issues.length === 0 ? (
-                        <li className="ok">✓ No issues found — assumptions, references and ratings are consistent.</li>
+                    {open.length === 0 ? (
+                        <li className="ok">✓ No open issues — assumptions, references and ratings are consistent.</li>
                     ) : (
-                        issues.map((it, i) => {
-                            const tgt = issueTarget(data, it);
+                        open.map((it, i) => {
+                            const tgt = issueTarget(data, it.message);
+                            const icon = it.severity === 'error' ? '⛔' : it.severity === 'notice' ? 'ℹ' : '⚠';
                             return (
-                                <li key={i}>
-                                    ⚠{' '}
+                                <li key={i} className={it.severity}>
+                                    <span aria-hidden>{icon}</span>{' '}
                                     {tgt ? (
                                         <button className="issuelink" title={`Jump to ${tgt.id || tgt.view} to fix this`} onClick={() => goto(tgt.view, tgt.id)}>
-                                            {it}
+                                            {it.message}
                                         </button>
                                     ) : (
-                                        it
+                                        <span className="grow">{it.message}</span>
+                                    )}
+                                    {it.severity === 'notice' && (
+                                        <button className="btn sm right" title="Accept this notice — it will no longer be an open point" onClick={() => acceptNotice(it.key)}>
+                                            Accept
+                                        </button>
                                     )}
                                 </li>
                             );
                         })
                     )}
                 </ul>
+                {acceptedList.length > 0 && (
+                    <>
+                        <h4 style={{ margin: '14px 0 6px' }}>Accepted notices</h4>
+                        <ul className="issues">
+                            {acceptedList.map((it, i) => (
+                                <li key={i} className="ok">
+                                    <span aria-hidden>✓</span> <span className="grow">{it.message}</span>
+                                    <button className="btn sm right" title="Reopen this notice" onClick={() => reopenNotice(it.key)}>
+                                        Reopen
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </>
+                )}
             </div>
 
             <div className="card">

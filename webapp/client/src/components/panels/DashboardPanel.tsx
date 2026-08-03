@@ -25,12 +25,13 @@ export default function DashboardPanel() {
     const project = data.project;
     const threats = data.threats.threats || [];
     const cms = data.countermeasures.countermeasures || [];
+    const implementedCms = cms.filter((c) => c.selected !== false);
     const components = sys.components || [];
     const interfaces = sys.interfaces || [];
     const assets = sys.assets || [];
     const thirdParty = components.filter((c) => c.provenance && !/^own\b/i.test(c.provenance));
     const ticketsOf = (c: any) => (c.ticketUrls?.length ? c.ticketUrls : c.ticketUrl ? [c.ticketUrl] : []);
-    const missingTicket = cms.filter((c) => (c.status === 'implemented' || c.status === 'verified') && !ticketsOf(c).length);
+    const missingTicket = implementedCms.filter((c) => (c.status === 'implemented' || c.status === 'verified') && !ticketsOf(c).length);
     const openThreats = threats.filter((t) => t.status === 'open');
     const reqs = data.requirements?.requirements || [];
     const defects = data.defects?.defects || [];
@@ -62,7 +63,7 @@ export default function DashboardPanel() {
                 <Stat label="Open threats" value={openThreats.length} warn={openThreats.length > 0} onClick={() => setView('threats')} />
                 <Stat label="Requirements" value={reqs.length} onClick={() => setView('requirements')} />
                 <Stat label="High threats w/o req." value={highNoReq.length} warn={highNoReq.length > 0} onClick={() => setView('threats')} />
-                <Stat label="Countermeasures" value={cms.length} onClick={() => setView('countermeasures')} />
+                <Stat label="Countermeasures" value={implementedCms.length} onClick={() => setView('countermeasures')} />
                 <Stat label="Missing ticket links" value={missingTicket.length} warn={missingTicket.length > 0} onClick={() => setView('countermeasures')} />
                 <Stat label="Open defects" value={openDefects.length} warn={openDefects.length > 0} onClick={() => setView('defects')} />
             </div>
@@ -210,7 +211,7 @@ export default function DashboardPanel() {
                         </tr>
                     </thead>
                     <tbody>
-                        {cms.map((c) => {
+                        {implementedCms.map((c) => {
                             const tickets = ticketsOf(c);
                             const needsTicket = (c.status === 'implemented' || c.status === 'verified') && !tickets.length;
                             return (
@@ -250,7 +251,7 @@ export default function DashboardPanel() {
                                 </tr>
                             );
                         })}
-                        {!cms.length && (
+                        {!implementedCms.length && (
                             <tr>
                                 <td colSpan={6} className="hint">No countermeasures.</td>
                             </tr>
