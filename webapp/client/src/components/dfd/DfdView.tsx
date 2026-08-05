@@ -543,7 +543,7 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
                 selected: n.id === selectedNodeId,
                 draggable: !connMode,
                 connectable: true,
-                data: { label: n.label, dtype: n.type, sub: compName(n.componentRef), risk: riskFor(n), hasChildren, connMode },
+                data: { label: n.componentRef ? compName(n.componentRef) || n.label : n.label, dtype: n.type, sub: compName(n.componentRef), risk: riskFor(n), hasChildren, connMode },
             });
         });
         return out;

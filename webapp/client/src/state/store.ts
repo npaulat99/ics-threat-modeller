@@ -14,6 +14,10 @@ const isPlaceholderComponentName = (label: string | undefined) => {
     const l = norm(label);
     return l === 'newcomponent' || l === 'newprocess' || l === 'newmultiprocess' || l === 'newstore' || l === 'newexternalentity' || l === 'newdevice';
 };
+const isPlaceholderDfdLabel = (label: string | undefined) => {
+    const l = norm(label);
+    return l === 'newcomponent' || l === 'newexternalentity' || l === 'newtrustboundary' || l === 'newboundary' || l === 'newprocess' || l === 'newmultiprocess' || l === 'newstore';
+};
 const DEVICE_HOUSING_ID = 'TB-1';
 const DEVICE_HOUSING_NAME = 'Device housing';
 const suffixNum = (id?: string | null) => {
@@ -172,7 +176,7 @@ function reconcileSystemDfd(system: any, dfd: any, authoritative: 'system' | 'df
         const parentNode = comp.parent ? nodesByComponent.get(comp.parent) : null;
         node.layer = comp.layer;
         node.parent = parentNode?.id ?? null;
-        if (!node.label || norm(node.label) === norm(comp.id)) node.label = comp.name;
+        if (!node.label || norm(node.label) === norm(comp.id) || isPlaceholderDfdLabel(node.label)) node.label = comp.name;
     }
 
     const tbNodes = nodes.filter((n: any) => n.type === 'trust-boundary');
