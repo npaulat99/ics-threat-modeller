@@ -8,6 +8,7 @@
 //     message which `applyArtifact` merges back into state — so the UI tracks the files live.
 import { create } from 'zustand';
 import type { LaunchConfig, ProjectData, ProjectSummary, RiskScheme, StepKey, ViewKey } from '../types';
+import { tutorialStorageKey } from '../tutorial/tutorialData';
 
 const norm = (v: string | null | undefined) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 const isPlaceholderComponentName = (label: string | undefined) => {
@@ -387,12 +388,17 @@ interface Store {
     focus: { view: string; id: string } | null;
     lastSavedAt: number;
     saveState: 'idle' | 'saving' | 'saved' | 'offline';
+    tutorialPromptOpen: boolean;
+    tutorialWalkthroughOpen: boolean;
 
     init(): Promise<void>;
     refreshProjects(): Promise<void>;
     refreshKb(): Promise<void>;
     selectProject(id: string): Promise<void>;
-    newProject(name: string): Promise<void>;
+    newProject(name: string): Promise<string>;
+    startTutorial(): void;
+    skipTutorial(): void;
+    closeTutorial(): void;
     setView(v: ViewKey | 'dashboard' | 'kb' | 'assistant'): void;
     goto(view: string, id?: string): void;
     setTheme(t: 'light' | 'dark'): void;
@@ -430,6 +436,8 @@ export const useStore = create<Store>((set, get) => ({
     focus: null,
     lastSavedAt: 0,
     saveState: 'idle',
+    tutorialPromptOpen: false,
+    tutorialWalkthroughOpen: false,
     undoDepth: 0,
     redoDepth: 0,
 
@@ -481,6 +489,36 @@ export const useStore = create<Store>((set, get) => ({
         await get().refreshProjects();
         await get().selectProject(id);
         set({ activeView: 'project' });
+        try {
+            if (!localStorage.getItem(tutorialStorageKey)) {
+                set({ tutorialPromptOpen: true, tutorialWalkthroughOpen: false });
+            }
+        } catch {
+            /* ignore localStorage access errors */
+        }
+        return id;
+    },
+
+    startTutorial() {
+        try {
+            localStorage.setItem(tutorialStorageKey, 'started');
+        } catch {
+            /* ignore localStorage access errors */
+        }
+        set({ tutorialPromptOpen: false, tutorialWalkthroughOpen: true });
+    },
+
+    skipTutorial() {
+        try {
+            localStorage.setItem(tutorialStorageKey, 'skipped');
+        } catch {
+            /* ignore localStorage access errors */
+        }
+        set({ tutorialPromptOpen: false, tutorialWalkthroughOpen: false });
+    },
+
+    closeTutorial() {
+        set({ tutorialPromptOpen: false, tutorialWalkthroughOpen: false });
     },
 
     setView(v) {

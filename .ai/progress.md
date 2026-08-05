@@ -186,3 +186,33 @@
 	launch contract (1.1) and the CLI bin + symlink startup fix (1.2). Remaining in this pass:
 	single-project detection, `TRA_PRESELECT_PROJECT` server endpoint, client preselect, and the
 	VS Code `embedrisk.openWebapp` command.
+
+## Execution pass - Goal 2 (new-project tutorial onboarding)
+
+- Added a dedicated tutorial resource folder under `webapp/client/src/tutorial/`:
+	- `tutorialData.ts` contains tutorial-only example project data, tutorial risk data, walkthrough
+		step script (01→09), and the persisted-choice key.
+	- `assets/cursor.svg` contains the tutorial cursor artwork used by the animation.
+	- Resources stay client-side and are never stored in `webapp/projects/` or returned by
+		`listProjects()`.
+- Extended the client store (`webapp/client/src/state/store.ts`) with onboarding state/actions:
+	- `tutorialPromptOpen` and `tutorialWalkthroughOpen` state.
+	- `newProject()` now opens the tutorial start/skip popup only when a project is newly created and
+		no prior choice exists in localStorage.
+	- `startTutorial()`, `skipTutorial()`, and `closeTutorial()` manage popup/walkthrough visibility
+		and persist the user choice (`started` / `skipped`).
+- Added `webapp/client/src/components/TutorialOnboarding.tsx`:
+	- Start/Skip intro modal shown after creating a new project.
+	- Centered animated walkthrough overlay with cursor-driven stage, no keyboard visuals,
+		01→09 step sequence, short what/how/why captions with bold emphasis, step indicator, and
+		next/back/finish controls.
+- Integrated onboarding into app shell (`webapp/client/src/App.tsx`) by rendering the tutorial
+	overlay component globally.
+- Added tutorial UI styling to `webapp/client/src/index.css` for balanced three-zone layout,
+	central animation focus, responsive behavior, and theme-consistent colors.
+- Added `webapp/client/src/env.d.ts` for `*.svg` module typing so tutorial asset imports typecheck.
+- Validation run:
+	- `cd webapp && npm --workspace client run typecheck` passed.
+	- `cd webapp && npm run build` passed.
+	- Manual runtime path (to be exercised in browser): create new project → popup appears; Start opens
+		walkthrough; Skip closes and is remembered; existing-project open does not trigger popup.

@@ -19,6 +19,7 @@ import AssistantPanel from './components/panels/AssistantPanel';
 import KbPanel from './components/panels/KbPanel';
 import SettingsModal from './components/SettingsModal';
 import StrideBoundaryEditor from './components/StrideBoundaryEditor';
+import TutorialOnboarding from './components/TutorialOnboarding';
 
 function promptNewProject(): string | null {
     return window.prompt('New device / project name:', 'New device');
@@ -98,6 +99,7 @@ export default function App() {
             )}
             <SettingsModal />
             <StrideBoundaryEditor />
+            <TutorialOnboarding />
         </div>
     );
 }

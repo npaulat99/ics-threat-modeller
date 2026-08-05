@@ -1921,6 +1921,209 @@ a.linkbtn {
     margin-bottom: 12px;
 }
 
+/* ---- Tutorial onboarding ------------------------------------------------- */
+.tutorial-start {
+    max-width: 620px;
+}
+
+.tutorial-quickfacts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.tutorial-quickfacts span {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px;
+    font-size: 12px;
+}
+
+.tutorial-overlay {
+    z-index: 130;
+}
+
+.tutorial-shell {
+    max-width: 1120px;
+    max-height: 90vh;
+    padding: 14px 16px 12px;
+}
+
+.tutorial-topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.tutorial-layout {
+    display: grid;
+    grid-template-columns: minmax(190px, 1fr) minmax(520px, 2.2fr) minmax(190px, 1fr);
+    gap: 12px;
+    align-items: stretch;
+}
+
+.tutorial-copy {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    padding: 12px 12px 8px;
+    font-size: 12.5px;
+}
+
+.tutorial-copy p {
+    margin: 0 0 8px;
+    line-height: 1.42;
+}
+
+.tutorial-stage-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tutorial-stage-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.15px;
+}
+
+.tutorial-stage {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    min-height: 360px;
+    background:
+        radial-gradient(circle at 18% 20%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 42%),
+        radial-gradient(circle at 82% 75%, color-mix(in srgb, var(--accent-2) 16%, transparent), transparent 42%),
+        linear-gradient(155deg, var(--surface), color-mix(in srgb, var(--surface) 74%, var(--surface-2)));
+    overflow: hidden;
+}
+
+.tutorial-sim-shell {
+    position: absolute;
+    inset: 26px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    display: grid;
+    grid-template-columns: 150px 1fr;
+}
+
+.tutorial-sim-rail {
+    border-right: 1px solid var(--border);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: color-mix(in srgb, var(--surface-2) 80%, var(--surface));
+}
+
+.tutorial-sim-step {
+    font-size: 11px;
+    color: var(--text-faint);
+    padding: 5px 6px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    text-transform: capitalize;
+}
+
+.tutorial-sim-step.active {
+    color: var(--text);
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    font-weight: 700;
+}
+
+.tutorial-sim-main {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+}
+
+.tutorial-sim-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    padding: 10px;
+}
+
+.tutorial-sim-card .title {
+    font-size: 12.5px;
+    margin-bottom: 4px;
+}
+
+.tutorial-sim-card .hint {
+    font-size: 11.5px;
+    color: var(--text-faint);
+}
+
+.tutorial-sim-cue {
+    width: fit-content;
+    margin-top: auto;
+    border-radius: 14px;
+    padding: 2px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.25px;
+    color: #fff;
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+}
+
+.tutorial-cursor {
+    position: absolute;
+    top: 26px;
+    left: 26px;
+    width: 34px;
+    height: 34px;
+    pointer-events: none;
+    transition: transform 560ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.18));
+}
+
+.tutorial-controls {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.tutorial-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.tutorial-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--border-strong);
+}
+
+.tutorial-dot.on {
+    width: 22px;
+    background: var(--accent);
+}
+
+@media (max-width: 1080px) {
+    .tutorial-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .tutorial-copy {
+        font-size: 12px;
+    }
+
+    .tutorial-stage {
+        min-height: 330px;
+    }
+}
+
 .inp.invalid,
 textarea.inp.invalid {
     border-color: var(--danger);
