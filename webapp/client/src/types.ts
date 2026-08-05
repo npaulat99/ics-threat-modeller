@@ -279,6 +279,7 @@ export interface Threat {
     impact: number;
     likelihoodRationale?: string;
     impactRationale?: string;
+    assumptionRefs?: string[]; // assumption IDs that justify threat feasibility/risk assessment
     interfaceRef?: string; // primary interface/attack vector id (system.interfaces) the threat enters through
     interfaceRefs?: string[]; // additional affected interfaces/vectors assessed together with the same threat
     interfaceLabel?: string; // free-text interface/vector when not in the interface list

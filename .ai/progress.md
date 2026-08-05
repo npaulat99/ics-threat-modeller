@@ -360,3 +360,76 @@ PASS:
 
 FAIL:
 - none in the previously failing verify-step command set.
+
+## Execution pass - Goal 5 (assumption references in threats)
+
+- Added structured threat assumption references:
+	- `webapp/client/src/types.ts`: `Threat.assumptionRefs?: string[]` (optional, backward-compatible).
+
+- Added UI support to cite assumptions in threat rationale:
+	- `webapp/client/src/components/panels/ThreatsPanel.tsx`:
+		- multi-select chip picker over all assumption categories + attacker profiles,
+		- inline cited-assumption text preview,
+		- invalid/missing reference hint text,
+		- compact summary tag for cited assumption IDs.
+	- `vscode-extension/src/wizard.ts`:
+		- threat editor “Supporting assumptions” chips,
+		- inline cited-assumption preview,
+		- save-time validation for assumption-ref format/existence,
+		- persisted `assumptionRefs` in normalized threat output.
+
+- Added validation for missing/invalid assumption references:
+	- `webapp/client/src/lib/validate.ts`: validates each `threat.assumptionRefs[]` against `ID_PATTERN` and known assumption IDs.
+	- `webapp/server/src/validate.js`: same checks server-side for parity.
+
+- Improved ID/ref coverage for assumptions:
+	- `webapp/client/src/lib/ids.ts`: non-attacker assumptions now participate in project-wide duplicate-ID checks and issue jump-target resolution.
+
+- Added report surfacing and cross-linking (threat -> assumption and back):
+	- `webapp/server/src/report.js`:
+		- traceability now carries assumptions + rationale fields,
+		- threat rows show cited assumptions with guarded links (invalid/missing IDs are rendered as plain text diagnostics),
+		- assumptions/attacker sections render IDs with anchors,
+		- assumptions show backlinks to citing threats,
+		- traceability CSV includes assumptions and rationale columns.
+	- `tools/generate-report.mjs` and `vscode-extension/runtime/tools/generate-report.mjs`:
+		- mirrored assumption-ref validation and report cross-link output,
+		- assumptions/rationale columns added to threat table,
+		- assumption anchors + threat backlinks included.
+
+- Validation run:
+	- `cd /home/noah/EmbedRisk/webapp && npm --workspace client run typecheck` passed.
+	- `cd /home/noah/EmbedRisk/webapp && npm run build` passed.
+	- `cd /home/noah/EmbedRisk/webapp && npm test` passed.
+	- `cd /home/noah/EmbedRisk/vscode-extension && npm run compile` passed.
+	- `node --check` passed for:
+		- `webapp/server/src/report.js`
+		- `webapp/server/src/validate.js`
+		- `tools/generate-report.mjs`
+		- `vscode-extension/runtime/tools/generate-report.mjs`
+	- Report smoke checks with a temp project:
+		- valid ref (`AD-1`) -> threat-to-assumption link, assumption anchor, and backlink all present.
+		- missing ref (`AD-404`) -> validation issue flagged (`unknown assumption`).
+
+## Verify pass - Goal 5 (verification role)
+
+PASS:
+- `cd /home/noah/EmbedRisk/webapp && npm test` succeeded (`embedrisk launcher tests passed`).
+- `cd /home/noah/EmbedRisk/webapp && npm --workspace client run typecheck` succeeded.
+- `cd /home/noah/EmbedRisk/webapp && npm run build` succeeded.
+- `cd /home/noah/EmbedRisk/webapp && npm run lint` succeeded.
+- `cd /home/noah/EmbedRisk/webapp && npm run format:check` succeeded.
+- `cd /home/noah/EmbedRisk/vscode-extension && npm run compile` succeeded.
+- `cd /home/noah/EmbedRisk/vscode-extension && npm run lint` succeeded.
+- `cd /home/noah/EmbedRisk/vscode-extension && npm run format:check` succeeded.
+- `cd /home/noah/EmbedRisk && node tools/test-models.js` succeeded (`All 47 model assertions passed.`).
+- `cd /home/noah/EmbedRisk && node --check webapp/server/src/validate.js && node --check webapp/server/src/report.js && node --check tools/generate-report.mjs && node --check vscode-extension/runtime/tools/generate-report.mjs` succeeded.
+- Goal 5 integration/report verification with temp project succeeded:
+	- valid assumption ref: `VALID_REF_OK`, `HAS_FORWARD_LINK`, `HAS_ASSUMPTION_ANCHOR`, `HAS_BACK_LINK`
+	- missing assumption ref: `MISSING_REF_FLAGGED`
+
+FAIL:
+- none in the Goal 5 verify-step command set.
+
+Notes:
+- No separate dedicated integration-test npm script exists; integration behavior was verified via `buildReport()` scenario checks above.

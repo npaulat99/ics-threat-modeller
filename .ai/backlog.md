@@ -17,6 +17,119 @@ Global guardrails for every goal (do not repeat inside each block):
 	`npm run build`, `node tools/test-models.js`, and the extension compile where relevant.
 - Read the referenced files first to ground every change in the real code.
 
+
+# === Goal: 1 — Launch the webapp into an existing project folder (and preselect a single project)
+
+## Feature summary
+
+A user with an existing on-disk TRA project (or a folder of projects) must be able to open it in the
+EmbedRisk webapp from a normal shell — without VS Code and without first clicking `+ New project`.
+An optional VS Code command is a convenience that shells out to the same CLI. The canonical
+behaviour is defined in `webapp/docs/launch-contract.md`; the CLI is the single source of truth for
+turning an input folder into an effective projects root plus an optional preselected project id.
+
+## Current state (already implemented — do not redo)
+
+- `webapp/docs/launch-contract.md` — the launch contract (container vs single-project shapes,
+	precedence `explicit arg > TRA_PROJECTS_DIR > cwd`, entry points, compatibility requirements).
+- `webapp/bin/embedrisk.js` — ESM `bin` launcher with a pure `resolveProjectsDir(argv, env, cwd)`
+	(precedence resolver) and a symlink-safe main-module guard; sets `TRA_PROJECTS_DIR` before
+	importing `../server/src/index.js`.
+- `webapp/package.json` — `bin.embedrisk`, `open` and `test` scripts.
+- `webapp/test/embedrisk.test.mjs` — plain-Node `assert` tests (precedence + symlink startup).
+
+## Remaining work to implement in this pass
+
+Implement all four parts below, in order.
+
+### Part A — Single-project detection in the CLI
+
+- Add a filesystem-aware resolver in `webapp/bin/embedrisk.js`, e.g.
+	`resolveLaunchTarget(argv, env, cwd)`, that first calls `resolveProjectsDir(...)` for the target
+	folder, then classifies it and returns `{ projectsRoot, preselectId }`:
+	- Single-project folder (directly contains the canonical first-step dir `01-project-description`)
+		→ `{ projectsRoot: dirname(target), preselectId: basename(target) }`.
+	- Otherwise (container or anything else) → `{ projectsRoot: target, preselectId: null }`.
+- Classification must be defensive: any stat/read error is treated as a container so a bad path can
+	never crash startup. Keep `resolveProjectsDir` pure; put filesystem access only in the new
+	resolver.
+- In `main()`, set `process.env.TRA_PROJECTS_DIR = projectsRoot` before importing the server, and
+	set `process.env.TRA_PRESELECT_PROJECT = preselectId` only when a preselect id is present.
+
+### Part B — Server exposes the preselected project
+
+- In `webapp/server/src/index.js`, read `process.env.TRA_PRESELECT_PROJECT` and expose it to the
+	client via a tiny read-only endpoint (e.g. `GET /api/config` returning
+	`{ preselectProjectId: string | null }`). Do not change existing endpoints or defaults.
+- Validate that the preselect id, if set, actually exists in `listProjects()`; if it does not,
+	return `null` (never trust an unvalidated id, and never let a stale env break startup).
+
+### Part C — Client honours the preselected project
+
+- In `webapp/client/src/state/store.ts` `init()`, after loading `/api/projects`, fetch
+	`/api/config`; if `preselectProjectId` is present and matches a listed project, select that one
+	instead of `projects[0]`. Fall back to the current `projects[0]` behaviour otherwise.
+- Keep the change minimal and typed; add the config type to `webapp/client/src/types.ts` if needed.
+
+### Part D — VS Code convenience command
+
+- Add an `embedrisk.openWebapp` command in `vscode-extension/package.json` (`contributes.commands`,
+	category `EmbedRisk`, title e.g. "Open webapp in this folder").
+- Implement it in `vscode-extension/src/extension.ts` so it shells out to the shared CLI against the
+	chosen folder (default: the first workspace folder; optionally prompt for a folder). It must NOT
+	reimplement folder resolution — it invokes the `embedrisk` CLI (via `node <path>/bin/embedrisk.js`
+	or the installed bin) so the launch contract stays single-sourced. Surface the served URL
+	(`http://localhost:<PORT>`) to the user (e.g. open a browser / show an info message).
+
+## Files allowed to change
+
+- `webapp/bin/embedrisk.js`
+- `webapp/server/src/index.js`
+- `webapp/client/src/state/store.ts`, `webapp/client/src/types.ts` (only if a config type is needed)
+- `webapp/test/embedrisk.test.mjs`
+- `vscode-extension/package.json`, `vscode-extension/src/extension.ts`
+- `webapp/docs/launch-contract.md` (only to reconcile wording if behaviour is clarified)
+- `.ai/progress.md`, `.ai/current-goal.md`
+
+Match each package's existing module style (server = ESM `.js` with explicit extensions; client =
+TS/React; extension = TS). Do not introduce a bundler or test framework.
+
+## Acceptance criteria
+
+- From any shell, `embedrisk <folder>` (via `node bin/embedrisk.js`, `npm exec -- embedrisk`, or a
+	global install) starts the server without VS Code and without a prior `+ New project`.
+- A standalone single-project folder (contains `01-project-description`) is served by shifting the
+	effective root to its parent and opening that project in the UI.
+- A container folder is served as-is; when a valid preselect id is present the client opens that
+	project, otherwise it opens `projects[0]` (unchanged fallback).
+- The VS Code command opens the webapp for the workspace folder by calling the shared CLI (no
+	duplicated resolution logic).
+- Precedence (`explicit arg > TRA_PROJECTS_DIR > cwd`), default `PORT` 4317, bind `0.0.0.0`, and the
+	existing `npm start` flow are all unchanged.
+
+## Required tests / validation
+
+- Extend `webapp/test/embedrisk.test.mjs` (plain Node `assert`):
+	- `resolveLaunchTarget`: single-project temp folder → `{ parent, basename }`; container temp
+		folder → `{ itself, null }`; precedence still holds when combined with classification.
+	- Startup regression: launch against a temp single-project folder and assert the server reports
+		`Projects directory: <parent>`, `/api/projects` lists the project, and `/api/config` returns
+		its id as `preselectProjectId`.
+- Run: `cd webapp && npm test`; `npm --workspace client run typecheck` (or `npm run build`) for the
+	client change; the extension's compile/build for the command.
+- Manual smoke: open a container and a single-project folder; confirm the right project opens.
+
+## Risks / guardrails
+
+- False positive: a container that itself contains a stray `01-project-description` would be
+	misread as a single project — key strictly on the canonical first-step dir; broader discovery is
+	out of contract.
+- Never trust `TRA_PRESELECT_PROJECT` blindly — validate it against `listProjects()` server-side and
+	match it client-side before selecting.
+- Keep `resolveProjectsDir` pure; isolate all filesystem access in `resolveLaunchTarget` and treat
+	stat errors as "container".
+- The VS Code command must shell out to the CLI, not duplicate resolution. Reliably surface failures
+	(missing Node, port in use) instead of failing silently.
 ---
 
 # === Goal 2: New-project tutorial onboarding ===
@@ -307,128 +420,3 @@ report, with cross-linking so a reviewer can navigate from a threat to the suppo
 - Shared-schema change — update client, server validate/report, extension, and both report copies.
 - Keep references optional; do not break existing threats/assumptions files.
 - Validate/normalise assumption IDs (reuse `lib/ids.ts`); do not render unvalidated ids as links.
-
-
-
-# Done
-
-# Current goal (whole-feature execute prompt)
-
-> Workflow: this file now holds an **entire goal** as one large execute prompt, not a single micro
-> step. Implement the whole remaining feature in one pass, run the validations at the end, then do a
-> single verify/review. When this goal is done, paste the next goal's block from `.ai/backlog.md`
-> into this file. Keep the shared-schema guardrails from `.github/copilot-instructions.md` and
-> `.ai/context.md`.
-
-Goal: 1 — Launch the webapp into an existing project folder (and preselect a single project)
-
-## Feature summary
-
-A user with an existing on-disk TRA project (or a folder of projects) must be able to open it in the
-EmbedRisk webapp from a normal shell — without VS Code and without first clicking `+ New project`.
-An optional VS Code command is a convenience that shells out to the same CLI. The canonical
-behaviour is defined in `webapp/docs/launch-contract.md`; the CLI is the single source of truth for
-turning an input folder into an effective projects root plus an optional preselected project id.
-
-## Current state (already implemented — do not redo)
-
-- `webapp/docs/launch-contract.md` — the launch contract (container vs single-project shapes,
-	precedence `explicit arg > TRA_PROJECTS_DIR > cwd`, entry points, compatibility requirements).
-- `webapp/bin/embedrisk.js` — ESM `bin` launcher with a pure `resolveProjectsDir(argv, env, cwd)`
-	(precedence resolver) and a symlink-safe main-module guard; sets `TRA_PROJECTS_DIR` before
-	importing `../server/src/index.js`.
-- `webapp/package.json` — `bin.embedrisk`, `open` and `test` scripts.
-- `webapp/test/embedrisk.test.mjs` — plain-Node `assert` tests (precedence + symlink startup).
-
-## Remaining work to implement in this pass
-
-Implement all four parts below, in order.
-
-### Part A — Single-project detection in the CLI
-
-- Add a filesystem-aware resolver in `webapp/bin/embedrisk.js`, e.g.
-	`resolveLaunchTarget(argv, env, cwd)`, that first calls `resolveProjectsDir(...)` for the target
-	folder, then classifies it and returns `{ projectsRoot, preselectId }`:
-	- Single-project folder (directly contains the canonical first-step dir `01-project-description`)
-		→ `{ projectsRoot: dirname(target), preselectId: basename(target) }`.
-	- Otherwise (container or anything else) → `{ projectsRoot: target, preselectId: null }`.
-- Classification must be defensive: any stat/read error is treated as a container so a bad path can
-	never crash startup. Keep `resolveProjectsDir` pure; put filesystem access only in the new
-	resolver.
-- In `main()`, set `process.env.TRA_PROJECTS_DIR = projectsRoot` before importing the server, and
-	set `process.env.TRA_PRESELECT_PROJECT = preselectId` only when a preselect id is present.
-
-### Part B — Server exposes the preselected project
-
-- In `webapp/server/src/index.js`, read `process.env.TRA_PRESELECT_PROJECT` and expose it to the
-	client via a tiny read-only endpoint (e.g. `GET /api/config` returning
-	`{ preselectProjectId: string | null }`). Do not change existing endpoints or defaults.
-- Validate that the preselect id, if set, actually exists in `listProjects()`; if it does not,
-	return `null` (never trust an unvalidated id, and never let a stale env break startup).
-
-### Part C — Client honours the preselected project
-
-- In `webapp/client/src/state/store.ts` `init()`, after loading `/api/projects`, fetch
-	`/api/config`; if `preselectProjectId` is present and matches a listed project, select that one
-	instead of `projects[0]`. Fall back to the current `projects[0]` behaviour otherwise.
-- Keep the change minimal and typed; add the config type to `webapp/client/src/types.ts` if needed.
-
-### Part D — VS Code convenience command
-
-- Add an `embedrisk.openWebapp` command in `vscode-extension/package.json` (`contributes.commands`,
-	category `EmbedRisk`, title e.g. "Open webapp in this folder").
-- Implement it in `vscode-extension/src/extension.ts` so it shells out to the shared CLI against the
-	chosen folder (default: the first workspace folder; optionally prompt for a folder). It must NOT
-	reimplement folder resolution — it invokes the `embedrisk` CLI (via `node <path>/bin/embedrisk.js`
-	or the installed bin) so the launch contract stays single-sourced. Surface the served URL
-	(`http://localhost:<PORT>`) to the user (e.g. open a browser / show an info message).
-
-## Files allowed to change
-
-- `webapp/bin/embedrisk.js`
-- `webapp/server/src/index.js`
-- `webapp/client/src/state/store.ts`, `webapp/client/src/types.ts` (only if a config type is needed)
-- `webapp/test/embedrisk.test.mjs`
-- `vscode-extension/package.json`, `vscode-extension/src/extension.ts`
-- `webapp/docs/launch-contract.md` (only to reconcile wording if behaviour is clarified)
-- `.ai/progress.md`, `.ai/current-goal.md`
-
-Match each package's existing module style (server = ESM `.js` with explicit extensions; client =
-TS/React; extension = TS). Do not introduce a bundler or test framework.
-
-## Acceptance criteria
-
-- From any shell, `embedrisk <folder>` (via `node bin/embedrisk.js`, `npm exec -- embedrisk`, or a
-	global install) starts the server without VS Code and without a prior `+ New project`.
-- A standalone single-project folder (contains `01-project-description`) is served by shifting the
-	effective root to its parent and opening that project in the UI.
-- A container folder is served as-is; when a valid preselect id is present the client opens that
-	project, otherwise it opens `projects[0]` (unchanged fallback).
-- The VS Code command opens the webapp for the workspace folder by calling the shared CLI (no
-	duplicated resolution logic).
-- Precedence (`explicit arg > TRA_PROJECTS_DIR > cwd`), default `PORT` 4317, bind `0.0.0.0`, and the
-	existing `npm start` flow are all unchanged.
-
-## Required tests / validation
-
-- Extend `webapp/test/embedrisk.test.mjs` (plain Node `assert`):
-	- `resolveLaunchTarget`: single-project temp folder → `{ parent, basename }`; container temp
-		folder → `{ itself, null }`; precedence still holds when combined with classification.
-	- Startup regression: launch against a temp single-project folder and assert the server reports
-		`Projects directory: <parent>`, `/api/projects` lists the project, and `/api/config` returns
-		its id as `preselectProjectId`.
-- Run: `cd webapp && npm test`; `npm --workspace client run typecheck` (or `npm run build`) for the
-	client change; the extension's compile/build for the command.
-- Manual smoke: open a container and a single-project folder; confirm the right project opens.
-
-## Risks / guardrails
-
-- False positive: a container that itself contains a stray `01-project-description` would be
-	misread as a single project — key strictly on the canonical first-step dir; broader discovery is
-	out of contract.
-- Never trust `TRA_PRESELECT_PROJECT` blindly — validate it against `listProjects()` server-side and
-	match it client-side before selecting.
-- Keep `resolveProjectsDir` pure; isolate all filesystem access in `resolveLaunchTarget` and treat
-	stat errors as "container".
-- The VS Code command must shell out to the CLI, not duplicate resolution. Reliably surface failures
-	(missing Node, port in use) instead of failing silently.

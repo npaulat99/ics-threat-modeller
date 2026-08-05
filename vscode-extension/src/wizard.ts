@@ -165,6 +165,15 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
     if (m.cmd === "threats") {
       const rows = m.threats as any[];
       const compIds = new Set((m.compIds as string[]) || []);
+      const assumptionsDoc = await rdRaw(f.proj, "02-assumptions/assumptions.json", {});
+      const assumptionIds = new Set([
+        ...((assumptionsDoc.device || []).map((x: any) => x.id)),
+        ...((assumptionsDoc.system || []).map((x: any) => x.id)),
+        ...((assumptionsDoc.environment || []).map((x: any) => x.id)),
+        ...((assumptionsDoc.operational || []).map((x: any) => x.id)),
+        ...((assumptionsDoc.attacker || []).map((x: any) => x.id)),
+      ].filter(Boolean));
+      const idPattern = /^[A-Za-z0-9 _\-:.]+$/;
       const problems: string[] = []; const seen = new Set<string>();
       rows.forEach((t, i) => {
         const id = (t.id || "").trim();
@@ -173,6 +182,10 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
         if (!(t.components || []).length) problems.push(`Threat '${id || i + 1}': at least one affected component is required.`);
         (t.components || []).forEach((c: string) => { if (!compIds.has(c)) problems.push(`Threat '${id}': unknown component '${c}'.`); });
         if (!(t.stride || []).length) problems.push(`Threat '${id}': assign at least one STRIDE category.`);
+        (t.assumptionRefs || []).forEach((a: string) => {
+          if (!idPattern.test(String(a))) problems.push(`Threat '${id}': invalid assumption ID '${a}'.`);
+          else if (!assumptionIds.has(a)) problems.push(`Threat '${id}': unknown assumption '${a}'.`);
+        });
       });
       if (problems.length) return panel.webview.postMessage({ cmd: "err", text: "Cannot save:\n" + problems.join("\n") });
       const prev = new Map(((await rdRaw(f.proj, "06-threats/threats.json", { threats: [] })).threats || []).map((t: any) => [t.id, t]));
@@ -193,7 +206,8 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
         ['attackerRef', 'interfaceRefs', 'interfaceLabel',
           'impactDimensions', 'likelihoodFactors', 'cvss',
           'likelihoodRationale', 'impactRationale',
-          'acceptedBy', 'acceptanceRationale', 'reviewDate'].forEach(pick);
+          'acceptedBy', 'acceptanceRationale', 'reviewDate',
+          'assumptionRefs'].forEach(pick);
         return out;
       });
       await write(f.proj, "06-threats/threats.json", { threats: norm });
@@ -686,6 +700,22 @@ function renderThreats(){
   $('#threats-body').innerHTML=threats.length?threats.map(function(t,i){
     var st=STRIDE.map(function(s){return chip(s[0],(t.stride||[]).indexOf(s[0])>=0,'data-i='+i+' data-role="stride" data-val="'+s[0]+'"',s[1]);}).join('');
     var cc=comps.length?comps.map(function(c){return chip(c.id,(t.components||[]).indexOf(c.id)>=0,'data-i='+i+' data-role="comp" data-val="'+esc(c.id)+'"',c.name);}).join(''):'<span class="hint">Add components in step 03</span>';
+    var asmOpts=[].concat(
+      (assumptions.device||[]).map(function(a){return {id:a.id,text:a.text||'',src:'Device'};}),
+      (assumptions.system||[]).map(function(a){return {id:a.id,text:a.text||'',src:'System'};}),
+      (assumptions.environment||[]).map(function(a){return {id:a.id,text:a.text||'',src:'Environment'};}),
+      (assumptions.operational||[]).map(function(a){return {id:a.id,text:a.text||'',src:'Operational'};}),
+      (assumptions.attacker||[]).map(function(a){return {id:a.id,text:(a.text||a.name||''),src:'Attacker'};})
+    );
+    var asmById={}; asmOpts.forEach(function(a){asmById[a.id]=a;});
+    var asms=asmOpts.length?asmOpts.map(function(a){return chip(a.id,(t.assumptionRefs||[]).indexOf(a.id)>=0,'data-i='+i+' data-role="asm" data-val="'+esc(a.id)+'"',a.src+(a.text?': '+a.text.slice(0,60):''));}).join(''):'<span class="hint">Define assumptions in step 02 first.</span>';
+    var asmNote=(t.assumptionRefs||[]).length?'<ul style="margin:6px 0 0 18px">'+(t.assumptionRefs||[]).map(function(aid){
+      var valid=/^[A-Za-z0-9 _\-:.]+$/.test(String(aid));
+      if(!valid)return '<li><b>'+esc(aid)+'</b> · invalid ID format</li>';
+      var row=asmById[aid];
+      if(!row)return '<li><b>'+esc(aid)+'</b> · assumption not found</li>';
+      return '<li><b>'+esc(aid)+'</b> ('+esc(row.src)+') · '+esc(row.text||'No detail text')+'</li>';
+    }).join('')+'</ul>':'';
     var dims=t.impactDimensions||{}, fac=t.likelihoodFactors||{};
     var hasFac=R.deriveLikelihood(fac)!=null||R.deriveImpact(dims)!=null;
     var primaryIfaceId=(t.interfaceRefs&&t.interfaceRefs[0]);
@@ -712,7 +742,8 @@ function renderThreats(){
     '<div class="grid2" style="margin-top:6px">'+
       '<div class="field"><label>Likelihood rationale</label><textarea class="inp" rows=2 data-i='+i+' data-k="likelihoodRationale">'+esc(t.likelihoodRationale||'')+'</textarea></div>'+
       '<div class="field"><label>Impact rationale</label><textarea class="inp" rows=2 data-i='+i+' data-k="impactRationale">'+esc(t.impactRationale||'')+'</textarea></div>'+
-    '</div>';
+    '</div>'+
+    '<div class="field" style="margin-top:6px"><label>Supporting assumptions</label><div class="chips">'+asms+'</div>'+asmNote+'</div>';
     var acceptedFields=t.status==='accepted'?
       '<div class="grid3" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'+
         '<div class="field"><label>Accepted by</label><input class="inp" data-i='+i+' data-k="acceptedBy" value="'+esc(t.acceptedBy||'')+'" placeholder="name / role"></div>'+
@@ -1021,7 +1052,8 @@ document.addEventListener('click',function(e){
     }
   }
   else if(el.classList.contains('chip')&&el.dataset.role){
-    var i=+el.dataset.i,val=el.dataset.val,arrKey=el.dataset.role==='stride'?'stride':'components';
+    var i=+el.dataset.i,val=el.dataset.val;
+    var arrKey=el.dataset.role==='stride'?'stride':(el.dataset.role==='asm'?'assumptionRefs':'components');
     var arr=threats[i][arrKey]||(threats[i][arrKey]=[]);var k=arr.indexOf(val);if(k>=0)arr.splice(k,1);else arr.push(val);
     renderThreats();
   }

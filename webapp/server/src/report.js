@@ -13,6 +13,8 @@ import { routeAround, roundedPath, labelPtOnPolyline, borderPoint } from '../../
 
 const esc = (s) =>
     String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const ID_PATTERN = /^[A-Za-z0-9 _\-:.]+$/;
+const assumptionAnchor = (id) => `assumption-${String(id ?? '').replace(/[^A-Za-z0-9_.:-]/g, '-')}`;
 
 /** Canonical STRIDE order (S,T,R,I,D,E) so the report always lists categories consistently. */
 const STRIDE_ORDER = ['S', 'T', 'R', 'I', 'D', 'E'];
@@ -336,6 +338,9 @@ export function buildTraceability({ system, threats, requirements, countermeasur
             threat: t.id,
             title: t.title,
             stride: sortStride(t.stride).join(''),
+            assumptionRefs: t.assumptionRefs || [],
+            likelihoodRationale: t.likelihoodRationale || '',
+            impactRationale: t.impactRationale || '',
             initial,
             initialBand: band(scheme, initial).name,
             requirement: rqs.map((r) => `${r.id}${r.standardRef ? ` [${r.standardRef}]` : ''}${(r.satisfiedByCM || []).length ? ` → ${(r.satisfiedByCM || []).join('+')}` : ''}`).join('; '),
@@ -526,9 +531,27 @@ function strideBoundaryTablesHtml(system = {}, dfd = {}) {
 
 const csvCell = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
 function traceabilityCsv(rows) {
-    const head = ['Asset', 'C/I/A/S', 'Threat', 'Title', 'STRIDE', 'Initial', 'InitialBand', 'Requirement', 'Control', 'Residual', 'ResidualBand', 'Evidence', 'Status', 'RatedBy', 'SignOff'];
+    const head = ['Asset', 'C/I/A/S', 'Threat', 'Title', 'STRIDE', 'Assumptions', 'Rationale', 'Initial', 'InitialBand', 'Requirement', 'Control', 'Residual', 'ResidualBand', 'Evidence', 'Status', 'RatedBy', 'SignOff'];
     const body = rows.map((r) =>
-        [r.asset, r.cias, r.threat, r.title, r.stride, r.initial, r.initialBand, r.requirement, r.control, r.residual, r.residualBand, r.evidence, r.status, r.ratedBy, r.signoff]
+        [
+            r.asset,
+            r.cias,
+            r.threat,
+            r.title,
+            r.stride,
+            (r.assumptionRefs || []).join('; '),
+            [r.likelihoodRationale && `L: ${r.likelihoodRationale}`, r.impactRationale && `I: ${r.impactRationale}`].filter(Boolean).join(' | '),
+            r.initial,
+            r.initialBand,
+            r.requirement,
+            r.control,
+            r.residual,
+            r.residualBand,
+            r.evidence,
+            r.status,
+            r.ratedBy,
+            r.signoff,
+        ]
             .map(csvCell)
             .join(','),
     );
@@ -546,6 +569,22 @@ export async function buildReport(id) {
     const defects = dd.defects || [];
     const issues = validate({ project, assumptions, system, threats: td, requirements: rd, countermeasures: cd, dfd, useCases, attackTrees, defects: dd });
     const trace = buildTraceability({ system, threats, requirements: reqs, countermeasures: cms, scheme });
+    const assumptionsFlat = [
+        ...(assumptions.device || []).map((a) => ({ id: a.id, text: a.text || '', source: 'Device' })),
+        ...(assumptions.system || []).map((a) => ({ id: a.id, text: a.text || '', source: 'System' })),
+        ...(assumptions.environment || []).map((a) => ({ id: a.id, text: a.text || '', source: 'Environment' })),
+        ...(assumptions.operational || []).map((a) => ({ id: a.id, text: a.text || '', source: 'Operational' })),
+        ...(assumptions.attacker || []).map((a) => ({ id: a.id, text: a.text || a.name || '', source: 'Attacker' })),
+    ].filter((a) => a.id);
+    const assumptionById = new Map(assumptionsFlat.map((a) => [a.id, a]));
+    const assumptionCitedBy = new Map();
+    for (const t of threats) {
+        for (const aid of t.assumptionRefs || []) {
+            const list = assumptionCitedBy.get(aid) || [];
+            list.push(t.id);
+            assumptionCitedBy.set(aid, list);
+        }
+    }
     const sbom = buildSbom({ project, system, defects });
     const sbomMode = project.sbom?.mode || 'in-tool';
     const sbomFormat = project.sbom?.format || 'cyclonedx';
@@ -570,24 +609,53 @@ export async function buildReport(id) {
             .join('') || '<p>No DFD nodes.</p>';
 
     const traceRows = trace
-        .map(
-            (r) =>
-                `<tr><td>${esc(r.asset)}</td><td>${esc(r.cias)}</td><td><b>${esc(r.threat)}</b> ${esc(r.title)} <span class=mono>${esc(r.stride)}</span></td>` +
+        .map((r) => {
+            const assumptionRefs = (r.assumptionRefs || [])
+                .map((aid) => {
+                    if (!ID_PATTERN.test(aid)) return `<span class='mono'>${esc(aid)}</span> (invalid ID)`;
+                    const row = assumptionById.get(aid);
+                    if (!row) return `<span class='mono'>${esc(aid)}</span> (missing)`;
+                    return `<a href='#${esc(assumptionAnchor(aid))}' class='mono'>${esc(aid)}</a> <span style='color:#4d5a6d'>(${esc(row.source)})</span>`;
+                })
+                .join(', ');
+            const rationale = [
+                r.likelihoodRationale ? `L: ${esc(r.likelihoodRationale)}` : '',
+                r.impactRationale ? `I: ${esc(r.impactRationale)}` : '',
+            ]
+                .filter(Boolean)
+                .join('<br>');
+            const support = [
+                assumptionRefs ? `<div style='margin-top:3px'><span class='mono'>Assumptions:</span> ${assumptionRefs}</div>` : '',
+                rationale ? `<div style='margin-top:3px;color:#4d5a6d'>${rationale}</div>` : '',
+            ]
+                .filter(Boolean)
+                .join('');
+            return (
+                `<tr id='threat-${esc(r.threat)}'><td>${esc(r.asset)}</td><td>${esc(r.cias)}</td><td><b>${esc(r.threat)}</b> ${esc(r.title)} <span class=mono>${esc(r.stride)}</span></td>` +
                 `<td style='color:${band(scheme, r.initial).color}'>${r.initial} ${esc(r.initialBand)}</td><td>${esc(r.requirement) || '—'}</td>` +
                 `<td>${esc(r.control) || '—'}</td><td style='color:${band(scheme, r.residual).color}'>${r.residual} ${esc(r.residualBand)}</td>` +
-                `<td>${r.evidence ? r.evidence.split(' ').map((u) => `<a href='${esc(u)}'>link</a>`).join(' ') : '—'}</td><td>${esc(r.status)}${r.signoff ? `<br><span class=mono style='font-size:11px'>${esc(r.signoff)}</span>` : ''}${r.ratedBy ? `<br><span class=mono style='font-size:11px'>rated: ${esc(r.ratedBy)}</span>` : ''}</td></tr>`,
-        )
+                `<td>${r.evidence ? r.evidence.split(' ').map((u) => `<a href='${esc(u)}'>link</a>`).join(' ') : '—'}${support}</td><td>${esc(r.status)}${r.signoff ? `<br><span class=mono style='font-size:11px'>${esc(r.signoff)}</span>` : ''}${r.ratedBy ? `<br><span class=mono style='font-size:11px'>rated: ${esc(r.ratedBy)}</span>` : ''}</td></tr>`
+            );
+        })
         .join('');
 
     const assumptionSection = ['device', 'system', 'environment', 'operational']
         .map((k) => {
             const items = assumptions[k] || [];
             if (!items.length) return '';
-            return `<h3>${k[0].toUpperCase() + k.slice(1)} assumptions</h3><ul>${items.map((a) => `<li>${esc(a.text || a)}</li>`).join('')}</ul>`;
+            return `<h3>${k[0].toUpperCase() + k.slice(1)} assumptions</h3><ul>${items
+                .map((a) => {
+                    const cited = (assumptionCitedBy.get(a.id) || []).map((tid) => `<a href='#threat-${esc(tid)}' class='mono'>${esc(tid)}</a>`).join(', ');
+                    return `<li id='${esc(assumptionAnchor(a.id))}'><span class='mono'><b>${esc(a.id)}</b></span> — ${esc(a.text || a)}${cited ? `<br><span style='font-size:11px;color:#4d5a6d'>cited by: ${cited}</span>` : ''}</li>`;
+                })
+                .join('')}</ul>`;
         })
         .join('');
     const atk = (assumptions.attacker || [])
-        .map((a) => `<li><b>${esc(a.name)}</b> (cap ${a.capability}, ${esc(a.access)}): ${esc(a.text || '')}</li>`)
+        .map((a) => {
+            const cited = (assumptionCitedBy.get(a.id) || []).map((tid) => `<a href='#threat-${esc(tid)}' class='mono'>${esc(tid)}</a>`).join(', ');
+            return `<li id='${esc(assumptionAnchor(a.id))}'><span class='mono'><b>${esc(a.id)}</b></span> · <b>${esc(a.name)}</b> (cap ${a.capability}, ${esc(a.access)}): ${esc(a.text || '')}${cited ? `<br><span style='font-size:11px;color:#4d5a6d'>cited by: ${cited}</span>` : ''}</li>`;
+        })
         .join('');
     const assets = (system.assets || [])
         .map((a) => `<li>${esc(a.name)} (C${a.objectives?.confidentiality}/I${a.objectives?.integrity}/A${a.objectives?.availability}/S${a.objectives?.safety})${a.storage ? ` — <i>${esc(a.storage)}</i>` : ''}</li>`)
