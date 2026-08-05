@@ -50,6 +50,7 @@ function NodeInspector() {
     const rel = (data.threats.threats || []).filter((t) => compIds && (t.components || []).some((c) => compIds.has(c)));
     const conns = dfd.flows.filter((f) => f.from === node.id || f.to === node.id);
     const isTb = node.type === 'trust-boundary';
+    const isDeviceHousing = node.id === 'TB-1';
 
     const addConn = () => {
         if (!target || !connLabel.trim()) return;
@@ -98,9 +99,15 @@ function NodeInspector() {
                     <button className="btn sm" style={{ marginTop: 8 }} onClick={() => openStrideBoundary(node.id)}>
                         STRIDE strengths / weaknesses
                     </button>
-                    <button className="btn sm danger" style={{ marginTop: 8, marginLeft: 8 }} onClick={deleteNode}>
-                        Delete trust boundary
-                    </button>
+                    {isDeviceHousing ? (
+                        <span className="hint" style={{ display: 'inline-block', marginTop: 8, marginLeft: 8 }}>
+                            Device housing is mandatory and cannot be deleted.
+                        </span>
+                    ) : (
+                        <button className="btn sm danger" style={{ marginTop: 8, marginLeft: 8 }} onClick={deleteNode}>
+                            Delete trust boundary
+                        </button>
+                    )}
                 </div>
             ) : (
                 <>

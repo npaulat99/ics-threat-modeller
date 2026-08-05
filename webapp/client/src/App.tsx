@@ -20,6 +20,10 @@ import KbPanel from './components/panels/KbPanel';
 import SettingsModal from './components/SettingsModal';
 import StrideBoundaryEditor from './components/StrideBoundaryEditor';
 
+function promptNewProject(): string | null {
+    return window.prompt('New device / project name:', 'New device');
+}
+
 export default function App() {
     const data = useStore((s) => s.data);
     const view = useStore((s) => s.activeView);
@@ -80,7 +84,13 @@ export default function App() {
                             Create a project to begin, or copy a folder into <code>tra-webapp/projects/</code>. Each step is a JSON
                             file you can edit here or directly on disk — changes sync live.
                         </p>
-                        <button className="btn primary" onClick={() => newProject('New device')}>
+                        <button
+                            className="btn primary"
+                            onClick={async () => {
+                                const name = promptNewProject();
+                                if (name) await newProject(name);
+                            }}
+                        >
                             + New project
                         </button>
                     </div>

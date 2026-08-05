@@ -10,6 +10,13 @@ const CATS: { key: 'device' | 'system' | 'environment' | 'operational'; label: s
     { key: 'operational', label: 'Operational', help: 'Default passwords, update cadence, lifetime.' },
 ];
 
+const ASSUMPTION_PREFIX: Record<typeof CATS[number]['key'], string> = {
+    device: 'AD-',
+    system: 'AS-',
+    environment: 'AE-',
+    operational: 'AO-',
+};
+
 type TabKey = 'overview' | 'attacker' | 'device' | 'system' | 'environment' | 'operational';
 
 export default function AssumptionsPanel() {
@@ -22,7 +29,7 @@ export default function AssumptionsPanel() {
     const setList = (key: typeof CATS[number]['key'], list: Assumption[]) => set({ [key]: list });
     const addAssumption = (key: typeof CATS[number]['key']) => {
         const list = a[key] || [];
-        setList(key, [...list, { id: uid('A-', list.map((x) => x.id)), text: '' }]);
+        setList(key, [...list, { id: uid(ASSUMPTION_PREFIX[key], list.map((x) => x.id)), text: '' }]);
     };
     const setAttacker = (list: AttackerProfile[]) => set({ attacker: list });
     const addAttacker = () =>

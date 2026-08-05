@@ -10,6 +10,12 @@ import { create } from 'zustand';
 import type { ProjectData, ProjectSummary, RiskScheme, StepKey, ViewKey } from '../types';
 
 const norm = (v: string | null | undefined) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+const isPlaceholderComponentName = (label: string | undefined) => {
+    const l = norm(label);
+    return l === 'newcomponent' || l === 'newprocess' || l === 'newmultiprocess' || l === 'newstore' || l === 'newexternalentity' || l === 'newdevice';
+};
+const DEVICE_HOUSING_ID = 'TB-1';
+const DEVICE_HOUSING_NAME = 'Device housing';
 const suffixNum = (id?: string | null) => {
     const m = String(id || '').match(/(\d+)$/);
     return m ? Number(m[1]) : null;
@@ -212,10 +218,11 @@ function reconcileDfdSystem(system: any, dfd: any) {
 
     const nextComponents = componentNodes.map((node: any) => {
         const existing: any = existingComponents.get(node.componentRef) || {};
+        const preserveExistingName = !!existing.name && isPlaceholderComponentName(node.label) && norm(existing.name) !== norm(node.label);
         return {
             ...existing,
             id: node.componentRef,
-            name: node.label || existing.name || node.componentRef,
+            name: preserveExistingName ? existing.name : node.label || existing.name || node.componentRef,
             kind: existing.kind || (node.type === 'store' ? 'store' : node.type === 'external-entity' ? 'external-entity' : node.type === 'multiprocess' ? 'multiprocess' : 'software'),
             layer: Number(node.layer) || 1,
             parent: node.parent ? ((nodeById.get(node.parent) as any)?.componentRef ?? null) : null,
@@ -247,6 +254,11 @@ function reconcileDfdSystem(system: any, dfd: any) {
                 .map((nodeId: string) => (nodeById.get(nodeId) as any)?.componentRef)
                 .filter(Boolean),
         }));
+
+    const deviceComponent = (nextComponents as any[]).find((c) => c.kind === 'device') || (system?.components || []).find((c: any) => c.kind === 'device');
+    if (deviceComponent && !nextTrustBoundaries.some((tb) => tb.id === DEVICE_HOUSING_ID)) {
+        nextTrustBoundaries.unshift({ id: DEVICE_HOUSING_ID, name: DEVICE_HOUSING_NAME, members: [deviceComponent.id] });
+    }
 
     return {
         ...(system || {}),
@@ -302,6 +314,33 @@ function pushHistory(prev: ProjectData, step: string) {
     histStep = step;
     histTime = now;
     useStore.setState({ undoDepth: undoStack.length, redoDepth: 0 });
+}
+
+function ensureDeviceHousing(system: any, dfd: any) {
+    const deviceComponent = (system?.components || []).find((c: any) => c.kind === 'device');
+    if (!deviceComponent) return { system, dfd };
+    const systemBoundaries = [...(system?.trustBoundaries || [])];
+    if (!systemBoundaries.some((tb: any) => tb.id === DEVICE_HOUSING_ID)) {
+        systemBoundaries.unshift({ id: DEVICE_HOUSING_ID, name: DEVICE_HOUSING_NAME, members: [deviceComponent.id] });
+    }
+    const dfdNodes = [...(dfd?.nodes || [])];
+    const hasNode = dfdNodes.some((n: any) => n.type === 'trust-boundary' && n.id === DEVICE_HOUSING_ID);
+    if (!hasNode) {
+        const deviceNode = dfdNodes.find((n: any) => n.componentRef === deviceComponent.id);
+        if (deviceNode) {
+            dfdNodes.unshift({
+                id: DEVICE_HOUSING_ID,
+                label: DEVICE_HOUSING_NAME,
+                type: 'trust-boundary',
+                layer: 1,
+                parent: null,
+                x: deviceNode.x ?? 200,
+                y: (deviceNode.y ?? 200) - 80,
+                members: [deviceNode.id],
+            });
+        }
+    }
+    return { system: { ...(system || {}), trustBoundaries: systemBoundaries }, dfd: { ...(dfd || {}), nodes: dfdNodes } };
 }
 
 function restoreSnapshot(target: ProjectData, current: ProjectData) {
@@ -485,6 +524,9 @@ export const useStore = create<Store>((set, get) => ({
             nextData.system = reconcileDfdSystem(nextData.system, nextData.dfd);
             nextData.dfd = reconcileSystemDfd(nextData.system, nextData.dfd, 'dfd');
         }
+        const enforced = ensureDeviceHousing(nextData.system, nextData.dfd);
+        nextData.system = enforced.system;
+        nextData.dfd = enforced.dfd;
         set({ data: nextData });
         const id = get().activeId;
         if (!id) return;
@@ -590,6 +632,8 @@ export const useStore = create<Store>((set, get) => ({
     applyArtifact(step, value) {
         const data = get().data;
         if (!data) return;
+        const activeTag = (document.activeElement as HTMLElement | null)?.tagName;
+        if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') return;
         if (JSON.stringify((data as any)[step]) === JSON.stringify(value)) return;
         set({ data: { ...data, [step]: value } });
     },

@@ -82,6 +82,7 @@ export default function SystemPanel() {
     };
     const editingTb = (sys.trustBoundaries || []).find((b) => b.id === editingId) || null;
     const editingAsset = (sys.assets || []).find((a) => a.id === editingId) || null;
+    const isDeviceHousing = (tb: TrustBoundary) => tb.id === 'TB-1';
 
     return (
         <div className="panel">
@@ -92,7 +93,7 @@ export default function SystemPanel() {
                         <li>Mark third-party components (OSS / commercial) with <b>provenance</b> — they drive SBOM and supply-chain scope.</li>
                         <li><b>Group assets</b> at the right level: model one "measurement integrity" asset, not one per signal.</li>
                         <li>Categorise interfaces (network / external / user) and record where each asset is <b>stored</b> (internal/external flash, secure element…) — storage location changes the attacker's required access.</li>
-                        <li>Rate each asset's C / I / A / Safety (0–5); impact later defaults to the worst dimension (Bug Bar).</li>
+                        <li>Rate each asset's protection goals: C / I / A / Safety (0–5). Safety stays in the model when the asset or function can affect a hazardous plant state; otherwise it can stay low or zero.</li>
                     </ul>
                 </HelpButton>
             </div>
@@ -241,9 +242,15 @@ export default function SystemPanel() {
                                         <div className="head">
                                             <IdInput id={c.id} onRename={setEditingId} />
                                             <input className="inp grow" value={c.name} onChange={(e) => upd({ name: e.target.value })} />
-                                            <button className="btn sm danger" aria-label={`Delete trust boundary ${c.id}`} onClick={() => confirmDelete(`trust boundary ${c.id}`) && (set({ trustBoundaries: sys.trustBoundaries.filter((x) => x.id !== c.id) }), setEditingId(null))}>
-                                                ✕
-                                            </button>
+                                            {isDeviceHousing(c) ? (
+                                                <span className="hint" style={{ marginLeft: 8 }}>
+                                                    Mandatory device housing
+                                                </span>
+                                            ) : (
+                                                <button className="btn sm danger" aria-label={`Delete trust boundary ${c.id}`} onClick={() => confirmDelete(`trust boundary ${c.id}`) && (set({ trustBoundaries: sys.trustBoundaries.filter((x) => x.id !== c.id) }), setEditingId(null))}>
+                                                    ✕
+                                                </button>
+                                            )}
                                         </div>
                                         <Field label="Members">
                                             <Chips options={compOpts} value={c.members || []} onChange={(v) => upd({ members: v })} />
@@ -277,9 +284,15 @@ export default function SystemPanel() {
                                             <button className="btn sm" onClick={() => setEditingId(c.id)}>
                                                 Edit
                                             </button>
-                                            <button className="btn sm danger" aria-label={`Delete trust boundary ${c.id}`} onClick={() => confirmDelete(`trust boundary ${c.id}`) && set({ trustBoundaries: sys.trustBoundaries.filter((x) => x.id !== c.id) })}>
-                                                ✕
-                                            </button>
+                                            {isDeviceHousing(c) ? (
+                                                <span className="hint" style={{ marginLeft: 8 }}>
+                                                    Mandatory device housing
+                                                </span>
+                                            ) : (
+                                                <button className="btn sm danger" aria-label={`Delete trust boundary ${c.id}`} onClick={() => confirmDelete(`trust boundary ${c.id}`) && set({ trustBoundaries: sys.trustBoundaries.filter((x) => x.id !== c.id) })}>
+                                                    ✕
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="summary-links">
                                             <span className="lbl">Members:</span>
@@ -326,6 +339,9 @@ export default function SystemPanel() {
                                                 </Field>
                                             ))}
                                         </div>
+                                        <p className="hint" style={{ marginTop: 8 }}>
+                                            Defines asset protection priorities. Safety is prioritized for assets that directly impact plant stability.
+                                        </p>
                                         <div className="grid2">
                                             <Field label="Asset type" hint="Pick the closest business or technical class.">
                                                 <ComboInput value={c.type || 'function'} onChange={(v) => upd({ type: v })} options={ASSET_TYPE_OPTS} placeholder="function, data, credential…" />
@@ -354,7 +370,7 @@ export default function SystemPanel() {
                     ) : (
                         <>
                             <div className="toolbar">
-                                <h3 style={{ margin: 0 }}>Assets &amp; objectives</h3>
+                                <h3 style={{ margin: 0 }}>Assets &amp; protection goals</h3>
                                 <div className="right">
                                     <button className="btn sm" onClick={addAsset}>
                                         + Asset
