@@ -7,7 +7,7 @@
 //   - When a JSON file is edited externally, the backend pushes an {type:'artifact'}
 //     message which `applyArtifact` merges back into state — so the UI tracks the files live.
 import { create } from 'zustand';
-import type { ProjectData, ProjectSummary, RiskScheme, StepKey, ViewKey } from '../types';
+import type { LaunchConfig, ProjectData, ProjectSummary, RiskScheme, StepKey, ViewKey } from '../types';
 
 const norm = (v: string | null | undefined) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 const isPlaceholderComponentName = (label: string | undefined) => {
@@ -443,15 +443,20 @@ export const useStore = create<Store>((set, get) => ({
                 e.returnValue = '';
             }
         });
-        const [scheme, kb, bugBar, projects] = await Promise.all([
+        const [scheme, kb, bugBar, projects, config] = await Promise.all([
             getJSON<RiskScheme>('/api/risk-scheme').catch(() => null),
             getJSON<any>('/api/kb').catch(() => null),
             getJSON<any>('/api/bug-bar').catch(() => null),
             getJSON<ProjectSummary[]>('/api/projects').catch(() => []),
+            getJSON<LaunchConfig>('/api/config').catch(() => ({ preselectProjectId: null })),
         ]);
         set({ scheme, kb, bugBar, theme: saved, projects });
         connect();
-        if (projects.length) await get().selectProject(projects[0].id);
+        if (projects.length) {
+            const preferred = config?.preselectProjectId;
+            const selected = preferred && projects.some((p) => p.id === preferred) ? preferred : projects[0].id;
+            await get().selectProject(selected);
+        }
     },
 
     async refreshProjects() {

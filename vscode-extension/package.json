@@ -36,6 +36,11 @@
         "category": "EmbedRisk"
       },
       {
+        "command": "embedrisk.openWebapp",
+        "title": "Open webapp in this folder",
+        "category": "EmbedRisk"
+      },
+      {
         "command": "embedrisk.wizard",
         "title": "Open guided wizard",
         "category": "EmbedRisk"

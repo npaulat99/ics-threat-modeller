@@ -382,6 +382,10 @@ export interface ProjectSummary {
     slTarget: string;
 }
 
+export interface LaunchConfig {
+    preselectProjectId: string | null;
+}
+
 export interface RiskBand {
     name: string;
     min: number;

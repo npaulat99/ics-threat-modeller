@@ -16,6 +16,11 @@ Order rationale: the launcher (Goal 1) is the smallest, most self-contained chan
 the project-root open flow that the new-project tutorial (Goal 2) also depends on. The three
 modelling features (Goals 3-5) follow in the order the request listed them.
 
+> Execution model: this file is the high-level backlog and acceptance criteria. The loop now runs
+> **one whole goal per pass** — the active goal lives in `.ai/current-goal.md` as a single large
+> execute prompt, and Goals 2-5 are prewritten as paste-ready execute prompts in `.ai/backlog.md`.
+> The per-goal `Steps` below remain a checklist of what each execute prompt must cover.
+
 ---
 
 ## Goal 0: Loop system hardening (DONE)

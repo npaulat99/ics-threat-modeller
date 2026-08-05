@@ -23,9 +23,17 @@
 - Use-case diagrams (Goal 4) add a new persisted artifact and step-order entry.
 - Launcher/onboarding (Goals 1-2) need the single project-root contract decided in step 1.1 first.
 
-## Next step
+## Blocker found in verify-step (step 1.2) — RESOLVED
 
-- Goal 1, step 1.1: decide and document the launch contract in `webapp/docs/launch-contract.md`.
+- Symptom: `embedrisk` does nothing under `npm exec -- embedrisk` (exits 0, no server); `npm test`
+	also fails ("Missing script: test").
+- Root cause: the `isMain` guard in `webapp/bin/embedrisk.js` compares `import.meta.url` (realpath)
+	against `pathToFileURL(process.argv[1])` (the npm bin **symlink** path). They never match under
+	a symlinked bin, so `main()` never runs. Direct `node bin/embedrisk.js` works only because
+	argv[1] already equals the realpath.
+- Planned fix (step 1.2 fix): compare realpaths in the main-module check, add a `test` npm script,
+	and add a plain-node `assert` regression test that runs the CLI through a symlink. Kept to the
+	startup-detection fix; no server/client/extension changes and no drift into steps 1.3/1.4.
 
 ## Execution pass - Goal 1, step 1.1
 
@@ -61,3 +69,120 @@
 - Remaining risks: the contract is design-only; the risk of divergence moves to the Goal 1
 	implementation step, where the shared CLI launcher must actually enforce this resolution order
 	and the VS Code command must shell out to it rather than reimplementing folder resolution.
+
+## Execution pass - Goal 1, step 1.2
+
+- Added `webapp/bin/embedrisk.js` as a shell-launchable ESM entry point that resolves the target
+	projects root from `argv[0]`, `TRA_PROJECTS_DIR`, or the current working directory, then sets
+	`process.env.TRA_PROJECTS_DIR` before importing the existing server entry point.
+- Exported the resolver as a small pure function so the precedence rule can be validated with a
+	plain Node `assert` check without adding a new test framework or changing server code.
+- Updated `webapp/package.json` with a `bin` entry for `embedrisk` and an `npm run open` helper
+	that invokes the same launcher.
+- Left `webapp/server/src/*`, the client, and the VS Code extension unchanged so `npm start`
+	continues to use the existing low-level server path and defaults.
+- Validation run:
+	- `node --input-type=module` assertions against `resolveProjectsDir` verified precedence:
+		explicit argument > `TRA_PROJECTS_DIR` > current working directory, plus relative-path
+		resolution.
+	- Smoke test: launched `node /home/noah/EmbedRisk/webapp/bin/embedrisk.js <tempdir>` from
+		`/tmp` with `PORT=4319`; the server reported `Projects directory: <tempdir>` and served
+		`GET /api/projects` successfully.
+	- Regression: `env -u TRA_PROJECTS_DIR -u HOST PORT=4320 npm start` still served the bundled
+		`/home/noah/EmbedRisk/webapp/projects` root.
+	- Default semantics check: importing `webapp/server/src/paths.js` with `TRA_PROJECTS_DIR` and
+		`PORT` unset still yielded `PORT === 4317` and `projectsDir === join(webappRoot, 'projects')`.
+
+## Execution pass - Goal 1, step 1.2 (startup fix)
+
+- Fixed `webapp/bin/embedrisk.js` main-module detection to compare real filesystem paths between
+	`process.argv[1]` and `import.meta.url`, so symlinked bin execution paths (for example,
+	`node_modules/.bin/embedrisk` and `npm exec -- embedrisk`) now execute `main()` instead of
+	exiting silently.
+- Kept `resolveProjectsDir` behavior unchanged (explicit argument > `TRA_PROJECTS_DIR` > cwd), and
+	kept launcher side effects limited to runtime invocation.
+- Added `webapp/test/embedrisk.test.mjs` with plain Node `assert` tests for precedence and a
+	symlink-startup regression that spawns a temporary symlink to the bin, waits for server readiness,
+	verifies `/api/projects` responds, and then terminates the child process.
+- Added `"test": "node test/embedrisk.test.mjs"` to `webapp/package.json` so `verify-step` can
+	run `npm test` directly.
+- Validation run:
+	- `cd webapp && npm test` passed (`embedrisk launcher tests passed`).
+	- `npm exec -- embedrisk <tempdir>` now starts and reports `Projects directory: <tempdir>`.
+	- `node /home/noah/EmbedRisk/webapp/bin/embedrisk.js <tempdir>` still starts and serves requests.
+	- `env -u TRA_PROJECTS_DIR -u HOST PORT=4343 npm start` still reports
+		`Projects directory: /home/noah/EmbedRisk/webapp/projects` and serves requests.
+
+## Execution pass - Goal 1 (whole-feature completion)
+
+- Part A (CLI single-project detection): extended `webapp/bin/embedrisk.js` with
+	`resolveLaunchTarget(argv, env, cwd)` that classifies a resolved target as single-project when
+	`01-project-description/` exists as a directory, mapping to `{ projectsRoot: dirname(target),
+	preselectId: basename(target) }`; all filesystem errors fall back to container mode.
+- Part A wiring: `main()` now sets `TRA_PROJECTS_DIR` to `projectsRoot` before server import and
+	sets `TRA_PRESELECT_PROJECT` only when a preselect id is present.
+- Part B (server exposure): added `GET /api/config` in `webapp/server/src/index.js`, returning
+	`{ preselectProjectId }` with server-side validation against `listProjects()` so stale/invalid env
+	ids are returned as `null`.
+- Part C (client honor preselect): added `LaunchConfig` type in `webapp/client/src/types.ts` and
+	updated `webapp/client/src/state/store.ts` `init()` to fetch `/api/config`; if the id is present
+	and matches the fetched project list, that project is selected; otherwise fallback remains
+	`projects[0]`.
+- Part D (VS Code convenience): added command contribution `embedrisk.openWebapp` in
+	`vscode-extension/package.json` and implemented command handler in
+	`vscode-extension/src/extension.ts` that shells out to the shared CLI (`node <...>/webapp/bin/embedrisk.js`
+	when available, else `embedrisk`) for the chosen/default folder and surfaces
+	`http://localhost:<PORT|4317>` via info action.
+- Test extension: expanded `webapp/test/embedrisk.test.mjs` with `resolveLaunchTarget`
+	classification assertions (single-project vs container, including env precedence with
+	classification) and a startup regression that launches via symlink against a single-project folder
+	and verifies parent-root logging, `/api/projects`, and `/api/config` preselect id.
+- Validation run:
+	- `cd webapp && npm test` passed.
+	- `cd webapp && npm --workspace client run typecheck` passed.
+	- `cd webapp && npm run build` passed.
+	- `cd vscode-extension && npm run compile` passed.
+	- Manual smoke:
+		- Single-project launch via `npm exec -- embedrisk <single-project-folder>` reported parent
+			projects root and `/api/config` returned the expected project id.
+		- Container launch via `npm exec -- embedrisk <container-folder>` reported container root and
+			`/api/config` returned `null`.
+
+## Review pass - Goal 1, step 1.2 (startup fix) — COMPLETE
+
+- Reviewed the diff and on-disk files against every acceptance criterion; all are met:
+	- `npm exec -- embedrisk <dir>` and symlinked-bin execution now start the server (no silent
+		exit); direct `node bin/embedrisk.js` still works; `npm test` exists and passes; the
+		symlink-startup regression test guards against recurrence.
+- Root-cause fix confirmed correct: `isMain` compares `realpathSync(process.argv[1])` to
+	`realpathSync(fileURLToPath(import.meta.url))`, wrapped in try/catch so a missing/odd
+	`argv[1]` safely yields `false` without auto-starting on import.
+- Architecture consistency: launcher is ESM and reuses the existing server unchanged; test uses the
+	repo's framework-free `assert` style; env is set before importing `paths.js`.
+- Edge cases covered: no-arg/env/cwd precedence, ephemeral-port reservation to avoid collisions,
+	and SIGTERM→SIGKILL child cleanup to avoid leaked processes.
+- Scope respected: only `webapp/bin/embedrisk.js`, `webapp/package.json`,
+	`webapp/test/embedrisk.test.mjs`, and the `.ai/*` files changed. No server/client/extension edits
+	and no drift into steps 1.3/1.4.
+- Minor correction applied during review: added the missing trailing newline to
+	`webapp/bin/embedrisk.js`.
+- Validation performed by reviewer: `cd webapp && npm test` → `embedrisk launcher tests passed`.
+- Remaining risks: the symlink startup test relies on POSIX symlink+shebang execution and may need a
+	guard/skip on Windows; single-project detection (1.3) and the VS Code command (1.4) are still
+	open.
+
+## Workflow change (whole-goal execute prompts)
+
+- To cut plan/review token overhead, the loop now runs one **whole goal** per pass instead of many
+	micro-steps. `.ai/current-goal.md` holds the entire active goal as a single large execute prompt;
+	`.ai/backlog.md` holds Goals 2-5 prewritten as paste-ready execute prompts. `.ai/goals.md` remains
+	the high-level backlog and acceptance criteria.
+- Procedure: execute the whole goal → run validations at the end → one verify/review → then paste the
+	next goal's block from `.ai/backlog.md` over `.ai/current-goal.md`.
+
+## Next step
+
+- Goal 1 (whole feature) is the active execute prompt in `.ai/current-goal.md`. Already done:
+	launch contract (1.1) and the CLI bin + symlink startup fix (1.2). Remaining in this pass:
+	single-project detection, `TRA_PRESELECT_PROJECT` server endpoint, client preselect, and the
+	VS Code `embedrisk.openWebapp` command.

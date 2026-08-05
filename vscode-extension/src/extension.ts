@@ -26,6 +26,25 @@ const pathExists = async (u: vscode.Uri) => { try { await vscode.workspace.fs.st
 const reportsScript = (ctx: vscode.ExtensionContext) => vscode.Uri.joinPath(ctx.extensionUri, "runtime", "tools", "generate-report.mjs");
 const projectsRoot = () => vscode.Uri.file(path.join(os.homedir(), "Documents", "EmbedRisk", "projects"));
 const importedKbRoot = (ctx: vscode.ExtensionContext) => vscode.Uri.joinPath(ctx.globalStorageUri, "knowledge-base", "imported");
+const shellQuote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
+
+async function resolveWebappLauncher(ctx: vscode.ExtensionContext) {
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath;
+  const candidates = [
+    workspaceRoot ? path.join(workspaceRoot, "webapp", "bin", "embedrisk.js") : "",
+    path.join(ctx.extensionUri.fsPath, "..", "webapp", "bin", "embedrisk.js"),
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    if (await pathExists(vscode.Uri.file(candidate))) return candidate;
+  }
+  return null;
+}
+
+async function pickLaunchFolder() {
+  if (vscode.workspace.workspaceFolders?.length) return vscode.workspace.workspaceFolders[0].uri;
+  const picked = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectMany: false, openLabel: "Open in EmbedRisk webapp" });
+  return picked?.[0] || null;
+}
 
 async function writeJson(u: vscode.Uri, obj: unknown) {
   await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(u.fsPath)));
@@ -131,6 +150,25 @@ async function openLayer(target: number) {
 
 export function activate(ctx: vscode.ExtensionContext) {
   const attackTreeEditor = new AttackTreeEditor(ctx.extensionUri);
+  const openWebappCommand = async () => {
+    const target = await pickLaunchFolder();
+    if (!target) return;
+
+    const launcher = await resolveWebappLauncher(ctx);
+    const command = launcher
+      ? `${shellQuote(process.execPath)} ${shellQuote(launcher)} ${shellQuote(target.fsPath)}`
+      : `embedrisk ${shellQuote(target.fsPath)}`;
+    const terminal = vscode.window.createTerminal({ name: "EmbedRisk Webapp", cwd: target.fsPath });
+    terminal.show(true);
+    terminal.sendText(command, true);
+
+    const port = process.env.PORT || "4317";
+    const url = vscode.Uri.parse(`http://localhost:${port}`);
+    const action = await vscode.window.showInformationMessage(`EmbedRisk webapp launch requested for ${target.fsPath}.`, "Open webapp", "Reveal command terminal");
+    if (action === "Open webapp") await vscode.env.openExternal(url);
+    if (action === "Reveal command terminal") terminal.show(true);
+  };
+
   const createProjectCommand = async () => {
     const name = await vscode.window.showInputBox({ prompt: "Device / project name" });
     if (!name) return;
@@ -161,6 +199,7 @@ export function activate(ctx: vscode.ExtensionContext) {
       await generateReport(ctx, projDir);
     }),
     vscode.commands.registerCommand("embedrisk.newProject", createProjectCommand),
+    vscode.commands.registerCommand("embedrisk.openWebapp", openWebappCommand),
     vscode.commands.registerCommand("embedrisk.wizard", () => openWizard(ctx)),
     vscode.commands.registerCommand("embedrisk.kbBrowse", () => openKbBrowser(ctx)),
     vscode.commands.registerCommand("embedrisk.dfdNative", async () => {
