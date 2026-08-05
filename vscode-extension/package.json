@@ -71,6 +71,11 @@
         "category": "EmbedRisk"
       },
       {
+        "command": "embedrisk.useCases",
+        "title": "Open use-case diagrams",
+        "category": "EmbedRisk"
+      },
+      {
         "command": "embedrisk.dfdLayerDown",
         "title": "DFD layer down (into component)",
         "category": "EmbedRisk"
@@ -126,11 +131,23 @@
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "embedrisk.useCases",
+        "displayName": "EmbedRisk use-case diagrams",
+        "selector": [
+          {
+            "filenamePattern": "**/04b-use-cases/use-cases.json"
+          }
+        ],
+        "priority": "default"
       }
     ]
   },
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --platform=node --external:vscode --outfile=dist/extension.js --format=cjs",
+    "lint": "npm run compile",
+    "format:check": "npm run build",
     "compile": "tsc -p . --noEmit && npm run build",
     "watch": "npm run build -- --watch",
     "package": "npm run compile && vsce package --no-dependencies",

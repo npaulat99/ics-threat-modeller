@@ -17,6 +17,7 @@ export const STEP_FILES = {
     assumptions: '02-assumptions/assumptions.json',
     system: '03-system-assets/system.json',
     dfd: '04-dfd/dfd.json',
+    useCases: '04b-use-cases/use-cases.json',
     threats: '06-threats/threats.json',
     requirements: '05-requirements/requirements.json',
     countermeasures: '08-countermeasures/countermeasures.json',
@@ -34,6 +35,7 @@ export const DEFAULTS = {
     assumptions: () => ({ device: [], system: [], environment: [], operational: [], attacker: [] }),
     system: () => ({ components: [], interfaces: [], trustBoundaries: [], assets: [] }),
     dfd: () => ({ nodes: [], flows: [] }),
+    useCases: () => ({ diagrams: [] }),
     threats: () => ({ threats: [] }),
     requirements: () => ({ requirements: [] }),
     countermeasures: () => ({ countermeasures: [] }),
@@ -455,6 +457,7 @@ export async function scaffoldProject(name) {
         ],
         flows: [],
     });
+    await writeArtifact(slug, 'useCases', { diagrams: [] });
     await writeArtifact(slug, 'threats', { threats: [] });
     await writeArtifact(slug, 'countermeasures', { countermeasures: [] });
     await writeArtifact(slug, 'attackTrees', { trees: [] });

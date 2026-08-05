@@ -39,6 +39,8 @@ const ass = read(project.steps["02-assumptions"]);
 const sys = read(project.steps["03-system-assets"]);
 const threats = read(project.steps["06-threats"]).threats;
 const cms = read(project.steps["08-countermeasures"]).countermeasures;
+let useCases = { diagrams: [] };
+try { useCases = read(project.steps["04b-use-cases"] || "04b-use-cases/use-cases.json"); } catch { }
 let reqs = [];
 try { reqs = read(project.steps["05-requirements"]).requirements || []; } catch { }
 
@@ -79,6 +81,7 @@ const reqRows = reqs.map((r) =>
   `<tr><td><b>${esc(r.id)}</b></td><td>${esc(r.text)}</td><td>${esc(r.standardRef || '')}${r.slFr ? ` · ${esc(r.slFr)}` : ''}</td>` +
   `<td>${esc((r.derivedFromThreat || []).join(', '))}</td><td>${esc((r.satisfiedByCM || []).join(', '))}</td></tr>`
 ).join('');
+const useCaseRows = (useCases.diagrams || []).map((d) => `<li><b>${esc(d.name || d.id)}</b> — ${(d.entities || []).length} entities, ${(d.connections || []).length} connections</li>`).join('');
 
 // SBOM (CycloneDX 1.5) from component list
 const sbomMode = project.sbom?.mode || 'in-tool';
@@ -143,6 +146,7 @@ const html = `<!doctype html><meta charset=utf8><title>TRA ${esc(project.title |
 <h2>Threats &amp; risk</h2><table><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>Initial risk</th><th>Residual risk</th><th>Status</th></tr>${rows}</table>
 <h2>Countermeasures</h2><ul>${cmRows || '<li>None defined.</li>'}</ul>
 ${reqRows ? `<h2>Security requirements</h2><table><tr><th>ID</th><th>Requirement</th><th>Standard ref</th><th>From threats</th><th>Satisfied by</th></tr>${reqRows}</table>` : ''}
+${project.reportOptions?.includeUseCases ? `<h2>Use-case diagrams</h2>${useCaseRows ? `<ul>${useCaseRows}</ul>` : '<p>No use-case diagrams defined.</p>'}` : ''}
 ${sbomSection}
 <h2>Plausibility check</h2>${issues.length ? `<ul class=warn>${issues.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : '<p>No issues found.</p>'}`;
 

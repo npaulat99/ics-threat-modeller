@@ -9,7 +9,7 @@ const PROX = { remote: 1, adjacent: 2, local: 3, physical: 4 };
 const reqProx = (e) => (e >= 4 ? 1 : e === 3 ? 2 : e === 2 ? 3 : 4);
 const DEFAULT_ACCEPTABLE_RISK = 12;
 
-export function validate({ project = {}, assumptions = {}, system = {}, threats = {}, requirements = {}, countermeasures = {}, dfd = {}, attackTrees = {}, defects = {} } = {}) {
+export function validate({ project = {}, assumptions = {}, system = {}, threats = {}, requirements = {}, countermeasures = {}, dfd = {}, useCases = {}, attackTrees = {}, defects = {} } = {}) {
     const issues = [];
     const add = (severity, message, key) => issues.push({ severity, message, key: key ?? message });
     const threatList = arr(threats.threats ?? threats);
@@ -96,6 +96,15 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
         if (typeof i.hidden !== 'undefined' && typeof i.hidden !== 'boolean') {
             add('warning', `Interface '${i.id || i.name || 'unknown'}': hidden must be a boolean when set.`);
         }
+    }
+
+    const diagrams = Array.isArray(useCases?.diagrams) ? useCases.diagrams : [];
+    if (diagrams.length > 0 && !project.reportOptions?.includeUseCases) {
+        add(
+            'notice',
+            `Use-case diagrams exist (${diagrams.length}) but report inclusion is disabled. Accept this notice if the exclusion is intentional.`,
+            'usecases-excluded',
+        );
     }
 
     const reqCms = new Set(reqList.flatMap((r) => arr(r.satisfiedByCM)));

@@ -38,6 +38,8 @@ const ass = read(project.steps["02-assumptions"]);
 const sys = read(project.steps["03-system-assets"]);
 const threats = read(project.steps["06-threats"]).threats;
 const cms = read(project.steps["08-countermeasures"]).countermeasures;
+let useCases = { diagrams: [] };
+try { useCases = read(project.steps["04b-use-cases"] || "04b-use-cases/use-cases.json"); } catch { }
 
 const band = (r) => scheme.matrix.bands.find((b) => r >= b.min && r <= b.max) || scheme.matrix.bands[0];
 const residual = (t) => {
@@ -63,12 +65,17 @@ const rows = threats.map((t) => {
   return `<tr><td>${t.id}</td><td>${t.title}</td><td>${t.stride.join("")}</td><td>${t.likelihood}x${t.impact}=<b style="color:${band(r).color}">${r} ${band(r).name}</b></td><td>${rr.l}x${rr.i}=<b style="color:${band(rrv).color}">${rrv} ${band(rrv).name}</b></td><td>${t.status}</td></tr>`;
 }).join("");
 
+const ucRows = (useCases.diagrams || []).map((d) =>
+  `<li><b>${d.name || d.id}</b> (${(d.entities || []).length} entities, ${(d.connections || []).length} connections)</li>`
+).join("");
+
 const html = `<!doctype html><meta charset=utf8><title>TRA ${project.title}</title>
 <style>body{font:14px system-ui;margin:2rem;max-width:60rem}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px;text-align:left}h1{font-size:1.4rem}.warn{color:#c62828}</style>
 <h1>${project.title}</h1><p>Device: ${project.device.name} (${project.device.type}) | SL-T ${project.slTarget} | mode ${project.scope.mode} | status ${project.status}</p>
 <h2>Attacker profiles</h2><ul>${ass.attacker.map((a) => `<li><b>${a.name}</b> cap ${a.capability}, ${a.access}: ${a.text}</li>`).join("")}</ul>
 <h2>Assets</h2><ul>${sys.assets.map((a) => `<li>${a.name} (C${a.objectives.confidentiality}/I${a.objectives.integrity}/A${a.objectives.availability}/S${a.objectives.safety})</li>`).join("")}</ul>
 <h2>Threats & risk</h2><table><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>Initial</th><th>Residual</th><th>Status</th></tr>${rows}</table>
+${project.reportOptions?.includeUseCases ? `<h2>Use-case diagrams</h2>${ucRows ? `<ul>${ucRows}</ul>` : '<p>No use-case diagrams defined.</p>'}` : ''}
 <h2>Plausibility check</h2>${issues.length ? `<ul class=warn>${issues.map((i) => `<li>${i}</li>`).join("")}</ul>` : "<p>No issues found.</p>"}`;
 
 mkdirSync(join(base, "report"), { recursive: true });

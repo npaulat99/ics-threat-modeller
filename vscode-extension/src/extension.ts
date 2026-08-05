@@ -10,6 +10,7 @@ import { openKbBrowser } from "./kbBrowser";
 import { DfdEditor } from "./dfdEditor";
 import { NativeDfdEditor } from "./nativeDfdEditor";
 import { AttackTreeEditor } from "./attackTreeEditor";
+import { UseCaseEditor } from "./useCaseEditor";
 
 interface Node { id: string; label: string; type: string; layer: number; parent?: string | null }
 interface Dfd { nodes: Node[]; flows: { id: string; label?: string; from: string; to: string }[]; }
@@ -93,6 +94,7 @@ async function scaffoldProject(dir: vscode.Uri, name: string, slug: string) {
       "02-assumptions": "02-assumptions/assumptions.json",
       "03-system-assets": "03-system-assets/system.json",
       "04-dfd": "04-dfd/dfd.json",
+      "04b-use-cases": "04b-use-cases/use-cases.json",
       "05-requirements": "05-requirements/requirements.json",
       "06-threats": "06-threats/threats.json",
       "07-attack-trees": "07-attack-trees/attack-trees.json",
@@ -119,6 +121,7 @@ async function scaffoldProject(dir: vscode.Uri, name: string, slug: string) {
   await writeJson(vscode.Uri.joinPath(dir, "02-assumptions", "assumptions.json"), assumptions);
   await writeJson(vscode.Uri.joinPath(dir, "03-system-assets", "system.json"), system);
   await writeJson(vscode.Uri.joinPath(dir, "04-dfd", "dfd.json"), dfd);
+  await writeJson(vscode.Uri.joinPath(dir, "04b-use-cases", "use-cases.json"), { diagrams: [] });
   await writeJson(vscode.Uri.joinPath(dir, "05-requirements", "requirements.json"), { requirements: [] });
   await writeJson(vscode.Uri.joinPath(dir, "06-threats", "threats.json"), { threats: [] });
   await writeJson(vscode.Uri.joinPath(dir, "07-attack-trees", "attack-trees.json"), { trees: [] });
@@ -150,6 +153,7 @@ async function openLayer(target: number) {
 
 export function activate(ctx: vscode.ExtensionContext) {
   const attackTreeEditor = new AttackTreeEditor(ctx.extensionUri);
+  const useCaseEditor = new UseCaseEditor(ctx.extensionUri);
   const openWebappCommand = async () => {
     const target = await pickLaunchFolder();
     if (!target) return;
@@ -206,6 +210,14 @@ export function activate(ctx: vscode.ExtensionContext) {
       const u = await find();
       if (!u) { vscode.window.showWarningMessage("No 04-dfd/dfd.json in the workspace."); return; }
       await vscode.commands.executeCommand("vscode.openWith", u, "embedrisk.dfdNative");
+    }),
+    vscode.commands.registerCommand("embedrisk.useCases", async () => {
+      const pf = await vscode.workspace.findFiles("**/01-project-description/project.json", "**/node_modules/**", 1);
+      if (!pf[0]) { vscode.window.showWarningMessage("No EmbedRisk project found."); return; }
+      const projDir = vscode.Uri.joinPath(pf[0], "..", "..");
+      const file = vscode.Uri.joinPath(projDir, "04b-use-cases", "use-cases.json");
+      if (!(await pathExists(file))) await writeJson(file, { diagrams: [] });
+      await vscode.commands.executeCommand("vscode.openWith", file, "embedrisk.useCases");
     }),
     vscode.commands.registerCommand("embedrisk.newAttackTree", async () => {
       const tf = await vscode.workspace.findFiles("**/06-threats/threats.json", "**/node_modules/**", 1);
@@ -287,6 +299,7 @@ export function activate(ctx: vscode.ExtensionContext) {
     }),
     vscode.window.registerCustomEditorProvider("embedrisk.dfdNative", new NativeDfdEditor(ctx.extensionUri), { webviewOptions: { retainContextWhenHidden: true } }),
     vscode.window.registerCustomEditorProvider("embedrisk.attackTree", attackTreeEditor, { webviewOptions: { retainContextWhenHidden: true } }),
+    vscode.window.registerCustomEditorProvider("embedrisk.useCases", useCaseEditor, { webviewOptions: { retainContextWhenHidden: true } }),
     vscode.window.registerCustomEditorProvider("embedrisk.dfdEditor", new DfdEditor(ctx.extensionUri)),
   );
   // The wizard no longer opens automatically on activation. Run "EmbedRisk: Open guided wizard"

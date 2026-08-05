@@ -218,6 +218,104 @@ function layerSvg(dfd, parentId, system = {}) {
     return `<svg width='${Math.min(W, 900)}' height='${Math.min(H, 620)}' viewBox='0 0 ${W} ${H}' xmlns='http://www.w3.org/2000/svg'><defs><marker id='a' markerWidth='8' markerHeight='8' refX='7' refY='3' orient='auto'><path d='M0,0L7,3L0,6' fill='#6b7688'/></marker></defs>${out.join('')}</svg>`;
 }
 
+function useCaseSvg(diagram = {}) {
+    const entities = Array.isArray(diagram.entities) ? diagram.entities : [];
+    const groups = Array.isArray(diagram.groups) ? diagram.groups : [];
+    const conns = Array.isArray(diagram.connections) ? diagram.connections : [];
+    if (!entities.length) return '<p>No entities in this diagram.</p>';
+
+    const ACTOR_W = 80;
+    const ACTOR_H = 120;
+    const ACTION_W = 180;
+    const ACTION_H = 70;
+    const boxOf = (e, idx) => {
+        const x = Number.isFinite(e?.x) ? e.x : 80 + (idx % 4) * 220;
+        const y = Number.isFinite(e?.y) ? e.y : 80 + Math.floor(idx / 4) * 180;
+        if (e.kind === 'actor' || e.kind === 'misuse-actor') return { x, y, w: ACTOR_W, h: ACTOR_H };
+        return { x, y, w: ACTION_W, h: ACTION_H };
+    };
+    const byId = new Map(entities.map((e, i) => [e.id, { e, b: boxOf(e, i) }]));
+
+    const groupSvgs = groups
+        .map((g) => {
+            const memberBoxes = (g.members || []).map((id) => byId.get(id)?.b).filter(Boolean);
+            if (!memberBoxes.length) return '';
+            const minX = Math.min(...memberBoxes.map((b) => b.x)) - 30;
+            const minY = Math.min(...memberBoxes.map((b) => b.y)) - 45;
+            const maxX = Math.max(...memberBoxes.map((b) => b.x + b.w)) + 30;
+            const maxY = Math.max(...memberBoxes.map((b) => b.y + b.h)) + 24;
+            return (
+                `<rect x='${minX}' y='${minY}' width='${maxX - minX}' height='${maxY - minY}' fill='none' stroke='#4d5a6d' stroke-width='1.4' rx='8'/>` +
+                `<text x='${minX + 10}' y='${minY + 16}' font-size='11' fill='#2a3342'>${esc(g.name || g.id)}</text>`
+            );
+        })
+        .join('');
+
+    const defs =
+        '<defs>' +
+        "<marker id='uc-arrow' markerWidth='8' markerHeight='8' refX='7' refY='3' orient='auto'><path d='M0,0L7,3L0,6' fill='#5e6a7b'/></marker>" +
+        '</defs>';
+
+    const connSvgs = conns
+        .map((c) => {
+            const from = byId.get(c.from)?.b;
+            const to = byId.get(c.to)?.b;
+            if (!from || !to) return '';
+            const x1 = from.x + from.w / 2;
+            const y1 = from.y + from.h / 2;
+            const x2 = to.x + to.w / 2;
+            const y2 = to.y + to.h / 2;
+            const dashed = c.dashed ? " stroke-dasharray='6 4'" : '';
+            const arrow = c.arrow || 'none';
+            const start = arrow === 'backward' || arrow === 'both' ? " marker-start='url(#uc-arrow)'" : '';
+            const end = arrow === 'forward' || arrow === 'both' ? " marker-end='url(#uc-arrow)'" : '';
+            const mx = (x1 + x2) / 2;
+            const my = (y1 + y2) / 2;
+            const label = c.label
+                ? `<rect x='${mx - 70}' y='${my - 18}' width='140' height='14' rx='3' fill='#fff' stroke='#d9dee7'/><text x='${mx}' y='${my - 8}' text-anchor='middle' font-size='10'>${esc(c.label)}</text>`
+                : '';
+            return `<line x1='${x1}' y1='${y1}' x2='${x2}' y2='${y2}' stroke='#5e6a7b' stroke-width='1.6'${dashed}${start}${end}/>${label}`;
+        })
+        .join('');
+
+    const entitySvgs = entities
+        .map((e, i) => {
+            const b = boxOf(e, i);
+            const cx = b.x + b.w / 2;
+            const cy = b.y + b.h / 2;
+            if (e.kind === 'actor' || e.kind === 'misuse-actor') {
+                const dark = e.kind === 'misuse-actor';
+                const stroke = dark ? '#111' : '#2f3a4a';
+                const fill = dark ? '#111' : 'none';
+                const textFill = dark ? '#fff' : '#1d2430';
+                return (
+                    `<circle cx='${cx}' cy='${b.y + 16}' r='10' fill='${fill}' stroke='${stroke}' stroke-width='1.8'/>` +
+                    `<line x1='${cx}' y1='${b.y + 26}' x2='${cx}' y2='${b.y + 64}' stroke='${stroke}' stroke-width='1.8'/>` +
+                    `<line x1='${cx - 18}' y1='${b.y + 40}' x2='${cx + 18}' y2='${b.y + 40}' stroke='${stroke}' stroke-width='1.8'/>` +
+                    `<line x1='${cx}' y1='${b.y + 64}' x2='${cx - 14}' y2='${b.y + 92}' stroke='${stroke}' stroke-width='1.8'/>` +
+                    `<line x1='${cx}' y1='${b.y + 64}' x2='${cx + 14}' y2='${b.y + 92}' stroke='${stroke}' stroke-width='1.8'/>` +
+                    `<text x='${cx}' y='${b.y + 110}' text-anchor='middle' font-size='10.5' fill='${textFill}'>${esc(e.name || e.id)}</text>`
+                );
+            }
+            const dark = e.kind === 'misuse-action';
+            return (
+                `<ellipse cx='${cx}' cy='${cy}' rx='${b.w / 2}' ry='${b.h / 2}' fill='${dark ? '#111' : '#fff'}' stroke='${dark ? '#111' : '#2f3a4a'}' stroke-width='1.6'/>` +
+                `<text x='${cx}' y='${cy + 4}' text-anchor='middle' font-size='10.5' fill='${dark ? '#fff' : '#1d2430'}'>${esc(e.name || e.id)}</text>`
+            );
+        })
+        .join('');
+
+    const all = [...entities.map((e, i) => boxOf(e, i))];
+    const minX = Math.min(...all.map((b) => b.x)) - 60;
+    const minY = Math.min(...all.map((b) => b.y)) - 60;
+    const maxX = Math.max(...all.map((b) => b.x + b.w)) + 60;
+    const maxY = Math.max(...all.map((b) => b.y + b.h)) + 60;
+    const w = Math.max(400, maxX - minX);
+    const h = Math.max(260, maxY - minY);
+
+    return `<svg width='${Math.min(980, w)}' height='${Math.min(700, h)}' viewBox='${minX} ${minY} ${w} ${h}' xmlns='http://www.w3.org/2000/svg'>${defs}${groupSvgs}${connSvgs}${entitySvgs}</svg>`;
+}
+
 /** The traceability chain, one row per threat — reused by the HTML matrix and CSV/JSON exports. */
 export function buildTraceability({ system, threats, requirements, countermeasures, scheme }) {
     const assetById = new Map((system.assets || []).map((a) => [a.id, a]));
@@ -441,12 +539,12 @@ function traceabilityCsv(rows) {
 export async function buildReport(id) {
     const scheme = await loadScheme();
     const p = await readProject(id);
-    const { project, assumptions, system, dfd, threats: td, requirements: rd, countermeasures: cd, attackTrees, defects: dd } = p;
+    const { project, assumptions, system, dfd, useCases, threats: td, requirements: rd, countermeasures: cd, attackTrees, defects: dd } = p;
     const threats = td.threats || [];
     const reqs = rd.requirements || [];
     const cms = cd.countermeasures || [];
     const defects = dd.defects || [];
-    const issues = validate({ project, assumptions, system, threats: td, requirements: rd, countermeasures: cd, dfd, attackTrees, defects: dd });
+    const issues = validate({ project, assumptions, system, threats: td, requirements: rd, countermeasures: cd, dfd, useCases, attackTrees, defects: dd });
     const trace = buildTraceability({ system, threats, requirements: reqs, countermeasures: cms, scheme });
     const sbom = buildSbom({ project, system, defects });
     const sbomMode = project.sbom?.mode || 'in-tool';
@@ -497,6 +595,14 @@ export async function buildReport(id) {
     const ifaceList = (system.interfaces || [])
         .map((i) => `<li><b>${esc(i.name)}</b> ${esc(i.protocol || '')} · ${esc(i.exposure)}${i.category ? ` · ${esc(i.category)}` : ''}</li>`)
         .join('');
+    const ucDiagrams = Array.isArray(useCases?.diagrams) ? useCases.diagrams : [];
+    const useCaseSection = project.reportOptions?.includeUseCases
+        ? ucDiagrams.length
+            ? `<h2>Use-case diagrams</h2>${ucDiagrams
+                .map((d) => `<h3>${esc(d.name || d.id)}</h3>${useCaseSvg(d)}`)
+                .join('')}`
+            : ''
+        : '';
     const reqRows = reqs
         .map(
             (r) =>
@@ -560,6 +666,7 @@ export async function buildReport(id) {
         `<h2>Traceability matrix</h2><div class='trace-note'>This matrix shows the full chain from protected asset to assessed threat, required security response, implemented countermeasure, residual risk and linked evidence. Machine-readable exports are written alongside the report as <code>report/traceability.csv</code>, <code>report/traceability.json</code> and <code>${esc(sbomFile)}</code>.</div>` +
         `<table><tr><th>Asset</th><th>C/I/A/S</th><th>Threat</th><th>Initial</th><th>Requirement</th><th>Control</th><th>Residual</th><th>Evidence</th><th>Status</th></tr>${traceRows}</table>` +
         `<h2>Data flow diagram (all layers)</h2>${dfdHtml}` +
+        useCaseSection +
         tbSection +
         strideSection +
         strideTbSection +

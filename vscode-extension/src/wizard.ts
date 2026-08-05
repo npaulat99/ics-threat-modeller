@@ -49,6 +49,7 @@ async function writeSnapshot(proj: vscode.Uri, version: string): Promise<void> {
     assumptions: "02-assumptions/assumptions.json",
     system: "03-system-assets/system.json",
     dfd: "04-dfd/dfd.json",
+    useCases: "04b-use-cases/use-cases.json",
     requirements: "05-requirements/requirements.json",
     threats: "06-threats/threats.json",
     attackTrees: "07-attack-trees/attack-trees.json",
@@ -70,9 +71,13 @@ async function buildData(proj: vscode.Uri) {
   const system = await rdRaw(proj, "03-system-assets/system.json", { components: [], assets: [] });
   const assumptions = await rdRaw(proj, "02-assumptions/assumptions.json", {});
   const dfd = await rdRaw(proj, "04-dfd/dfd.json", { nodes: [] });
+  const useCases = await rdRaw(proj, "04b-use-cases/use-cases.json", { diagrams: [] });
   const reqs = (await rdRaw(proj, "05-requirements/requirements.json", { requirements: [] })).requirements || [];
   const tracker = await readChangeTracker(proj);
   const comps = (system.components || []).map((c: any) => ({ id: c.id, name: c.name }));
+  const useCaseNoticePending = (useCases.diagrams || []).length > 0
+    && !project.reportOptions?.includeUseCases
+    && !((project.acceptedNotices || []).includes("usecases-excluded"));
   return {
     changeTracker: tracker,
     project: {
@@ -81,6 +86,9 @@ async function buildData(proj: vscode.Uri) {
       mode: project.scope?.mode || "graybox",
       boundary: project.scope?.boundary || "",
       sbom: project.sbom || {},
+      includeUseCases: !!project.reportOptions?.includeUseCases,
+      useCaseNames: (useCases.diagrams || []).map((d: any) => d.name || d.id),
+      useCaseNoticePending,
     },
     threats, cms, comps,
     requirements: reqs,
@@ -103,6 +111,7 @@ async function buildData(proj: vscode.Uri) {
       system: (system.components || []).length,
       systemAssets: (system.assets || []).length,
       dfd: (dfd.nodes || []).length,
+      useCases: (useCases.diagrams || []).length,
       requirements: reqs.length,
       threats: threats.length,
       attackTrees: await countTrees(proj),
@@ -134,9 +143,23 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
       const project = await rdRaw(f.proj, "01-project-description/project.json", {});
       project.device = project.device || {}; project.device.name = m.name; project.slTarget = m.sl;
       project.scope = project.scope || {}; project.scope.mode = m.mode; project.scope.boundary = m.bnd;
+      project.reportOptions = project.reportOptions || {};
+      project.reportOptions.includeUseCases = !!m.includeUseCases;
+      if (project.reportOptions.includeUseCases && Array.isArray(project.acceptedNotices)) {
+        project.acceptedNotices = project.acceptedNotices.filter((k: string) => k !== "usecases-excluded");
+      }
       if (m.sbom && typeof m.sbom === "object") project.sbom = m.sbom;
       await write(f.proj, "01-project-description/project.json", project);
       return panel.webview.postMessage({ cmd: "msg", text: "Project saved.", counts: await counts() });
+    }
+
+    if (m.cmd === "ackUseCaseNotice") {
+      const project = await rdRaw(f.proj, "01-project-description/project.json", {});
+      const notices = Array.isArray(project.acceptedNotices) ? project.acceptedNotices : [];
+      if (!notices.includes("usecases-excluded")) notices.push("usecases-excluded");
+      project.acceptedNotices = notices;
+      await write(f.proj, "01-project-description/project.json", project);
+      return sendInit();
     }
 
     if (m.cmd === "threats") {
@@ -348,6 +371,11 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
           proj.device = proj.device || {}; proj.device.name = d.project.name;
           proj.slTarget = d.project.sl; proj.scope = proj.scope || {};
           proj.scope.mode = d.project.mode; proj.scope.boundary = d.project.boundary;
+          proj.reportOptions = proj.reportOptions || {};
+          proj.reportOptions.includeUseCases = !!d.project.includeUseCases;
+          if (proj.reportOptions.includeUseCases && Array.isArray(proj.acceptedNotices)) {
+            proj.acceptedNotices = proj.acceptedNotices.filter((k: string) => k !== "usecases-excluded");
+          }
           if (d.project.sbom) proj.sbom = d.project.sbom;
           await write(f.proj, "01-project-description/project.json", proj);
         }
@@ -369,6 +397,7 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
       return;
     }
     if (m.cmd === "dfd") return void vscode.commands.executeCommand("vscode.openWith", vscode.Uri.joinPath(f.proj, "04-dfd/dfd.json"), "embedrisk.dfdNative");
+    if (m.cmd === "useCases") return void vscode.commands.executeCommand("embedrisk.useCases");
     if (m.cmd === "report") return void vscode.commands.executeCommand("embedrisk.report");
     if (m.cmd === "kb") return void vscode.commands.executeCommand("embedrisk.kbBrowse");
     if (m.cmd === "atree") return void vscode.commands.executeCommand("embedrisk.newAttackTree");
@@ -406,6 +435,18 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
             <select class="inp" id="p-mode"><option>blackbox</option><option>graybox</option><option>whitebox</option></select></div>
         </div>
         <div class="field"><label>Boundary</label><input class="inp" id="p-bnd"></div>
+        <div class="field" style="margin-top:8px">
+          <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="p-uc-inc"> Include use-case diagrams in report</label>
+        </div>
+        <div class="field" style="margin-top:6px"><button class="btn" data-cmd="useCases">Open use-case editor</button></div>
+        <div class="field" id="p-uc-note" style="display:none;border:1px solid var(--warn);border-radius:8px;padding:8px;background:var(--surface-2)">
+          <b style="color:var(--warn)">Notice:</b> Use-case diagrams exist but are excluded from the report.
+          <div style="margin-top:6px"><button class="btn sm" data-cmd="ackUseCaseNotice">Acknowledge intentional exclusion</button></div>
+        </div>
+        <div class="field" style="margin-top:8px">
+          <label>Use-case diagrams</label>
+          <ul id="p-uc-list" class="hint" style="margin:4px 0 0 18px"></ul>
+        </div>
         <details style="margin-top:8px"><summary class="hint" style="cursor:pointer;list-style:none;padding:3px 0">&#9654; Software Bill of Materials (SBOM)</summary>
           <div class="grid3" style="margin-top:6px">
             <div class="field"><label>SBOM source</label>
@@ -505,7 +546,7 @@ let changeTracker={currentVersion:null,entries:[]};
 let assumptions={attacker:[],device:[],system:[],environment:[],operational:[]};
 let system={components:[],interfaces:[],trustBoundaries:[],assets:[]};
 let requirements=[];
-let project={name:'',sl:'SL2',mode:'graybox',boundary:''};
+let project={name:'',sl:'SL2',mode:'graybox',boundary:'',includeUseCases:false,useCaseNames:[],useCaseNoticePending:false};
 let undoStack=[], redoStack=[], histKey='', histTime=0;
 let asmTab='attacker', sysTab='components';
 const $=function(s){return document.querySelector(s);};
@@ -574,9 +615,12 @@ function renderRail(){
 }
 function renderProject(p){
   p=p||{};
-  project={name:p.name||'',sl:p.sl||'SL2',mode:p.mode||'graybox',boundary:p.boundary||'',sbom:p.sbom||{}};
+  project={name:p.name||'',sl:p.sl||'SL2',mode:p.mode||'graybox',boundary:p.boundary||'',sbom:p.sbom||{},includeUseCases:!!p.includeUseCases,useCaseNames:p.useCaseNames||[],useCaseNoticePending:!!p.useCaseNoticePending};
   $('#devname').textContent=project.name?('· '+project.name):'';
   $('#p-name').value=project.name;$('#p-sl').value=project.sl;$('#p-mode').value=project.mode;$('#p-bnd').value=project.boundary;
+  var ucInc=$('#p-uc-inc'); if(ucInc) ucInc.checked=!!project.includeUseCases;
+  var ucList=$('#p-uc-list'); if(ucList) ucList.innerHTML=(project.useCaseNames||[]).length?(project.useCaseNames||[]).map(function(n){return '<li>'+esc(n)+'</li>';}).join(''):'<li>No use-case diagrams yet.</li>';
+  var ucNote=$('#p-uc-note'); if(ucNote) ucNote.style.display=project.useCaseNoticePending?'block':'none';
   var sbom=project.sbom||{},sbomMode=sbom.mode||'in-tool';
   var mSel=$('#p-sbom-mode');if(mSel)mSel.value=sbomMode;
   var fmtEl=$('#p-sbom-fmt');if(fmtEl)fmtEl.style.display=sbomMode==='in-tool'?'':'none';
@@ -992,6 +1036,7 @@ document.addEventListener('input',function(e){
   if(t.id==='p-sl'){project.sl=t.value;return;}
   if(t.id==='p-mode'){project.mode=t.value;return;}
   if(t.id==='p-bnd'){project.boundary=t.value;return;}
+  if(t.id==='p-uc-inc'){project.includeUseCases=!!t.checked;return;}
   if(t.dataset.i!==undefined&&t.dataset.k){var i=+t.dataset.i,k=t.dataset.k;
     if(k==='likelihood'||k==='impact'){threats[i][k]=Math.max(1,Math.min(5,+t.value||1));var el=document.getElementById('tp-'+i);if(el)el.innerHTML=riskCell(threats[i]);}
     else if(k==='status'){threats[i].status=t.value;var cell=t.closest('td');var bd=cell&&cell.querySelector('.badge');if(bd){bd.className='badge st-'+t.value;bd.textContent=statusLabel(t.value);}}

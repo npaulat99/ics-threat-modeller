@@ -6,141 +6,83 @@
 > into this file. Keep the shared-schema guardrails from `.github/copilot-instructions.md` and
 > `.ai/context.md`.
 
-# === Goal 3: Hide interfaces in the DFD view ===
+# === Goal 4: Use-case diagrams ===
 
-Goal: 3 — Let the user hide an interface from the DFD view (step 04), then restore it via `CTRL+Z`
-or from step 03. (Shared-schema + webapp UI feature.)
+Goal: 4 — Add a use-case diagram editor (reusing the existing draw.io engine) with misuse-case
+extensions, grouping boxes, a new persisted artifact, and report-inclusion control.
 
-## Feature summary
+## Decision to make first
 
-In step 04 (DFD) the user can select an interface and tick a checkbox "hide this interface", which
-removes it from the DFD presentation. Undo (`CTRL+Z`) restores it. Alternatively the user can go to
-step 03 (system assets), where — **only after** an interface has been hidden — an unhide checkbox
-becomes available to make it visible again. Hidden state must persist and be respected by undo/redo,
-validation, and report generation.
-
-## Read first
-
-- `webapp/client/src/types.ts` — the `Interface` type (interfaces live in the `system` artifact,
-	`03-system-assets/system.json`).
-- `webapp/server/src/artifacts.js` (`STEP_FILES`, defaults), `webapp/server/src/validate.js`,
-	`webapp/server/src/report.js` — the server consumers of the interface data.
-- `webapp/client/src/components/dfd/DfdView.tsx` and `DfdOverview.tsx` — DFD rendering.
-- `webapp/client/src/components/panels/SystemPanel.tsx` — step 03 UI.
-- `webapp/shared/dfdEngine.js` and any extension code that reads interfaces
-	(`vscode-extension/src/*.ts`, `media/dfd-model.js`) for the shared-schema impact.
-
-## Implementation parts
-
-### Part A — Persisted hidden flag
-
-- Add an optional `hidden?: boolean` (default falsy) to the interface model in `types.ts` and the
-	system artifact. Absence/`false` means visible — keep backward compatibility with existing files.
-
-### Part B — Hide control in step 04
-
-- In the DFD view, when an interface is selected, offer a "hide this interface" checkbox that sets
-	`hidden = true`. Hidden interfaces are omitted from the DFD presentation (but remain in the model).
-
-### Part C — Conditional unhide in step 03
-
-- In the step-03 system panel, show an unhide checkbox for an interface **only when** it is currently
-	hidden; unticking it clears `hidden`. Do not show the control for never-hidden interfaces.
-
-### Part D — Undo/redo, validation, report
-
-- Ensure the hide/unhide mutation flows through the existing undo/redo (`CTRL+Z`) history.
-- Update `validate.js` and `report.js` (and the extension/report copies if applicable) so hidden
-	interfaces are handled consistently (e.g. excluded from the DFD render but still counted where the
-	assessment requires them, per existing semantics). Confirm behaviour against example projects.
-
-## Acceptance criteria
-
-- Hiding an interface in step 04 removes it from the DFD presentation without corrupting the model.
-- `CTRL+Z` restores a hidden interface; step 03 also offers an unhide control, shown only once the
-	interface is hidden.
-- Hidden state persists to disk and is respected by validation and report generation.
-- Existing projects without the flag continue to load and render unchanged.
-
-## Required tests / validation
-
-- `npm --workspace client run typecheck` / `npm run build`; server-side check that
-	`validate`/`report` handle the flag; `node tools/test-models.js` if the DFD models are touched.
-- Manual: hide in 04 → gone from DFD; undo → back; hide again → unhide from 03 → back.
-
-## Risks / guardrails
-
-- This is a shared-schema change — update every consumer (client, server validate/report, extension,
-	report copies under `vscode-extension/runtime/tools/` and `tools/`).
-- Keep the flag optional and backward compatible; never drop a hidden interface from the persisted
-	model (hidden ≠ deleted).
-
-Goal: 2 — Show a start/skip tutorial when a user opens a new project, and guide them through a tiny
-example with a central animated walkthrough. (Webapp/React feature.)
+The draw.io engine currently lives in the **VS Code extension** (`vscode-extension/media/drawio/`,
+`vscode-extension/src/dfdEditor.ts`). Confirm the host for the use-case editor: implement it where
+draw.io already exists (the extension) unless the current-goal instructions say the webapp. Either
+way, the use-case **artifact** must be added to the shared step model so both consumers can read it
+and the report can include it. Read these before deciding:
+`vscode-extension/src/{extension,dfdEditor,wizard}.ts`, `vscode-extension/media/*.js`,
+`webapp/server/src/artifacts.js`, `webapp/client/src/types.ts`.
 
 ## Feature summary
 
-When a user opens a **new** project in the webapp, show a popup that explains this is a tutorial with
-`Start tutorial` and `Skip tutorial`. If started, present a central animated walkthrough that guides
-the user through a tiny example project, explaining every methodology step in the correct order
-(what / how / why). The animation window sits in the middle and shows a cursor-driven actor using
-EmbedRisk — **no visible keyboard**. Around the animation are short texts with the most important
-information in **bold**. Keep it visually clean and balanced (window/background/text proportions,
-focus on the animation, not too much text).
-
-## Read first
-
-- `webapp/client/src/App.tsx` — the `+ New project` flow (`promptNewProject` → `newProject(name)`).
-- `webapp/client/src/state/store.ts` — `newProject`/`createProject` and `init` (where to trigger the
-	popup and persist the "seen tutorial" choice, e.g. via `localStorage`).
-- `webapp/client/src/components/SettingsModal.tsx` and `index.css` / `tra-ui.css` for existing modal
-	and styling patterns to reuse.
+From step 01 a button opens a Use-Case editor. The user can model multiple use-case diagrams with the
+standard building blocks: **Actor** (stick figure with a name label beneath the feet), **Action**
+(oval with description text centered inside), and **Connection** lines (full or dashed; plain or
+arrow pointing either direction; with a parallel text label). Include misuse-case variants
+(blacked-out actor and blacked-out action). The user can add **grouping boxes** placed behind the
+other entities (full border, like the label technique but solid) to group and name areas, selecting
+which entities belong inside. An **Exit** button saves the use cases and returns to step 01, which
+then shows a list of all use-case diagram names. A setting controls whether use-case diagrams are
+included in the final report (**default: no**). If the user added (mis-)use cases but left the default
+`no`, show an acknowledgeable notice that they will be excluded (they can confirm it is intentional).
 
 ## Implementation parts
 
-### Part A — Dedicated tutorial folder
+### Part A — Use-case artifact + wiring
 
-- Create a dedicated tutorial folder (e.g. `webapp/tutorial/` or `webapp/client/src/tutorial/`) that
-	holds the tutorial's own example project data, its tutorial risk data, and any assets (SVG/CSS)
-	for the animation. Tutorial resources must NOT pollute `webapp/projects/` or regular project
-	content, and must not be picked up by `listProjects()`.
+- Add a new use-case artifact to the project step model (`artifacts.js` `STEP_FILES`/defaults,
+	`types.ts`), persisted as its own JSON, and wire it into persistence, validation, and report
+	generation. Preserve the existing step order and backward compatibility.
 
-### Part B — Tutorial popup on new-project open
+### Part B — Editor (reuse draw.io)
 
-- After a new project is created, show a modal with a short intro and two actions: `Start tutorial`
-	and `Skip tutorial`. Persist the choice (e.g. `localStorage` key) so it does not reappear every
-	time; only trigger on genuinely new projects, not on opening an existing one.
+- Build the editor on the existing draw.io engine with: named actors (label beneath the figure),
+	actions (label centered in the oval), connections (full/dashed, plain/arrow with direction,
+	parallel label), and grouping boxes rendered **behind** other entities with a solid border and a
+	name, where the user selects the contained entities.
 
-### Part C — Central animated walkthrough
+### Part C — Misuse-case variants
 
-- Build a centered overlay: a focused **animation window** in the middle showing a cursor/hand actor
-	performing EmbedRisk actions (no visible keyboard), surrounded by concise captions with key points
-	in **bold**. Provide next/back/close controls and a step indicator.
-- Sequence the walkthrough through the methodology steps in order (`01-project-description` …
-	`09-defects`), each with a one- or two-line what/how/why. Keep animations lightweight (CSS/SVG or
-	small JS), not a heavy dependency.
+- Support blacked-out actor and blacked-out action styling for misuse cases.
 
-### Part D — Visual polish
+### Part D — Step-01 entry + list + Exit
 
-- Balanced proportions and consistent theme (light/dark) with the rest of the app; readable, not
-	text-heavy; the animation is the focal point.
+- Add a button in step 01 to open the editor; support multiple diagrams; `Exit` saves and returns to
+	step 01, which lists all diagram names. Support reopen and safe delete.
+
+### Part E — Report inclusion setting + notice
+
+- Add a setting to include use-case diagrams in the report, defaulting to `off`.
+- When (mis-)use cases exist but inclusion is still `off`, show an acknowledgeable notice; record the
+	acknowledgement so it is not nagging.
 
 ## Acceptance criteria
 
-- Opening a new project shows the start/skip popup; the choice is remembered.
-- Starting the tutorial runs a centered animated walkthrough covering every step in order with short,
-	bold-highlighted captions and no visible keyboard.
-- Tutorial resources live in a dedicated folder and never appear as a real project.
-- The onboarding is visually clean, proportionate, and readable in both themes.
+- Multiple use-case diagrams can be created, saved, reopened, and deleted safely.
+- Actors, actions, connections (full/dashed, plain/arrow both directions, labeled), misuse variants,
+	and grouping boxes are all representable and persisted.
+- Step 01 shows the list of diagram names after Exit; the report includes or excludes use cases per
+	the setting, defaulting to `no`.
+- If use cases exist but remain excluded, the user sees and can acknowledge the notice.
 
 ## Required tests / validation
 
-- `npm --workspace client run typecheck` and `npm run build` succeed.
-- Manual: create a new project → popup appears → Start runs the walkthrough end-to-end; Skip dismisses
-	and is remembered; existing-project open does not show it.
+- `node tools/test-models.js` (extend for the use-case model if it follows the isomorphic
+	CommonJS-model pattern); the extension compile/build; report generation on an example with and
+	without inclusion.
 
 ## Risks / guardrails
 
-- Do not let tutorial data leak into `webapp/projects/` or `listProjects()`.
-- Keep animation dependencies minimal; prefer CSS/SVG over a large animation library.
-- Respect the "no visible keyboard" and "focus on the animation, minimal text" constraints.
+- New persisted artifact + step-model change ripples to both consumers and both report copies
+	(`tools/` and `vscode-extension/runtime/tools/`). Update all of them.
+- Keep `vscode-extension/media/*.js` models CommonJS (loadable in the webview and via `require()` in
+	`tools/test-models.js`).
+- Default report inclusion is `no`; do not silently include use cases.
