@@ -92,6 +92,12 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
         }
     }
 
+    for (const i of interfaces) {
+        if (typeof i.hidden !== 'undefined' && typeof i.hidden !== 'boolean') {
+            add('warning', `Interface '${i.id || i.name || 'unknown'}': hidden must be a boolean when set.`);
+        }
+    }
+
     const reqCms = new Set(reqList.flatMap((r) => arr(r.satisfiedByCM)));
     for (const c of cmList) {
         if (!c.id) add('error', 'A countermeasure is missing its ID.');

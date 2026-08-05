@@ -36,7 +36,7 @@ function NodeInspector() {
     const dfd = data.dfd;
     const currentParent = dfdPath.length ? dfdPath[dfdPath.length - 1] : null;
     const siblings = dfd.nodes.filter((n) => (n.parent ?? null) === currentParent && n.id !== node.id && n.type !== 'trust-boundary');
-    const connIfaces = data.system.interfaces || [];
+    const connIfaces = (data.system.interfaces || []).filter((itf) => !itf.hidden);
     const nodeLabel = (id: string) => dfd.nodes.find((n) => n.id === id)?.label || connIfaces.find((i) => i.id === id)?.name || id;
     const updNode = (patch: any) => save('dfd', { ...dfd, nodes: dfd.nodes.map((n) => (n.id === node.id ? { ...n, ...patch } : n)) });
     const setFlows = (flows: any[]) => save('dfd', { ...dfd, flows });
@@ -353,6 +353,15 @@ function InterfaceInspector() {
             <div className="field">
                 <label>Category</label>
                 <input className="inp" value={itf.category || ''} onChange={(e) => upd({ category: e.target.value })} placeholder="e.g. network, debug, physical" />
+            </div>
+            <div className="field">
+                <label>Visibility in DFD view</label>
+                <label className="check">
+                    <input type="checkbox" checked={!!itf.hidden} onChange={(e) => upd({ hidden: e.target.checked })} /> hide this interface
+                </label>
+                <p className="hint" style={{ marginTop: 8 }}>
+                    Hidden interfaces are not shown in step 04, but remain in data and can be unhidden in step 03.
+                </p>
             </div>
             <div className="field">
                 <label>Rotation (current layer)</label>

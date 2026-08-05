@@ -58,7 +58,7 @@ function layerSvg(dfd, parentId, system = {}) {
         }
         return null;
     };
-    const ifaces = system.interfaces || [];
+    const ifaces = (system.interfaces || []).filter((itf) => !itf.hidden);
     const CHIP_W = 150;
     const CHIP_H = 34;
     const GAP = 20;

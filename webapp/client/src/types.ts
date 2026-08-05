@@ -140,6 +140,7 @@ export interface Interface {
     exposure: 'physical' | 'local' | 'adjacent' | 'remote';
     tag?: string; // short chip tag shown in the DFD (e.g. BLE, HMI, JTAG)
     protocol?: string;
+    hidden?: boolean; // optional DFD presentation flag (true = hidden from step-04 rendering)
 }
 export interface TrustBoundary {
     id: string;

@@ -6,7 +6,74 @@
 > into this file. Keep the shared-schema guardrails from `.github/copilot-instructions.md` and
 > `.ai/context.md`.
 
-# === Goal 2: New-project tutorial onboarding ===
+# === Goal 3: Hide interfaces in the DFD view ===
+
+Goal: 3 — Let the user hide an interface from the DFD view (step 04), then restore it via `CTRL+Z`
+or from step 03. (Shared-schema + webapp UI feature.)
+
+## Feature summary
+
+In step 04 (DFD) the user can select an interface and tick a checkbox "hide this interface", which
+removes it from the DFD presentation. Undo (`CTRL+Z`) restores it. Alternatively the user can go to
+step 03 (system assets), where — **only after** an interface has been hidden — an unhide checkbox
+becomes available to make it visible again. Hidden state must persist and be respected by undo/redo,
+validation, and report generation.
+
+## Read first
+
+- `webapp/client/src/types.ts` — the `Interface` type (interfaces live in the `system` artifact,
+	`03-system-assets/system.json`).
+- `webapp/server/src/artifacts.js` (`STEP_FILES`, defaults), `webapp/server/src/validate.js`,
+	`webapp/server/src/report.js` — the server consumers of the interface data.
+- `webapp/client/src/components/dfd/DfdView.tsx` and `DfdOverview.tsx` — DFD rendering.
+- `webapp/client/src/components/panels/SystemPanel.tsx` — step 03 UI.
+- `webapp/shared/dfdEngine.js` and any extension code that reads interfaces
+	(`vscode-extension/src/*.ts`, `media/dfd-model.js`) for the shared-schema impact.
+
+## Implementation parts
+
+### Part A — Persisted hidden flag
+
+- Add an optional `hidden?: boolean` (default falsy) to the interface model in `types.ts` and the
+	system artifact. Absence/`false` means visible — keep backward compatibility with existing files.
+
+### Part B — Hide control in step 04
+
+- In the DFD view, when an interface is selected, offer a "hide this interface" checkbox that sets
+	`hidden = true`. Hidden interfaces are omitted from the DFD presentation (but remain in the model).
+
+### Part C — Conditional unhide in step 03
+
+- In the step-03 system panel, show an unhide checkbox for an interface **only when** it is currently
+	hidden; unticking it clears `hidden`. Do not show the control for never-hidden interfaces.
+
+### Part D — Undo/redo, validation, report
+
+- Ensure the hide/unhide mutation flows through the existing undo/redo (`CTRL+Z`) history.
+- Update `validate.js` and `report.js` (and the extension/report copies if applicable) so hidden
+	interfaces are handled consistently (e.g. excluded from the DFD render but still counted where the
+	assessment requires them, per existing semantics). Confirm behaviour against example projects.
+
+## Acceptance criteria
+
+- Hiding an interface in step 04 removes it from the DFD presentation without corrupting the model.
+- `CTRL+Z` restores a hidden interface; step 03 also offers an unhide control, shown only once the
+	interface is hidden.
+- Hidden state persists to disk and is respected by validation and report generation.
+- Existing projects without the flag continue to load and render unchanged.
+
+## Required tests / validation
+
+- `npm --workspace client run typecheck` / `npm run build`; server-side check that
+	`validate`/`report` handle the flag; `node tools/test-models.js` if the DFD models are touched.
+- Manual: hide in 04 → gone from DFD; undo → back; hide again → unhide from 03 → back.
+
+## Risks / guardrails
+
+- This is a shared-schema change — update every consumer (client, server validate/report, extension,
+	report copies under `vscode-extension/runtime/tools/` and `tools/`).
+- Keep the flag optional and backward compatible; never drop a hidden interface from the persisted
+	model (hidden ≠ deleted).
 
 Goal: 2 — Show a start/skip tutorial when a user opens a new project, and guide them through a tiny
 example with a central animated walkthrough. (Webapp/React feature.)

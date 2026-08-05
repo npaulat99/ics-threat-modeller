@@ -216,3 +216,56 @@
 	- `cd webapp && npm run build` passed.
 	- Manual runtime path (to be exercised in browser): create new project → popup appears; Start opens
 		walkthrough; Skip closes and is remembered; existing-project open does not trigger popup.
+
+## Execution pass - Goal 3 (hide interfaces in DFD view)
+
+- Added shared-schema support in [webapp/client/src/types.ts](webapp/client/src/types.ts):
+	- `Interface.hidden?: boolean` is now optional and backward compatible (missing/false = visible).
+- Implemented step-04 hide behavior in [webapp/client/src/components/Inspector.tsx](webapp/client/src/components/Inspector.tsx):
+	- The selected interface inspector now provides a checkbox `hide this interface`.
+	- Ticking it sets `hidden: true` on the interface inside the system artifact (no deletion).
+	- Node connection target options now exclude hidden interfaces in DFD editing UI.
+- Updated DFD rendering to respect hidden interfaces:
+	- [webapp/client/src/components/dfd/DfdView.tsx](webapp/client/src/components/dfd/DfdView.tsx) now filters hidden interfaces out of layer visibility and interface-derived selection behavior.
+	- [webapp/client/src/components/dfd/DfdOverview.tsx](webapp/client/src/components/dfd/DfdOverview.tsx) now omits hidden interfaces from overview badges.
+- Implemented step-03 conditional unhide behavior in [webapp/client/src/components/panels/SystemPanel.tsx](webapp/client/src/components/panels/SystemPanel.tsx):
+	- A visibility checkbox is shown only when an interface is already hidden.
+	- Unticking clears `hidden` and makes the interface visible in step 04 again.
+- Updated server consumers for compatibility:
+	- [webapp/server/src/report.js](webapp/server/src/report.js) excludes hidden interfaces from the DFD SVG render.
+	- [webapp/server/src/validate.js](webapp/server/src/validate.js) accepts the optional flag and warns only if `hidden` exists with a non-boolean value.
+	- Existing assessment semantics remain intact: hidden interfaces are not deleted and continue to participate in reference integrity/coverage checks.
+- Validation run:
+	- `cd webapp && npm --workspace client run typecheck` passed.
+	- `cd webapp && npm run build` passed.
+	- `cd webapp && npm test` passed.
+	- Server-side smoke: generated a report from a temporary copied project with an interface set to `hidden: true`; report generation completed successfully.
+
+## Verify pass - Goal 3 (verification role)
+
+PASS:
+- `cd webapp && npm test` succeeded (`embedrisk launcher tests passed`).
+- `cd webapp && npm --workspace client run typecheck` succeeded.
+- `cd webapp && npm run build` succeeded (Vite production build completed).
+- `cd vscode-extension && npm run compile` succeeded (`tsc --noEmit` + esbuild bundle).
+
+FAIL:
+- `cd /home/noah/EmbedRisk && node tools/test-models.js`
+	- Exact error: `AssertionError [ERR_ASSERTION]: FAIL: root siblings exclude trust boundary`
+	- Likely cause: existing native DFD model test expectation no longer matches current model behavior; this is in `tools/test-models.js` / `vscode-extension/media/dfd-model.js` and is not directly touched by Goal 3 files.
+- `cd webapp && npm run lint`
+	- Exact error: `npm error Missing script: "lint"`
+	- Likely cause: lint script is not configured in `webapp/package.json`.
+- `cd webapp && npm run format:check`
+	- Exact error: `npm error Missing script: "format:check"`
+	- Likely cause: formatting-check script is not configured in `webapp/package.json`.
+- `cd vscode-extension && npm run lint`
+	- Exact error: `npm error Missing script: "lint"`
+	- Likely cause: lint script is not configured in `vscode-extension/package.json`.
+- `cd vscode-extension && npm run format:check`
+	- Exact error: `npm error Missing script: "format:check"`
+	- Likely cause: formatting-check script is not configured in `vscode-extension/package.json`.
+
+Notes:
+- No dedicated integration-test script is defined in the package scripts; coverage comes from the available regression/model/build/type checks above.
+- Manual acceptance flow for Goal 3 (hide in step 04, undo, unhide from step 03) was not executed in this terminal-only verify pass.

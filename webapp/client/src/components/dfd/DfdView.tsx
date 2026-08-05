@@ -203,13 +203,14 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
     const compName = (ref?: string) => (ref ? compById.get(ref)?.name || '' : '');
     const visibleIfaceIds = useMemo(() => {
         const ids = new Set<string>();
+        const interfaces = (data.system.interfaces || []).filter((itf) => !itf.hidden);
         if (currentParent == null) {
-            for (const itf of data.system.interfaces || []) ids.add(itf.id);
+            for (const itf of interfaces) ids.add(itf.id);
             return ids;
         }
         for (const f of dfd.flows) {
-            if (f.from === currentParent && (data.system.interfaces || []).some((itf) => itf.id === f.to)) ids.add(f.to);
-            if (f.to === currentParent && (data.system.interfaces || []).some((itf) => itf.id === f.from)) ids.add(f.from);
+            if (f.from === currentParent && interfaces.some((itf) => itf.id === f.to)) ids.add(f.to);
+            if (f.to === currentParent && interfaces.some((itf) => itf.id === f.from)) ids.add(f.from);
         }
         return ids;
     }, [currentParent, dfd.flows, data.system.interfaces]);
@@ -813,6 +814,7 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
 
     const selectedIfaceIds = new Set(
         (data.system.interfaces || [])
+            .filter((itf) => !itf.hidden)
             .filter((itf) => selectedNodeId && !selectedNodeId.startsWith('iface:') && targetForComponent(itf.component) === selectedNodeId)
             .map((itf) => itf.id),
     );

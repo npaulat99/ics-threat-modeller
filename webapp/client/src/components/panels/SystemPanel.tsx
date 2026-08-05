@@ -220,6 +220,16 @@ export default function SystemPanel() {
                                         <Field label="Protocol">
                                             <input value={c.protocol || ''} onChange={(e) => upd({ protocol: e.target.value })} />
                                         </Field>
+                                        {c.hidden && (
+                                            <Field label="DFD visibility" hint="This control only appears after the interface has been hidden in step 04.">
+                                                <label className="check">
+                                                    <input type="checkbox" checked={!!c.hidden} onChange={(e) => upd({ hidden: e.target.checked })} /> hide this interface
+                                                </label>
+                                                <p className="hint" style={{ marginTop: 8 }}>
+                                                    Untick to unhide this interface in the DFD view.
+                                                </p>
+                                            </Field>
+                                        )}
                                     </div>
                                 </div>
                             );
