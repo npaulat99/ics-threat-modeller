@@ -12,7 +12,7 @@ const CATS: { key: 'device' | 'system' | 'environment' | 'operational'; label: s
 
 const ASSUMPTION_PREFIX: Record<typeof CATS[number]['key'], string> = {
     device: 'AD-',
-    system: 'AS-',
+    system: 'SYSA-',
     environment: 'AE-',
     operational: 'AO-',
 };

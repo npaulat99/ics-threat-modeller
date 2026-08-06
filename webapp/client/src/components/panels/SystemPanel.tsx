@@ -71,7 +71,7 @@ export default function SystemPanel() {
         setEditingId(id);
     };
     const addAsset = () => {
-        const id = uid('AS-', (sys.assets || []).map((c) => c.id));
+        const id = uid('AST-', (sys.assets || []).map((c) => c.id));
         set({
             assets: [
                 ...(sys.assets || []),
