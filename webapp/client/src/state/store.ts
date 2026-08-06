@@ -299,7 +299,7 @@ const saveTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 // rapid edits to the same step within a short window coalesce into one undo step so typing or
 // dragging does not produce dozens of tiny steps. undo()/redo() restore a snapshot and push the
 // changed artifacts to the backend.
-const STEP_KEYS: StepKey[] = ['project', 'assumptions', 'system', 'dfd', 'threats', 'requirements', 'countermeasures', 'attackTrees', 'defects'];
+const STEP_KEYS: StepKey[] = ['project', 'assumptions', 'system', 'dfd', 'useCases', 'threats', 'requirements', 'countermeasures', 'attackTrees', 'defects'];
 let undoStack: ProjectData[] = [];
 let redoStack: ProjectData[] = [];
 let histStep = '';
@@ -349,7 +349,7 @@ function ensureDeviceHousing(system: any, dfd: any) {
 }
 
 function restoreSnapshot(target: ProjectData, current: ProjectData) {
-    useStore.setState({ data: target, selectedNodeId: null, selectedEdgeId: null });
+    useStore.setState({ data: target, selectedNodeId: null, selectedEdgeId: null, ucSelection: null });
     const id = useStore.getState().activeId;
     if (!id) return;
     useStore.setState({ saveState: 'saving' });
@@ -383,6 +383,8 @@ interface Store {
     dfdPath: string[];
     selectedNodeId: string | null;
     selectedEdgeId: string | null;
+    ucDiagramId: string | null;
+    ucSelection: { type: 'entity' | 'connection' | 'group'; id: string } | null;
     strideBoundaryId: string | null;
     settingsOpen: boolean;
     focus: { view: string; id: string } | null;
@@ -405,6 +407,8 @@ interface Store {
     setDfdPath(path: string[]): void;
     selectNode(id: string | null): void;
     selectEdge(id: string | null): void;
+    setUcDiagram(id: string | null): void;
+    selectUcItem(sel: { type: 'entity' | 'connection' | 'group'; id: string } | null): void;
     openStrideBoundary(id: string | null): void;
     openSettings(v: boolean): void;
     drillInto(id: string): void;
@@ -431,6 +435,8 @@ export const useStore = create<Store>((set, get) => ({
     dfdPath: [],
     selectedNodeId: null,
     selectedEdgeId: null,
+    ucDiagramId: null,
+    ucSelection: null,
     strideBoundaryId: null,
     settingsOpen: false,
     focus: null,
@@ -479,7 +485,7 @@ export const useStore = create<Store>((set, get) => ({
 
     async selectProject(id) {
         const data = await getJSON<ProjectData>(`/api/projects/${id}`);
-        set({ activeId: id, data, dfdPath: [], selectedNodeId: null, selectedEdgeId: null });
+        set({ activeId: id, data, dfdPath: [], selectedNodeId: null, selectedEdgeId: null, ucDiagramId: null, ucSelection: null });
         clearHistory();
         subscribe(id);
     },
@@ -544,6 +550,12 @@ export const useStore = create<Store>((set, get) => ({
     },
     selectEdge(id) {
         set({ selectedEdgeId: id, selectedNodeId: null });
+    },
+    setUcDiagram(id) {
+        set({ ucDiagramId: id, ucSelection: null });
+    },
+    selectUcItem(sel) {
+        set({ ucSelection: sel });
     },
     openStrideBoundary(id) {
         set({ strideBoundaryId: id });

@@ -4,7 +4,7 @@ import { validate, openIssues } from '../lib/validate';
 import { riskOf, descendantComponentIds } from '../lib/risk';
 import RiskMatrix from './RiskMatrix';
 import { RiskPill, Chips, IdInput } from './common';
-import type { DfdNodeType } from '../types';
+import type { DfdNodeType, UseCaseArrow, UseCaseEntityKind } from '../types';
 
 const HANDLE_OPTS = ['t', 'r', 'b', 'l', 'tl', 'tr', 'br', 'bl'];
 
@@ -387,11 +387,158 @@ function InterfaceInspector() {
     );
 }
 
+const UC_ENTITY_KINDS: UseCaseEntityKind[] = ['actor', 'misuse-actor', 'action', 'misuse-action'];
+const UC_ENTITY_LABEL: Record<UseCaseEntityKind, string> = { actor: 'Actor', 'misuse-actor': 'Misuse actor', action: 'Action', 'misuse-action': 'Misuse action' };
+const UC_ARROW_OPTS: { value: UseCaseArrow; label: string }[] = [
+    { value: 'none', label: 'No arrow' },
+    { value: 'forward', label: '→ forward' },
+    { value: 'backward', label: '← backward' },
+    { value: 'both', label: '↔ both' },
+];
+
+/** The use-case diagram currently shown in the main panel (falls back to the first diagram). */
+function useActiveUcDiagram() {
+    const data = useStore((s) => s.data)!;
+    const ucDiagramId = useStore((s) => s.ucDiagramId);
+    const diagrams = data.useCases?.diagrams || [];
+    const diagram = diagrams.find((d) => d.id === ucDiagramId) || diagrams[0] || null;
+    const save = useStore((s) => s.save);
+    const setDiagram = (patch: any) => {
+        if (!diagram) return;
+        save('useCases', { diagrams: diagrams.map((d) => (d.id === diagram.id ? { ...d, ...patch } : d)) });
+    };
+    return { diagram, diagrams, setDiagram };
+}
+
+function UcEntityInspector() {
+    const ucSelection = useStore((s) => s.ucSelection);
+    const selectUcItem = useStore((s) => s.selectUcItem);
+    const { diagram, setDiagram } = useActiveUcDiagram();
+    const entity = diagram?.entities.find((e) => e.id === ucSelection?.id);
+    if (!diagram || !entity) return null;
+
+    const upd = (patch: any) => setDiagram({ entities: diagram.entities.map((e) => (e.id === entity.id ? { ...e, ...patch } : e)) });
+    const del = () => {
+        setDiagram({
+            entities: diagram.entities.filter((e) => e.id !== entity.id),
+            connections: diagram.connections.filter((c) => c.from !== entity.id && c.to !== entity.id),
+            groups: diagram.groups.map((g) => ({ ...g, members: (g.members || []).filter((m) => m !== entity.id) })),
+        });
+        selectUcItem(null);
+    };
+
+    return (
+        <div className="block">
+            <h2>Selected entity</h2>
+            <div className="field">
+                <label>Kind</label>
+                <select className="inp" value={entity.kind} onChange={(e) => upd({ kind: e.target.value as UseCaseEntityKind })}>
+                    {UC_ENTITY_KINDS.map((k) => (
+                        <option key={k} value={k}>
+                            {UC_ENTITY_LABEL[k]}
+                        </option>
+                    ))}
+                </select>
+            </div>
+            <div className="field">
+                <label>Name</label>
+                <input className="inp" value={entity.name} onChange={(e) => upd({ name: e.target.value })} />
+            </div>
+            <button className="btn sm danger" onClick={del}>
+                Delete entity
+            </button>
+        </div>
+    );
+}
+
+function UcConnectionInspector() {
+    const ucSelection = useStore((s) => s.ucSelection);
+    const selectUcItem = useStore((s) => s.selectUcItem);
+    const { diagram, setDiagram } = useActiveUcDiagram();
+    const conn = diagram?.connections.find((c) => c.id === ucSelection?.id);
+    if (!diagram || !conn) return null;
+    const entityLabel = (id: string) => diagram.entities.find((e) => e.id === id)?.name || id;
+
+    const upd = (patch: any) => setDiagram({ connections: diagram.connections.map((c) => (c.id === conn.id ? { ...c, ...patch } : c)) });
+    const del = () => {
+        setDiagram({ connections: diagram.connections.filter((c) => c.id !== conn.id) });
+        selectUcItem(null);
+    };
+
+    return (
+        <div className="block">
+            <h2>Selected connection</h2>
+            <p className="hint">
+                {entityLabel(conn.from)} → {entityLabel(conn.to)}
+            </p>
+            <div className="field">
+                <label>Arrow</label>
+                <select className="inp" value={conn.arrow || 'none'} onChange={(e) => upd({ arrow: e.target.value as UseCaseArrow })}>
+                    {UC_ARROW_OPTS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                            {o.label}
+                        </option>
+                    ))}
+                </select>
+            </div>
+            <div className="field">
+                <label className="check">
+                    <input type="checkbox" checked={!!conn.dashed} onChange={(e) => upd({ dashed: e.target.checked })} /> Dashed line
+                </label>
+            </div>
+            <div className="field">
+                <label>Label</label>
+                <input className="inp" value={conn.label || ''} onChange={(e) => upd({ label: e.target.value })} placeholder="e.g. includes, extends" />
+            </div>
+            <button className="btn sm danger" onClick={del}>
+                Delete connection
+            </button>
+        </div>
+    );
+}
+
+function UcGroupInspector() {
+    const ucSelection = useStore((s) => s.ucSelection);
+    const selectUcItem = useStore((s) => s.selectUcItem);
+    const { diagram, setDiagram } = useActiveUcDiagram();
+    const group = diagram?.groups.find((g) => g.id === ucSelection?.id);
+    if (!diagram || !group) return null;
+
+    const upd = (patch: any) => setDiagram({ groups: diagram.groups.map((g) => (g.id === group.id ? { ...g, ...patch } : g)) });
+    const del = () => {
+        setDiagram({ groups: diagram.groups.filter((g) => g.id !== group.id) });
+        selectUcItem(null);
+    };
+
+    return (
+        <div className="block">
+            <h2>Selected grouping box</h2>
+            <div className="field">
+                <label>Name</label>
+                <input className="inp" value={group.name} onChange={(e) => upd({ name: e.target.value })} />
+            </div>
+            <div className="field">
+                <label>Members</label>
+                <Chips
+                    options={diagram.entities.map((e) => ({ value: e.id, label: e.name || e.id }))}
+                    value={group.members || []}
+                    onChange={(v) => upd({ members: v })}
+                    empty="No entities on this diagram yet."
+                />
+            </div>
+            <button className="btn sm danger" onClick={del}>
+                Delete grouping box
+            </button>
+        </div>
+    );
+}
+
 export default function Inspector() {
     const data = useStore((s) => s.data);
     const view = useStore((s) => s.activeView);
     const selectedNodeId = useStore((s) => s.selectedNodeId);
     const selectedEdgeId = useStore((s) => s.selectedEdgeId);
+    const ucSelection = useStore((s) => s.ucSelection);
     if (!data) return <aside className="inspector" />;
     const issues = openIssues(validate(data), data.project?.acceptedNotices);
     const isIface = !!selectedNodeId?.startsWith('iface:');
@@ -403,6 +550,10 @@ export default function Inspector() {
             {view === 'dfd' && selectedEdgeId && <EdgeInspector />}
             {view === 'dfd' && !selectedEdgeId && isIface && <InterfaceInspector />}
             {view === 'dfd' && !selectedEdgeId && selectedNodeId && !isIface && <NodeInspector />}
+            {view === 'useCases' && ucSelection?.type === 'entity' && <UcEntityInspector />}
+            {view === 'useCases' && ucSelection?.type === 'connection' && <UcConnectionInspector />}
+            {view === 'useCases' && ucSelection?.type === 'group' && <UcGroupInspector />}
+
 
             <div className="block">
                 <h2>{matrixRef ? 'Risk on this component' : 'Residual risk matrix'}</h2>

@@ -115,6 +115,10 @@ export interface UseCaseGroup {
     id: string;
     name: string;
     members: string[];
+    x?: number;
+    y?: number;
+    w?: number;
+    h?: number;
 }
 
 export interface UseCaseDiagram {

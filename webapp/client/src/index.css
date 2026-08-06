@@ -1627,19 +1627,16 @@ a.linkbtn {
 }
 
 /* ---- Use-case diagram canvas (step 04b) ---------------------------------- */
-.uc-toolbar {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-bottom: 10px;
-}
-
 .uc-canvas {
     overflow: auto;
-    max-height: 62vh;
+    max-height: 68vh;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
+}
+
+.uc-canvas.connmode .uc-entity {
+    cursor: crosshair;
 }
 
 .uc-entity {
@@ -1690,6 +1687,21 @@ a.linkbtn {
     fill: none;
 }
 
+.uc-conn-hit {
+    stroke: transparent;
+    stroke-width: 14px;
+    cursor: pointer;
+}
+
+.uc-conn-group.sel .uc-conn {
+    stroke: var(--accent);
+    stroke-width: 2.4;
+}
+
+.uc-arrow-head {
+    fill: context-stroke;
+}
+
 .uc-conn-label {
     font-size: 10.5px;
     fill: var(--text-dim);
@@ -1698,16 +1710,34 @@ a.linkbtn {
     stroke-width: 4;
 }
 
+.uc-group {
+    cursor: pointer;
+}
+
+.uc-group.empty .uc-group-rect {
+    stroke-dasharray: 8 5;
+}
+
 .uc-group-rect {
     fill: color-mix(in srgb, var(--accent) 5%, transparent);
     stroke: var(--border-strong);
     stroke-width: 1.4;
 }
 
+.uc-group.sel .uc-group-rect {
+    stroke: var(--accent);
+    stroke-width: 2.4;
+}
+
 .uc-group-label {
     font-size: 10.5px;
     font-weight: 600;
     fill: var(--text-dim);
+}
+
+.uc-group-empty {
+    font-size: 11px;
+    fill: var(--text-faint);
 }
 
 .adt-arrow {
