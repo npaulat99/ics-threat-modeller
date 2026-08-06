@@ -62,6 +62,38 @@ The server binds to `0.0.0.0`, so it is reachable from outside the VM (e.g. the 
 it prints a `network: http://<ip>:4317` URL on startup. Override the interface/port with the
 `HOST` and `PORT` environment variables.
 
+### Open a project from the shell
+
+The webapp now ships a small CLI launcher named `embedrisk`.
+
+- `embedrisk <folder>` opens the webapp against an existing TRA project folder or a projects root.
+- `npm exec -- embedrisk <folder>` runs the same launcher from the local checkout without a global
+  install.
+- `npm install -g <path-to-webapp>` exposes the same `embedrisk` command anywhere on your machine.
+- `npm run open -- <folder>` is a convenience alias inside the webapp package; it calls the same
+  launcher.
+
+If you already have a project folder on disk, the launcher can be started from **any shell location**
+as long as the command is installed or you invoke it through `npm exec`. That is the main change
+from the initial "clone the repo and run `npm start` inside `webapp/`" flow: `npm start` is still
+the direct server start for the repo checkout, while `embedrisk` is the user-facing command for
+opening an existing project root from the console.
+
+Recommended patterns:
+
+```bash
+# From the cloned repository (no global install needed)
+cd tra-webapp
+npm exec -- embedrisk ../some-existing-projects-root
+
+# From anywhere after a global install
+embedrisk /path/to/projects
+```
+
+`embedrisk` is the console entry point. When it receives a single project folder, it opens the
+project directly; when it receives a projects-container folder, it opens that container as-is.
+The shell command is the same one the VS Code command uses internally.
+
 ### Development (hot reload)
 
 ```bash
@@ -74,6 +106,26 @@ npm run dev            # Vite dev server on :5173 (proxies API + WS to the backe
 TRA_PROJECTS_DIR=/path/to/projects npm start
 # e.g. reuse the extension's projects:  TRA_PROJECTS_DIR=../tra/projects npm start
 ```
+
+### Webapp scripts reference
+
+These are the npm scripts available in `webapp/`:
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Starts the client and server together for hot reload. |
+| `npm run dev:server` | Starts the Express/WebSocket backend only. |
+| `npm run dev:client` | Starts the Vite client only. |
+| `npm run build` | Builds the production client bundle into `client/dist`. |
+| `npm run open -- <folder>` | Starts the `embedrisk` CLI launcher against `<folder>`. |
+| `npm start` | Starts the low-level server entry point (`server/src/index.js`). |
+| `npm run serve` | Builds the client, then runs `npm start`. |
+| `npm test` | Runs the launcher regression tests. |
+| `npm run lint` | Runs the package validation checks used by the repo workflow. |
+| `npm run format:check` | Runs the package build check used by the repo workflow. |
+
+Only `embedrisk`/`npm exec -- embedrisk` are meant to be the console-facing way to open an existing
+project from anywhere. `npm start` remains the direct repo/server start path.
 
 ## DFD navigation
 
