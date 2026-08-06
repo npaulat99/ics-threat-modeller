@@ -2123,9 +2123,9 @@ a.linkbtn {
 }
 
 .tutorial-shell {
-    max-width: 1180px;
-    width: 96vw;
-    max-height: 94vh;
+    max-width: 1440px;
+    width: 92vw;
+    max-height: 92vh;
     padding: 14px 16px 12px;
     display: flex;
     flex-direction: column;
@@ -2167,7 +2167,7 @@ a.linkbtn {
 
 .tutorial-layout {
     display: grid;
-    grid-template-columns: minmax(0, 2.5fr) minmax(280px, 1fr);
+    grid-template-columns: minmax(0, 2.9fr) minmax(300px, 1fr);
     gap: 14px;
     align-items: stretch;
     min-height: 0;
@@ -2317,7 +2317,7 @@ a.linkbtn {
 .tw-stage {
     position: relative;
     height: 100%;
-    min-height: 340px;
+    min-height: 560px;
     border: 1px solid var(--border);
     border-radius: 12px;
     overflow: hidden;
@@ -2406,7 +2406,8 @@ a.linkbtn {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    overflow: hidden;
+    overflow-y: auto;
+    min-height: 0;
 }
 
 .tw-navhead {
@@ -2692,7 +2693,7 @@ a.linkbtn {
 /* dfd */
 .tw-dfd {
     position: relative;
-    height: 250px;
+    height: 340px;
     border: 1px solid var(--border);
     border-radius: 10px;
     background:
@@ -2701,34 +2702,33 @@ a.linkbtn {
     overflow: hidden;
 }
 
-.tw-zone {
+.tw-tb-line {
     position: absolute;
+    left: 68%;
+    top: 10px;
+    bottom: 10px;
+    width: 0;
+    border-left: 2px dashed var(--border-strong);
+    transform: translateX(-50%);
+    transition: opacity 400ms ease;
+    z-index: 3;
+}
+
+.tw-tb-label {
+    position: absolute;
+    left: 68%;
     top: 8px;
-    bottom: 8px;
-    width: 30%;
-    border: 1px dashed color-mix(in srgb, var(--accent) 40%, var(--border));
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--accent) 5%, transparent);
-}
-
-.tw-zone.left {
-    left: 4%;
-}
-
-.tw-zone.right {
-    right: 4%;
-    border-color: color-mix(in srgb, #c0392b 45%, var(--border));
-    background: color-mix(in srgb, #c0392b 6%, transparent);
-}
-
-.tw-zone span {
-    position: absolute;
-    top: 4px;
-    left: 8px;
-    font-size: 9.5px;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
     text-transform: uppercase;
-    letter-spacing: 0.4px;
     color: var(--text-faint);
+    background: var(--surface-2);
+    padding: 1px 6px;
+    border-radius: 5px;
+    transition: opacity 400ms ease;
+    z-index: 4;
 }
 
 .tw-dfdnode {
@@ -2742,11 +2742,14 @@ a.linkbtn {
     line-height: 1.25;
     text-align: center;
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
-    z-index: 2;
+    z-index: 5;
+}
+
+.tw-dfdnode.op {
+    border-radius: 999px;
 }
 
 .tw-dfdnode.dev {
-    border-color: var(--accent);
     font-weight: 700;
 }
 
@@ -2755,19 +2758,18 @@ a.linkbtn {
     inset: 0;
     width: 100%;
     height: 100%;
-    z-index: 1;
+    z-index: 2;
 }
 
 .tw-wire {
-    stroke: var(--accent);
-    stroke-width: 0.6;
+    stroke: var(--text-faint);
+    stroke-width: 0.7;
     fill: none;
     transition: opacity 400ms ease;
     stroke-dasharray: 0;
 }
 
 .tw-wire.cross {
-    stroke: #c0392b;
     stroke-dasharray: 2 1.4;
 }
 
@@ -2779,14 +2781,18 @@ a.linkbtn {
     opacity: 1;
 }
 
-.tw-boundary {
+.tw-flowlabel {
     position: absolute;
-    left: 30%;
-    top: 60%;
+    transform: translate(-50%, -50%);
     font-size: 9px;
-    color: #c0392b;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 6px;
+    white-space: nowrap;
     transition: opacity 400ms ease;
-    z-index: 3;
+    z-index: 6;
 }
 
 /* risk badges */
@@ -2905,6 +2911,35 @@ a.linkbtn {
     border-radius: 999px;
     padding: 2px 9px;
     white-space: nowrap;
+}
+
+.tw-rationale.pm {
+    color: var(--accent-2);
+    background: color-mix(in srgb, var(--accent-2) 14%, transparent);
+}
+
+.tw-rationale.cm {
+    color: #2f9e57;
+    background: color-mix(in srgb, #2f9e57 14%, transparent);
+}
+
+.tw-decision {
+    font-size: 10.5px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 2px 9px;
+    white-space: nowrap;
+}
+
+.tw-decision.implement {
+    color: #2f9e57;
+    background: color-mix(in srgb, #2f9e57 14%, transparent);
+}
+
+.tw-decision.skip {
+    color: var(--text-faint);
+    background: color-mix(in srgb, var(--text-faint) 16%, transparent);
+    text-decoration: line-through;
 }
 
 .tw-check {

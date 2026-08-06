@@ -240,21 +240,47 @@ function AssetsScreen({ reveal }: { reveal: number }) {
 }
 
 function DfdScreen({ reveal }: { reveal: number }) {
+    // Nodes sit on one horizontal line so every wire is a straight run between two edges —
+    // no line has to cross through a third node or dangle unattached.
     return (
         <div>
             <PanelHead num="04" title="Data flow diagram" />
+
             <div className="tw-dfd">
-                <div className="tw-zone left"><span>Plant network</span></div>
-                <div className="tw-zone right"><span>Untrusted WAN</span></div>
-                <div className="tw-dfdnode op" style={{ left: '8%', top: '30%' }}>SCADA<br />operator</div>
-                <div className="tw-dfdnode dev" style={{ left: '42%', top: '46%' }}>FC-300<br />controller</div>
-                <div className="tw-dfdnode cloud" style={{ left: '76%', top: '26%' }}>Vendor<br />cloud</div>
+                {/* Trust boundary: the only zone marker, deliberately neutral (not red/blue) */}
+                <div className={'tw-tb-line' + show(reveal, 2)} />
+                <div className={'tw-tb-label' + show(reveal, 2)}>Trust boundary</div>
+
+                {/* Entities, evenly spaced on the same row */}
+                <div className="tw-dfdnode op" style={{ left: '14%', top: '50%' }}>
+                    SCADA<br />operator
+                </div>
+                <div className="tw-dfdnode dev" style={{ left: '50%', top: '50%' }}>
+                    FC-300<br />controller
+                </div>
+                <div className="tw-dfdnode cloud" style={{ left: '86%', top: '50%' }}>
+                    Vendor<br />cloud
+                </div>
+
+                {/* Data flows — endpoints sit exactly on node edges */}
                 <svg className="tw-dfdwires" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <line className={'tw-wire' + show(reveal, 1)} x1="20" y1="36" x2="45" y2="52" />
-                    <line className={'tw-wire' + show(reveal, 2)} x1="55" y1="52" x2="80" y2="34" />
-                    <line className={'tw-wire cross' + show(reveal, 3)} x1="45" y1="60" x2="12" y2="78" />
+                    {/* SCADA operator -> controller (Modbus) */}
+                    <line className={'tw-wire' + show(reveal, 1)} x1="19.3" y1="50" x2="44.1" y2="50" />
+                    {/* Controller -> vendor cloud (telemetry) */}
+                    <line className={'tw-wire cross' + show(reveal, 2)} x1="55.9" y1="45" x2="81.3" y2="45" />
+                    {/* Vendor cloud -> controller (signed firmware) */}
+                    <line className={'tw-wire cross' + show(reveal, 3)} x1="81.3" y1="55" x2="55.9" y2="55" />
                 </svg>
-                <div className={'tw-boundary' + show(reveal, 3)}>trust boundary</div>
+
+                <div className={'tw-flowlabel' + show(reveal, 1)} style={{ left: '32%', top: '43%' }}>
+                    Modbus read/write
+                </div>
+                <div className={'tw-flowlabel' + show(reveal, 2)} style={{ left: '68%', top: '37%' }}>
+                    Telemetry (TLS)
+                </div>
+                <div className={'tw-flowlabel' + show(reveal, 3)} style={{ left: '68%', top: '63%' }}>
+                    Signed firmware
+                </div>
             </div>
         </div>
     );
@@ -315,13 +341,13 @@ function RequirementsScreen({ reveal }: { reveal: number }) {
     return (
         <div>
             <PanelHead num="05" title="Security requirements" action="+ Add requirement" />
-            <div className="tw-note">Each requirement records a rationale for traceability</div>
+            <div className="tw-note">Two origins: project management / compliance, or implementing a chosen countermeasure</div>
             <div className="tw-list">
                 {tutorialRequirements.map((r, i) => (
                     <div key={r.id} className={'tw-reqrow' + show(reveal, i + 1)}>
                         <span className="mono">{r.id}</span>
                         <span className="tw-reqtext">{r.text}</span>
-                        <span className="tw-rationale">{r.rationale}</span>
+                        <span className={'tw-rationale ' + r.origin}>{r.rationale}</span>
                     </div>
                 ))}
             </div>
@@ -330,19 +356,23 @@ function RequirementsScreen({ reveal }: { reveal: number }) {
 }
 
 function CountermeasuresScreen({ reveal }: { reveal: number }) {
+    const riskClass = (r: number) => (r >= 15 ? 'high' : r >= 9 ? 'med' : 'low');
     return (
         <div>
-            <PanelHead num="08" title="Countermeasures · residual risk" />
+            <PanelHead num="08" title="Countermeasures · evaluate value" />
+            <div className="tw-note">Implement a control only if it lowers the risk of at least one threat</div>
             <div className="tw-list">
                 {tutorialCountermeasures.map((c, i) => (
                     <div key={c.id} className={'tw-cmrow' + show(reveal, i + 1)}>
-                        <span className="tw-check">✓</span>
                         <span className="tw-cmtext">{c.text}</span>
                         <span className="mono tw-cmthreat">{c.threat}</span>
                         <span className="tw-residual">
-                            <span className="tw-risk high">{c.from}</span>
+                            <span className={'tw-risk ' + riskClass(c.from)}>{c.from}</span>
                             <span className="tw-arrow">→</span>
-                            <span className="tw-risk low">{c.to}</span>
+                            <span className={'tw-risk ' + riskClass(c.to)}>{c.to}</span>
+                        </span>
+                        <span className={'tw-decision ' + c.decision}>
+                            {c.decision === 'implement' ? '✓ Implement' : '✕ Skip · no value'}
                         </span>
                     </div>
                 ))}
@@ -355,7 +385,7 @@ function ReviewScreen({ reveal }: { reveal: number }) {
     const checks = [
         'Assets rated with CIA + Safety',
         'Threats linked to impact scenarios',
-        'Requirements carry a rationale',
+        'Controls evaluated; only value-adding ones implemented',
         'Residual risk accepted',
     ];
     return (
@@ -364,7 +394,7 @@ function ReviewScreen({ reveal }: { reveal: number }) {
                 <div><span className="tw-badge">09</span> <b>Review & report</b></div>
                 <span className={'tw-status' + (reveal >= 3 ? ' reviewed' : '')}>{reveal >= 3 ? '✓ Reviewed' : 'In review'}</span>
             </div>
-            <div className="tw-trace">asset → threat → requirement → control → residual risk</div>
+            <div className="tw-trace">asset → threat → countermeasure → requirement → residual risk</div>
             <div className="tw-list">
                 {checks.map((c, i) => (
                     <div key={c} className={'tw-checkrow' + (reveal >= (i < 2 ? 1 : 2) ? ' on' : '')}>
