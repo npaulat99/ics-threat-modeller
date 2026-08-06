@@ -650,7 +650,15 @@ export const useStore = create<Store>((set, get) => ({
             countermeasures: {
                 countermeasures: (data.countermeasures.countermeasures || []).map((c) => ({ ...c, id: m(c.id), components: arr(c.components), addresses: (c.addresses || []).map((a) => ({ ...a, threat: a.threat === oldId ? newId : a.threat })) })),
             },
-            attackTrees: { trees: (data.attackTrees?.trees || []).map((t) => ({ ...t, id: m(t.id), threatRef: t.threatRef === oldId ? newId : t.threatRef, root: mapNode(t.root) })) },
+            attackTrees: {
+                trees: (data.attackTrees?.trees || []).map((t) => ({
+                    ...t,
+                    id: m(t.id),
+                    threatRef: t.threatRef === oldId ? newId : t.threatRef,
+                    threatRefs: (t.threatRefs || []).map((r: string) => (r === oldId ? newId : r)),
+                    root: mapNode(t.root),
+                })),
+            },
             defects: { defects: (data.defects?.defects || []).map((d) => ({ ...d, id: m(d.id), component: d.component === oldId ? newId : d.component })) },
             assumptions: { ...data.assumptions, attacker: (data.assumptions.attacker || []).map((a) => ({ ...a, id: m(a.id) })) },
             dfd: {

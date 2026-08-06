@@ -186,8 +186,11 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
         if ((d.status === 'open' || d.status === 'triaged') && (d.severity === 'high' || d.severity === 'critical') && d.threatRef)
             add('warning', `${d.id}: open ${d.severity} defect — re-assess the linked threat '${d.threatRef}'.`);
     }
-    for (const tr of arr(attackTrees.trees))
-        if (tr.threatRef && !tIds.has(tr.threatRef)) add('error', `Attack tree '${tr.id}' references unknown threat '${tr.threatRef}'.`);
+    for (const tr of arr(attackTrees.trees)) {
+        const refs = [...new Set([...arr(tr.threatRefs), ...(tr.threatRef ? [tr.threatRef] : [])])];
+        for (const ref of refs)
+            if (!tIds.has(ref)) add('error', `Attack tree '${tr.id}' references unknown threat '${ref}'.`);
+    }
 
     return issues;
 }

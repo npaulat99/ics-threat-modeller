@@ -368,7 +368,8 @@ export interface AdNode {
 export interface AttackTree {
     id: string;
     title: string;
-    threatRef?: string; // the threat this tree decomposes
+    threatRef?: string; // legacy single-link field (kept for backward compatibility)
+    threatRefs?: string[]; // preferred: 0..n linked threats this tree decomposes
     description?: string;
     root: AdNode;
 }

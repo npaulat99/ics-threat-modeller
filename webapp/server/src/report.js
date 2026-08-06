@@ -691,7 +691,10 @@ export async function buildReport(id) {
         )
         .join('');
     const treeList = (attackTrees?.trees || [])
-        .map((t) => `<li><b>${esc(t.id)}</b> ${esc(t.title)}${t.threatRef ? ` &rarr; ${esc(t.threatRef)}` : ''}</li>`)
+        .map((t) => {
+            const refs = [...new Set([...(t.threatRefs || []), ...(t.threatRef ? [t.threatRef] : [])])];
+            return `<li><b>${esc(t.id)}</b> ${esc(t.title)}${refs.length ? ` &rarr; ${esc(refs.join(', '))}` : ''}</li>`;
+        })
         .join('');
     const strideRows = strideCov
         .map((e) => `<tr${e.gaps ? " style='background:#fff7f0'" : ''}><td>${esc(e.id)} ${esc(e.name)} <span class=mono>${esc(e.kind)}</span></td>${e.cells.map((c) => `<td style='text-align:center'>${c ? '✓' : '·'}</td>`).join('')}</tr>`)

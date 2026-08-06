@@ -32,11 +32,12 @@ export default function ThreatsPanel() {
     const assumptionOpts = assumptionRows.map((x) => ({ value: x.id, label: `${x.id} · ${x.source}${x.text ? ` · ${x.text.slice(0, 64)}` : ''}` }));
 
     const trees = data.attackTrees?.trees || [];
-    const treeFor = (tid: string) => trees.find((x) => x.threatRef === tid);
+    const treeThreatRefs = (tree: any) => [...new Set([...(tree.threatRefs || []), ...(tree.threatRef ? [tree.threatRef] : [])])];
+    const treeFor = (tid: string) => trees.find((x) => treeThreatRefs(x).includes(tid));
     const makeTree = (t: Threat) => {
         if (!treeFor(t.id)) {
             const root = { id: adId(), kind: 'goal' as const, label: t.title, gate: 'OR' as const, children: [] };
-            save('attackTrees', { trees: [...trees, { id: uid('AT', trees.map((x) => x.id)), title: t.title, threatRef: t.id, root }] });
+            save('attackTrees', { trees: [...trees, { id: uid('AT', trees.map((x) => x.id)), title: t.title, threatRef: t.id, threatRefs: [t.id], root }] });
         }
         setView('attackTrees');
     };
