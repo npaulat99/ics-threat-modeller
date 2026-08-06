@@ -104,8 +104,15 @@ export default function UseCasesPanel() {
     const [linking, setLinking] = useState(false);
     const [connectFrom, setConnectFrom] = useState<string | null>(null);
     const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
     const dragOffset = useRef({ x: 0, y: 0 });
     const svgRef = useRef<SVGSVGElement>(null);
+    const hadDiagramsRef = useRef(diagrams.length > 0);
+
+    const scrollEditorToTop = () => {
+        const main = panelRef.current?.closest('.main');
+        if (main instanceof HTMLElement) main.scrollTo({ top: 0 });
+    };
 
     // Reset local UI state when switching TRA projects (selection itself is reset by the store).
     useEffect(() => {
@@ -122,6 +129,13 @@ export default function UseCasesPanel() {
             setUcDiagram(diagrams[0].id);
         }
     }, [diagrams, ucDiagramId, setUcDiagram]);
+
+    useEffect(() => {
+        if (!hadDiagramsRef.current && diagrams.length > 0) {
+            requestAnimationFrame(scrollEditorToTop);
+        }
+        hadDiagramsRef.current = diagrams.length > 0;
+    }, [diagrams.length]);
 
     const activeDiagram = diagrams.find((d) => d.id === ucDiagramId) || diagrams[0] || null;
 
@@ -156,11 +170,15 @@ export default function UseCasesPanel() {
 
     if (!activeDiagram) {
         return (
-            <div className="panel">
+            <div className="panel" ref={panelRef}>
                 <div className="panelhead">
                     <h1>(Mis-)use cases</h1>
                 </div>
                 <p className="lead">Model actors, actions and misuse-case variants for the device. Optional and excluded from the report by default.</p>
+                <div className="notice-box" style={{ maxWidth: 680 }}>
+                    Known issue: after pressing <b>+ New diagram</b> for the first time in a project, the editor may black out.
+                    If that happens, reload the page once and the use-case editor will work normally.
+                </div>
                 <div className="inline">
                     <button className="btn primary" onClick={addDiagram}>
                         + New diagram
@@ -291,7 +309,7 @@ export default function UseCasesPanel() {
     });
 
     return (
-        <div className="panel">
+        <div className="panel" ref={panelRef}>
             <div className="panelhead">
                 <h1>(Mis-)use cases</h1>
             </div>
