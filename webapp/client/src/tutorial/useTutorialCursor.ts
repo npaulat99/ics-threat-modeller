@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { CursorKey } from '../tutorial/tutorialData';
 
 export interface CursorState {
@@ -64,7 +64,7 @@ export function useTutorialCursor(
     const firedRef = useRef<Set<number>>(new Set());
     const clickUntilRef = useRef<number>(0);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         firedRef.current = new Set();
         clickUntilRef.current = 0;
@@ -76,6 +76,10 @@ export function useTutorialCursor(
             setState({ x: last.x, y: last.y, clicking: false, typing: false, reveal: revealAt(path, 1), progress: 1, done: true });
             return;
         }
+
+        // Reset to the initial keyframe before the first animation tick so the
+        // browser never paints stale reveal state from the previous step.
+        setState({ x: first.x, y: first.y, clicking: false, typing: false, reveal: 0, progress: 0, done: false });
 
         startRef.current = performance.now();
 
