@@ -5,6 +5,7 @@ import Inspector from './components/Inspector';
 import WizardBar from './components/WizardBar';
 import DfdView from './components/dfd/DfdView';
 import ProjectPanel from './components/panels/ProjectPanel';
+import UseCasesPanel from './components/panels/UseCasesPanel';
 import AssumptionsPanel from './components/panels/AssumptionsPanel';
 import SystemPanel from './components/panels/SystemPanel';
 import ThreatsPanel from './components/panels/ThreatsPanel';
@@ -40,6 +41,8 @@ export default function App() {
                 return <AssumptionsPanel />;
             case 'system':
                 return <SystemPanel />;
+            case 'useCases':
+                return <UseCasesPanel />;
             case 'threats':
                 return <ThreatsPanel />;
             case 'requirements':

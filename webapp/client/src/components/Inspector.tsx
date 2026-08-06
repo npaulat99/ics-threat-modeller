@@ -13,6 +13,7 @@ const HELP: Record<string, string> = {
     assumptions: 'Attacker profiles are mandatory: capability (1–5) and access (remote→physical) feed the likelihood rubric directly.',
     system: 'Rate each asset’s C/I/A/Safety (0–5). Impact later defaults to the worst plausible asset (max of C/I/A/Safety).',
     dfd: 'Flows that cross a trust boundary are the threat hot-spots. Drill into a process to model its internals on a deeper layer.',
+    useCases: 'Optional: model actors and actions, plus misuse-case variants for abuse scenarios. Group related entities with a named grouping box. Report inclusion defaults to off.',
     threats: 'One STRIDE threat can touch many components. Likelihood × Impact = initial risk, banded Low/Medium/High/Critical.',
     countermeasures: 'A countermeasure can address several threats; record the residual L/I per link. Residual risk = the lowest residual achieved.',
     attackTrees: 'Optional: decompose an important threat into attacker steps (AND/OR/SAND) and attach defences. Each step carries access, skill and cost factors.',

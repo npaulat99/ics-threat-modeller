@@ -377,6 +377,7 @@ export interface ProjectData {
     assumptions: Assumptions;
     system: SystemDef;
     dfd: Dfd;
+    useCases: UseCasesDoc;
     threats: ThreatsDoc;
     requirements: RequirementsDoc;
     countermeasures: CountermeasuresDoc;

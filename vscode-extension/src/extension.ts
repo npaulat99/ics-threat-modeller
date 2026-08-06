@@ -27,7 +27,6 @@ const pathExists = async (u: vscode.Uri) => { try { await vscode.workspace.fs.st
 const reportsScript = (ctx: vscode.ExtensionContext) => vscode.Uri.joinPath(ctx.extensionUri, "runtime", "tools", "generate-report.mjs");
 const projectsRoot = () => vscode.Uri.file(path.join(os.homedir(), "Documents", "EmbedRisk", "projects"));
 const importedKbRoot = (ctx: vscode.ExtensionContext) => vscode.Uri.joinPath(ctx.globalStorageUri, "knowledge-base", "imported");
-const shellQuote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
 
 async function resolveWebappLauncher(ctx: vscode.ExtensionContext) {
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath;
@@ -45,6 +44,36 @@ async function pickLaunchFolder() {
   if (vscode.workspace.workspaceFolders?.length) return vscode.workspace.workspaceFolders[0].uri;
   const picked = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectMany: false, openLabel: "Open in EmbedRisk webapp" });
   return picked?.[0] || null;
+}
+
+async function launchWebappTask(target: vscode.Uri, launcher: string | null) {
+  const port = process.env.PORT || "4317";
+  const execution = launcher
+    ? new vscode.ProcessExecution(process.execPath, [launcher, target.fsPath], {
+      cwd: target.fsPath,
+      env: { ...process.env, PORT: port },
+    })
+    : new vscode.ProcessExecution("embedrisk", [target.fsPath], {
+      cwd: target.fsPath,
+      env: { ...process.env, PORT: port },
+    });
+
+  const task = new vscode.Task(
+    { type: "embedriskWebapp" },
+    vscode.TaskScope.Workspace,
+    "Open EmbedRisk webapp",
+    "embedrisk",
+    execution,
+    []
+  );
+  task.presentationOptions = {
+    reveal: vscode.TaskRevealKind.Always,
+    panel: vscode.TaskPanelKind.Dedicated,
+    focus: false,
+    clear: false,
+  };
+  await vscode.tasks.executeTask(task);
+  return port;
 }
 
 async function writeJson(u: vscode.Uri, obj: unknown) {
@@ -159,18 +188,11 @@ export function activate(ctx: vscode.ExtensionContext) {
     if (!target) return;
 
     const launcher = await resolveWebappLauncher(ctx);
-    const command = launcher
-      ? `${shellQuote(process.execPath)} ${shellQuote(launcher)} ${shellQuote(target.fsPath)}`
-      : `embedrisk ${shellQuote(target.fsPath)}`;
-    const terminal = vscode.window.createTerminal({ name: "EmbedRisk Webapp", cwd: target.fsPath });
-    terminal.show(true);
-    terminal.sendText(command, true);
-
-    const port = process.env.PORT || "4317";
+    const port = await launchWebappTask(target, launcher);
     const url = vscode.Uri.parse(`http://localhost:${port}`);
-    const action = await vscode.window.showInformationMessage(`EmbedRisk webapp launch requested for ${target.fsPath}.`, "Open webapp", "Reveal command terminal");
+    const action = await vscode.window.showInformationMessage(`EmbedRisk webapp launch requested for ${target.fsPath}.`, "Open webapp", "Show task output");
     if (action === "Open webapp") await vscode.env.openExternal(url);
-    if (action === "Reveal command terminal") terminal.show(true);
+    if (action === "Show task output") await vscode.commands.executeCommand("workbench.action.tasks.showLog");
   };
 
   const createProjectCommand = async () => {

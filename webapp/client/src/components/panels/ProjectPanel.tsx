@@ -98,6 +98,7 @@ function ScopeList({ items, onChange, placeholder }: { items: string[]; onChange
 export default function ProjectPanel() {
     const data = useStore((s) => s.data)!;
     const save = useStore((s) => s.save);
+    const setView = useStore((s) => s.setView);
     const activeId = useStore((s) => s.activeId);
     const refreshKb = useStore((s) => s.refreshKb);
     const p = data.project;
@@ -106,6 +107,16 @@ export default function ProjectPanel() {
     const setScope = (patch: any) => set({ scope: { ...(p.scope || {}), ...patch } });
     const setRepo = (patch: any) => set({ repo: { ...(p.repo || {}), ...patch } });
     const setSbom = (patch: any) => set({ sbom: { ...(p.sbom || {}), ...patch } });
+    const ucDiagrams = data.useCases?.diagrams || [];
+    const acceptedNotices = p.acceptedNotices || [];
+    const includeUseCases = !!p.reportOptions?.includeUseCases;
+    const ucNoticePending = ucDiagrams.length > 0 && !includeUseCases && !acceptedNotices.includes('usecases-excluded');
+    const setIncludeUseCases = (v: boolean) =>
+        set({
+            reportOptions: { ...(p.reportOptions || {}), includeUseCases: v },
+            acceptedNotices: v ? acceptedNotices.filter((k) => k !== 'usecases-excluded') : acceptedNotices,
+        });
+    const ackUseCaseNotice = () => set({ acceptedNotices: [...new Set([...acceptedNotices, 'usecases-excluded'])] });
     const [git, setGit] = useState('');
     const [gitWorkspace, setGitWorkspace] = useState<GitWorkspace | null>(null);
     const [gitStatus, setGitStatus] = useState<GitWorkspaceStatus | null>(null);
@@ -349,6 +360,43 @@ export default function ProjectPanel() {
                     <Field label="Out of scope" hint="Type an item and press Enter.">
                         <ScopeList items={p.scope?.outOfScope || []} onChange={(v) => setScope({ outOfScope: v })} placeholder="e.g. plant DCS" />
                     </Field>
+                </div>
+            </div>
+
+            <div className="card">
+                <h3>(Mis-)use cases</h3>
+                <p className="hint" style={{ marginTop: 0 }}>
+                    Model actors, actions and misuse-case variants for the device in a dedicated editor.
+                </p>
+                <button className="btn sm" onClick={() => setView('useCases')}>
+                    Open use-case editor
+                </button>
+                <Field label="Report inclusion" style={{ marginTop: 10 }} hint="Off by default — use-case diagrams are supporting material, not part of the TRA chain.">
+                    <label className="check">
+                        <input type="checkbox" checked={includeUseCases} onChange={(e) => setIncludeUseCases(e.target.checked)} /> Include use-case diagrams in report
+                    </label>
+                </Field>
+                {ucNoticePending && (
+                    <div className="notice-box" style={{ marginTop: 8 }}>
+                        <b>Notice:</b> {ucDiagrams.length} use-case diagram{ucDiagrams.length === 1 ? '' : 's'} exist but {ucDiagrams.length === 1 ? 'is' : 'are'} excluded from the report.
+                        <div style={{ marginTop: 6 }}>
+                            <button className="btn sm" onClick={ackUseCaseNotice}>
+                                Acknowledge intentional exclusion
+                            </button>
+                        </div>
+                    </div>
+                )}
+                <div style={{ marginTop: 10 }}>
+                    <label>Use-case diagrams</label>
+                    {ucDiagrams.length ? (
+                        <ul className="hint" style={{ margin: '4px 0 0 18px' }}>
+                            {ucDiagrams.map((d) => (
+                                <li key={d.id}>{d.name || d.id}</li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="hint">No use-case diagrams yet.</p>
+                    )}
                 </div>
             </div>
 

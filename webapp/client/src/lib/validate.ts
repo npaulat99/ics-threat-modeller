@@ -177,5 +177,14 @@ export function validate(data: ProjectData): Issue[] {
     }
     for (const tr of data.attackTrees?.trees || [])
         if (tr.threatRef && !tIds.has(tr.threatRef)) add('error', `Attack tree '${tr.id}' references unknown threat '${tr.threatRef}'.`);
+
+    const ucDiagrams = data.useCases?.diagrams || [];
+    if (ucDiagrams.length > 0 && !project.reportOptions?.includeUseCases) {
+        add(
+            'notice',
+            `Use-case diagrams exist (${ucDiagrams.length}) but report inclusion is disabled. Accept this notice if the exclusion is intentional.`,
+            'usecases-excluded',
+        );
+    }
     return issues;
 }

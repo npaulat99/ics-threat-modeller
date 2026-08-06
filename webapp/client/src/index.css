@@ -1065,6 +1065,14 @@ textarea {
     flex: 1;
 }
 
+.notice-box {
+    padding: 8px 10px;
+    background: color-mix(in srgb, #3b82f6 11%, var(--surface));
+    border: 1px solid color-mix(in srgb, #3b82f6 32%, var(--border));
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+}
+
 .issuelink {
     background: none;
     border: none;
@@ -1616,6 +1624,90 @@ a.linkbtn {
     fill: none;
     stroke: var(--text-dim);
     stroke-width: 1.6;
+}
+
+/* ---- Use-case diagram canvas (step 04b) ---------------------------------- */
+.uc-toolbar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.uc-canvas {
+    overflow: auto;
+    max-height: 62vh;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+
+.uc-entity {
+    cursor: grab;
+}
+
+.uc-entity .uc-shape {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 1.8;
+}
+
+.uc-entity ellipse.uc-shape {
+    fill: var(--surface);
+}
+
+.uc-entity .uc-label {
+    font-size: 11.5px;
+    fill: var(--text);
+}
+
+.uc-entity.sel .uc-shape {
+    stroke: var(--accent);
+    stroke-width: 2.4;
+}
+
+.uc-entity.dim {
+    opacity: 0.45;
+}
+
+.uc-entity.misuse .uc-shape {
+    stroke: var(--danger);
+    fill: color-mix(in srgb, var(--danger) 70%, black);
+}
+
+.uc-entity.misuse ellipse.uc-shape {
+    fill: color-mix(in srgb, var(--danger) 24%, var(--surface));
+}
+
+.uc-entity.misuse .uc-label {
+    fill: var(--danger);
+    font-weight: 600;
+}
+
+.uc-conn {
+    stroke: var(--text-dim);
+    stroke-width: 1.6;
+    fill: none;
+}
+
+.uc-conn-label {
+    font-size: 10.5px;
+    fill: var(--text-dim);
+    paint-order: stroke;
+    stroke: var(--surface-2);
+    stroke-width: 4;
+}
+
+.uc-group-rect {
+    fill: color-mix(in srgb, var(--accent) 5%, transparent);
+    stroke: var(--border-strong);
+    stroke-width: 1.4;
+}
+
+.uc-group-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    fill: var(--text-dim);
 }
 
 .adt-arrow {
