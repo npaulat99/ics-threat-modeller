@@ -426,6 +426,26 @@ textarea {
     width: 100%;
 }
 
+.field input[type='checkbox'],
+.field input[type='radio'] {
+    width: auto;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.field .check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+    cursor: pointer;
+}
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus,
