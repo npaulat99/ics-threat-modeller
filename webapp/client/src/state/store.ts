@@ -401,6 +401,8 @@ interface Store {
     startTutorial(): void;
     skipTutorial(): void;
     closeTutorial(): void;
+    openTutorial(): void;
+    openTutorialPrompt(): void;
     setView(v: ViewKey | 'dashboard' | 'kb' | 'assistant'): void;
     goto(view: string, id?: string): void;
     setTheme(t: 'light' | 'dark'): void;
@@ -525,6 +527,14 @@ export const useStore = create<Store>((set, get) => ({
 
     closeTutorial() {
         set({ tutorialPromptOpen: false, tutorialWalkthroughOpen: false });
+    },
+
+    openTutorial() {
+        set({ tutorialPromptOpen: false, tutorialWalkthroughOpen: true });
+    },
+
+    openTutorialPrompt() {
+        set({ tutorialPromptOpen: true, tutorialWalkthroughOpen: false });
     },
 
     setView(v) {

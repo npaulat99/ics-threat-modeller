@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../state/store';
 
 export default function TopBar() {
@@ -18,6 +18,21 @@ export default function TopBar() {
     const undoDepth = useStore((s) => s.undoDepth);
     const redoDepth = useStore((s) => s.redoDepth);
     const setSettings = useStore((s) => s.openSettings);
+    const openTutorial = useStore((s) => s.openTutorial);
+    const openTutorialPrompt = useStore((s) => s.openTutorialPrompt);
+
+    const [helpOpen, setHelpOpen] = useState(false);
+    const helpRef = useRef<HTMLDivElement>(null);
+
+    // Close the Help menu when clicking elsewhere.
+    useEffect(() => {
+        if (!helpOpen) return;
+        const onDown = (e: MouseEvent) => {
+            if (helpRef.current && !helpRef.current.contains(e.target as Node)) setHelpOpen(false);
+        };
+        window.addEventListener('mousedown', onDown);
+        return () => window.removeEventListener('mousedown', onDown);
+    }, [helpOpen]);
 
     // Global Ctrl/Cmd+Z (undo) and Ctrl+Y / Ctrl+Shift+Z (redo). We defer to the browser's native
     // undo while a text field is focused so typing corrections still work as expected.
@@ -92,6 +107,52 @@ export default function TopBar() {
             <button className="btn sm iconbtn" title="Project settings" aria-label="Project settings" onClick={() => setSettings(true)}>
                 ⚙
             </button>
+            <div className="helpmenu" ref={helpRef}>
+                <button
+                    className="btn sm iconbtn"
+                    title="Help"
+                    aria-label="Help"
+                    aria-haspopup="menu"
+                    aria-expanded={helpOpen}
+                    onClick={() => setHelpOpen((v) => !v)}
+                >
+                    ?
+                </button>
+                {helpOpen && (
+                    <div className="helpmenu-pop" role="menu">
+                        <button
+                            className="helpmenu-item"
+                            role="menuitem"
+                            onClick={() => {
+                                setHelpOpen(false);
+                                openTutorial();
+                            }}
+                        >
+                            ▶ Start tutorial
+                        </button>
+                        <button
+                            className="helpmenu-item"
+                            role="menuitem"
+                            onClick={() => {
+                                setHelpOpen(false);
+                                openTutorialPrompt();
+                            }}
+                        >
+                            Tutorial overview
+                        </button>
+                        <button
+                            className="helpmenu-item"
+                            role="menuitem"
+                            onClick={() => {
+                                setHelpOpen(false);
+                                setView('assistant');
+                            }}
+                        >
+                            Documentation &amp; assistant
+                        </button>
+                    </div>
+                )}
+            </div>
             <button className="btn" onClick={() => setView('review')}>
                 Generate report
             </button>
