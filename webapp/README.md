@@ -79,7 +79,29 @@ from the initial "clone the repo and run `npm start` inside `webapp/`" flow: `np
 the direct server start for the repo checkout, while `embedrisk` is the user-facing command for
 opening an existing project root from the console.
 
-Recommended patterns:
+Supported workflows:
+
+1. Checkout-based (no global install; deterministic for scripts/CI)
+
+```bash
+# Run from anywhere, but execute the launcher from this checkout
+npm --prefix /path/to/EmbedRisk/webapp exec -- embedrisk /path/to/projects-or-project
+```
+
+2. User-global command (best UX for daily use)
+
+```bash
+# One-time setup (Linux, no sudo; avoids /usr permission issues)
+npm config set prefix "$HOME/.local"
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+npm install -g /path/to/EmbedRisk/webapp
+
+# Then from anywhere
+embedrisk /path/to/projects-or-project
+```
+
+Recommended quick examples:
 
 ```bash
 # From the cloned repository (no global install needed)
