@@ -4,7 +4,7 @@
 // Two interchangeable views: an indented list and a graphical (node-and-gate) diagram.
 import { useState } from 'react';
 import { useStore, uid } from '../../state/store';
-import { Field, HelpButton, confirmDelete, IdInput } from '../common';
+import { Chips, Field, HelpButton, confirmDelete, IdInput } from '../common';
 import { evaluate, COST_FACTORS, updateNode, addChild, removeNode, moveChild, adId, KIND_LABEL, likelihoodFromProb, newNode, GATES, ADD_KINDS, ACCESS_OPTS, SKILL_OPTS, accessLabel, skillLabel } from '../../lib/attackTree';
 import AttackTreeDiagram from './AttackTreeDiagram';
 import type { AdGate, AdKind, AdNode, AttackTree } from '../../types';
@@ -16,6 +16,11 @@ interface Ops {
     add: (parentId: string, kind: AdKind) => void;
     del: (id: string) => void;
     move: (id: string, dir: -1 | 1) => void;
+}
+
+function treeThreatRefs(tree: AttackTree) {
+    const merged = [...(tree.threatRefs || []), ...(tree.threatRef ? [tree.threatRef] : [])].filter(Boolean) as string[];
+    return [...new Set(merged)];
 }
 
 function NodeRow({ node, depth, ops }: { node: AdNode; depth: number; ops: Ops }) {
@@ -133,6 +138,8 @@ function TreeCard({ tree, view }: { tree: AttackTree; view: 'list' | 'diagram' }
     const trees = data.attackTrees?.trees || [];
     const threats = data.threats.threats || [];
     const attackers = data.assumptions.attacker || [];
+    const linkedThreatIds = treeThreatRefs(tree);
+    const linkedThreatLabel = linkedThreatIds.join(', ');
 
     const writeTrees = (list: AttackTree[]) => save('attackTrees', { trees: list });
     const updTree = (patch: Partial<AttackTree>) => writeTrees(trees.map((t) => (t.id === tree.id ? { ...t, ...patch } : t)));
@@ -149,28 +156,32 @@ function TreeCard({ tree, view }: { tree: AttackTree; view: 'list' | 'diagram' }
 
     const m = evaluate(tree.root, new Map((data.countermeasures.countermeasures || []).map((c) => [c.id, c])));
     const hasSteps = (tree.root.children || []).some((c) => c.kind !== 'countermeasure' && c.kind !== 'vulnerability');
+    const setThreatLinks = (next: string[]) => updTree({ threatRefs: next, threatRef: next[0] || undefined });
+
     const applyToThreat = () => {
-        if (!tree.threatRef) return;
+        if (!linkedThreatIds.length) return;
         const L = likelihoodFromProb(m.prob);
-        save('threats', { threats: threats.map((t) => (t.id === tree.threatRef ? { ...t, likelihood: L } : t)) });
+        save('threats', { threats: threats.map((t) => (linkedThreatIds.includes(t.id) ? { ...t, likelihood: L } : t)) });
     };
     return (
         <div className="card">
             <div className="head">
                 <IdInput id={tree.id} />
                 <input className="inp grow" value={tree.title} onChange={(e) => updTree({ title: e.target.value })} />
-                <select className="inp" style={{ width: 200 }} value={tree.threatRef || ''} onChange={(e) => updTree({ threatRef: e.target.value || undefined })}>
-                    <option value="">(link a threat…)</option>
-                    {threats.map((t) => (
-                        <option key={t.id} value={t.id}>
-                            {t.id} · {t.title}
-                        </option>
-                    ))}
-                </select>
                 <button className="btn sm danger" aria-label={`Delete attack tree ${tree.id}`} onClick={() => confirmDelete(`attack tree ${tree.id}`) && writeTrees(trees.filter((t) => t.id !== tree.id))}>
                     Delete tree
                 </button>
             </div>
+
+            <Field label="Linked threats">
+                <Chips
+                    options={threats.map((t) => ({ value: t.id, label: `${t.id} · ${t.title}` }))}
+                    value={linkedThreatIds}
+                    onChange={setThreatLinks}
+                    empty="No threats available yet."
+                    label="linked threats"
+                />
+            </Field>
 
             <div className="admetrics">
                 {hasSteps ? (
@@ -180,9 +191,9 @@ function TreeCard({ tree, view }: { tree: AttackTree; view: 'list' | 'diagram' }
                         <span className="tag">success ≈ {Math.round(m.prob * 100)}%</span>
                         <span className="tag">defences {m.defenses}</span>
                         {m.vulns ? <span className="tag">vulnerabilities {m.vulns}</span> : null}
-                        {tree.threatRef && (
-                            <button className="btn sm" onClick={applyToThreat} title={`Set ${tree.threatRef}'s likelihood from this tree's cheapest path`}>
-                                → set {tree.threatRef} likelihood = {likelihoodFromProb(m.prob)}
+                        {linkedThreatIds.length > 0 && (
+                            <button className="btn sm" onClick={applyToThreat} title={`Set linked threat likelihoods (${linkedThreatLabel}) from this tree's cheapest path`}>
+                                → set linked threat likelihood{linkedThreatIds.length > 1 ? 's' : ''} = {likelihoodFromProb(m.prob)}
                             </button>
                         )}
                         <span className="muted" style={{ marginLeft: 8 }}>
@@ -214,7 +225,19 @@ export default function AttackTreesPanel() {
 
     const add = () => {
         const root: AdNode = { id: adId(), kind: 'goal', label: 'Attacker goal', gate: 'OR', children: [] };
-        save('attackTrees', { trees: [...trees, { id: uid('AT', trees.map((t) => t.id)), title: 'New attack tree', threatRef: threats[0]?.id, root }] });
+        const firstThreat = threats[0]?.id;
+        save('attackTrees', {
+            trees: [
+                ...trees,
+                {
+                    id: uid('AT', trees.map((t) => t.id)),
+                    title: 'New attack tree',
+                    threatRef: firstThreat,
+                    threatRefs: firstThreat ? [firstThreat] : [],
+                    root,
+                },
+            ],
+        });
     };
 
     return (

@@ -13,6 +13,8 @@ import { routeAround, roundedPath, labelPtOnPolyline, borderPoint } from '../../
 
 const esc = (s) =>
     String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const ID_PATTERN = /^[A-Za-z0-9 _\-:.]+$/;
+const assumptionAnchor = (id) => `assumption-${String(id ?? '').replace(/[^A-Za-z0-9_.:-]/g, '-')}`;
 
 /** Canonical STRIDE order (S,T,R,I,D,E) so the report always lists categories consistently. */
 const STRIDE_ORDER = ['S', 'T', 'R', 'I', 'D', 'E'];
@@ -58,7 +60,7 @@ function layerSvg(dfd, parentId, system = {}) {
         }
         return null;
     };
-    const ifaces = system.interfaces || [];
+    const ifaces = (system.interfaces || []).filter((itf) => !itf.hidden);
     const CHIP_W = 150;
     const CHIP_H = 34;
     const GAP = 20;
@@ -218,6 +220,104 @@ function layerSvg(dfd, parentId, system = {}) {
     return `<svg width='${Math.min(W, 900)}' height='${Math.min(H, 620)}' viewBox='0 0 ${W} ${H}' xmlns='http://www.w3.org/2000/svg'><defs><marker id='a' markerWidth='8' markerHeight='8' refX='7' refY='3' orient='auto'><path d='M0,0L7,3L0,6' fill='#6b7688'/></marker></defs>${out.join('')}</svg>`;
 }
 
+function useCaseSvg(diagram = {}) {
+    const entities = Array.isArray(diagram.entities) ? diagram.entities : [];
+    const groups = Array.isArray(diagram.groups) ? diagram.groups : [];
+    const conns = Array.isArray(diagram.connections) ? diagram.connections : [];
+    if (!entities.length) return '<p>No entities in this diagram.</p>';
+
+    const ACTOR_W = 80;
+    const ACTOR_H = 120;
+    const ACTION_W = 180;
+    const ACTION_H = 70;
+    const boxOf = (e, idx) => {
+        const x = Number.isFinite(e?.x) ? e.x : 80 + (idx % 4) * 220;
+        const y = Number.isFinite(e?.y) ? e.y : 80 + Math.floor(idx / 4) * 180;
+        if (e.kind === 'actor' || e.kind === 'misuse-actor') return { x, y, w: ACTOR_W, h: ACTOR_H };
+        return { x, y, w: ACTION_W, h: ACTION_H };
+    };
+    const byId = new Map(entities.map((e, i) => [e.id, { e, b: boxOf(e, i) }]));
+
+    const groupSvgs = groups
+        .map((g) => {
+            const memberBoxes = (g.members || []).map((id) => byId.get(id)?.b).filter(Boolean);
+            if (!memberBoxes.length) return '';
+            const minX = Math.min(...memberBoxes.map((b) => b.x)) - 30;
+            const minY = Math.min(...memberBoxes.map((b) => b.y)) - 45;
+            const maxX = Math.max(...memberBoxes.map((b) => b.x + b.w)) + 30;
+            const maxY = Math.max(...memberBoxes.map((b) => b.y + b.h)) + 24;
+            return (
+                `<rect x='${minX}' y='${minY}' width='${maxX - minX}' height='${maxY - minY}' fill='none' stroke='#4d5a6d' stroke-width='1.4' rx='8'/>` +
+                `<text x='${minX + 10}' y='${minY + 16}' font-size='11' fill='#2a3342'>${esc(g.name || g.id)}</text>`
+            );
+        })
+        .join('');
+
+    const defs =
+        '<defs>' +
+        "<marker id='uc-arrow' markerWidth='8' markerHeight='8' refX='7' refY='3' orient='auto'><path d='M0,0L7,3L0,6' fill='#5e6a7b'/></marker>" +
+        '</defs>';
+
+    const connSvgs = conns
+        .map((c) => {
+            const from = byId.get(c.from)?.b;
+            const to = byId.get(c.to)?.b;
+            if (!from || !to) return '';
+            const x1 = from.x + from.w / 2;
+            const y1 = from.y + from.h / 2;
+            const x2 = to.x + to.w / 2;
+            const y2 = to.y + to.h / 2;
+            const dashed = c.dashed ? " stroke-dasharray='6 4'" : '';
+            const arrow = c.arrow || 'none';
+            const start = arrow === 'backward' || arrow === 'both' ? " marker-start='url(#uc-arrow)'" : '';
+            const end = arrow === 'forward' || arrow === 'both' ? " marker-end='url(#uc-arrow)'" : '';
+            const mx = (x1 + x2) / 2;
+            const my = (y1 + y2) / 2;
+            const label = c.label
+                ? `<rect x='${mx - 70}' y='${my - 18}' width='140' height='14' rx='3' fill='#fff' stroke='#d9dee7'/><text x='${mx}' y='${my - 8}' text-anchor='middle' font-size='10'>${esc(c.label)}</text>`
+                : '';
+            return `<line x1='${x1}' y1='${y1}' x2='${x2}' y2='${y2}' stroke='#5e6a7b' stroke-width='1.6'${dashed}${start}${end}/>${label}`;
+        })
+        .join('');
+
+    const entitySvgs = entities
+        .map((e, i) => {
+            const b = boxOf(e, i);
+            const cx = b.x + b.w / 2;
+            const cy = b.y + b.h / 2;
+            if (e.kind === 'actor' || e.kind === 'misuse-actor') {
+                const dark = e.kind === 'misuse-actor';
+                const stroke = dark ? '#111' : '#2f3a4a';
+                const fill = dark ? '#111' : 'none';
+                const textFill = dark ? '#fff' : '#1d2430';
+                return (
+                    `<circle cx='${cx}' cy='${b.y + 16}' r='10' fill='${fill}' stroke='${stroke}' stroke-width='1.8'/>` +
+                    `<line x1='${cx}' y1='${b.y + 26}' x2='${cx}' y2='${b.y + 64}' stroke='${stroke}' stroke-width='1.8'/>` +
+                    `<line x1='${cx - 18}' y1='${b.y + 40}' x2='${cx + 18}' y2='${b.y + 40}' stroke='${stroke}' stroke-width='1.8'/>` +
+                    `<line x1='${cx}' y1='${b.y + 64}' x2='${cx - 14}' y2='${b.y + 92}' stroke='${stroke}' stroke-width='1.8'/>` +
+                    `<line x1='${cx}' y1='${b.y + 64}' x2='${cx + 14}' y2='${b.y + 92}' stroke='${stroke}' stroke-width='1.8'/>` +
+                    `<text x='${cx}' y='${b.y + 110}' text-anchor='middle' font-size='10.5' fill='${textFill}'>${esc(e.name || e.id)}</text>`
+                );
+            }
+            const dark = e.kind === 'misuse-action';
+            return (
+                `<ellipse cx='${cx}' cy='${cy}' rx='${b.w / 2}' ry='${b.h / 2}' fill='${dark ? '#111' : '#fff'}' stroke='${dark ? '#111' : '#2f3a4a'}' stroke-width='1.6'/>` +
+                `<text x='${cx}' y='${cy + 4}' text-anchor='middle' font-size='10.5' fill='${dark ? '#fff' : '#1d2430'}'>${esc(e.name || e.id)}</text>`
+            );
+        })
+        .join('');
+
+    const all = [...entities.map((e, i) => boxOf(e, i))];
+    const minX = Math.min(...all.map((b) => b.x)) - 60;
+    const minY = Math.min(...all.map((b) => b.y)) - 60;
+    const maxX = Math.max(...all.map((b) => b.x + b.w)) + 60;
+    const maxY = Math.max(...all.map((b) => b.y + b.h)) + 60;
+    const w = Math.max(400, maxX - minX);
+    const h = Math.max(260, maxY - minY);
+
+    return `<svg width='${Math.min(980, w)}' height='${Math.min(700, h)}' viewBox='${minX} ${minY} ${w} ${h}' xmlns='http://www.w3.org/2000/svg'>${defs}${groupSvgs}${connSvgs}${entitySvgs}</svg>`;
+}
+
 /** The traceability chain, one row per threat — reused by the HTML matrix and CSV/JSON exports. */
 export function buildTraceability({ system, threats, requirements, countermeasures, scheme }) {
     const assetById = new Map((system.assets || []).map((a) => [a.id, a]));
@@ -238,6 +338,9 @@ export function buildTraceability({ system, threats, requirements, countermeasur
             threat: t.id,
             title: t.title,
             stride: sortStride(t.stride).join(''),
+            assumptionRefs: t.assumptionRefs || [],
+            likelihoodRationale: t.likelihoodRationale || '',
+            impactRationale: t.impactRationale || '',
             initial,
             initialBand: band(scheme, initial).name,
             requirement: rqs.map((r) => `${r.id}${r.standardRef ? ` [${r.standardRef}]` : ''}${(r.satisfiedByCM || []).length ? ` → ${(r.satisfiedByCM || []).join('+')}` : ''}`).join('; '),
@@ -428,9 +531,27 @@ function strideBoundaryTablesHtml(system = {}, dfd = {}) {
 
 const csvCell = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
 function traceabilityCsv(rows) {
-    const head = ['Asset', 'C/I/A/S', 'Threat', 'Title', 'STRIDE', 'Initial', 'InitialBand', 'Requirement', 'Control', 'Residual', 'ResidualBand', 'Evidence', 'Status', 'RatedBy', 'SignOff'];
+    const head = ['Asset', 'C/I/A/S', 'Threat', 'Title', 'STRIDE', 'Assumptions', 'Rationale', 'Initial', 'InitialBand', 'Requirement', 'Control', 'Residual', 'ResidualBand', 'Evidence', 'Status', 'RatedBy', 'SignOff'];
     const body = rows.map((r) =>
-        [r.asset, r.cias, r.threat, r.title, r.stride, r.initial, r.initialBand, r.requirement, r.control, r.residual, r.residualBand, r.evidence, r.status, r.ratedBy, r.signoff]
+        [
+            r.asset,
+            r.cias,
+            r.threat,
+            r.title,
+            r.stride,
+            (r.assumptionRefs || []).join('; '),
+            [r.likelihoodRationale && `L: ${r.likelihoodRationale}`, r.impactRationale && `I: ${r.impactRationale}`].filter(Boolean).join(' | '),
+            r.initial,
+            r.initialBand,
+            r.requirement,
+            r.control,
+            r.residual,
+            r.residualBand,
+            r.evidence,
+            r.status,
+            r.ratedBy,
+            r.signoff,
+        ]
             .map(csvCell)
             .join(','),
     );
@@ -441,13 +562,29 @@ function traceabilityCsv(rows) {
 export async function buildReport(id) {
     const scheme = await loadScheme();
     const p = await readProject(id);
-    const { project, assumptions, system, dfd, threats: td, requirements: rd, countermeasures: cd, attackTrees, defects: dd } = p;
+    const { project, assumptions, system, dfd, useCases, threats: td, requirements: rd, countermeasures: cd, attackTrees, defects: dd } = p;
     const threats = td.threats || [];
     const reqs = rd.requirements || [];
     const cms = cd.countermeasures || [];
     const defects = dd.defects || [];
-    const issues = validate({ project, assumptions, system, threats: td, requirements: rd, countermeasures: cd, dfd, attackTrees, defects: dd });
+    const issues = validate({ project, assumptions, system, threats: td, requirements: rd, countermeasures: cd, dfd, useCases, attackTrees, defects: dd });
     const trace = buildTraceability({ system, threats, requirements: reqs, countermeasures: cms, scheme });
+    const assumptionsFlat = [
+        ...(assumptions.device || []).map((a) => ({ id: a.id, text: a.text || '', source: 'Device' })),
+        ...(assumptions.system || []).map((a) => ({ id: a.id, text: a.text || '', source: 'System' })),
+        ...(assumptions.environment || []).map((a) => ({ id: a.id, text: a.text || '', source: 'Environment' })),
+        ...(assumptions.operational || []).map((a) => ({ id: a.id, text: a.text || '', source: 'Operational' })),
+        ...(assumptions.attacker || []).map((a) => ({ id: a.id, text: a.text || a.name || '', source: 'Attacker' })),
+    ].filter((a) => a.id);
+    const assumptionById = new Map(assumptionsFlat.map((a) => [a.id, a]));
+    const assumptionCitedBy = new Map();
+    for (const t of threats) {
+        for (const aid of t.assumptionRefs || []) {
+            const list = assumptionCitedBy.get(aid) || [];
+            list.push(t.id);
+            assumptionCitedBy.set(aid, list);
+        }
+    }
     const sbom = buildSbom({ project, system, defects });
     const sbomMode = project.sbom?.mode || 'in-tool';
     const sbomFormat = project.sbom?.format || 'cyclonedx';
@@ -472,24 +609,53 @@ export async function buildReport(id) {
             .join('') || '<p>No DFD nodes.</p>';
 
     const traceRows = trace
-        .map(
-            (r) =>
-                `<tr><td>${esc(r.asset)}</td><td>${esc(r.cias)}</td><td><b>${esc(r.threat)}</b> ${esc(r.title)} <span class=mono>${esc(r.stride)}</span></td>` +
+        .map((r) => {
+            const assumptionRefs = (r.assumptionRefs || [])
+                .map((aid) => {
+                    if (!ID_PATTERN.test(aid)) return `<span class='mono'>${esc(aid)}</span> (invalid ID)`;
+                    const row = assumptionById.get(aid);
+                    if (!row) return `<span class='mono'>${esc(aid)}</span> (missing)`;
+                    return `<a href='#${esc(assumptionAnchor(aid))}' class='mono'>${esc(aid)}</a> <span style='color:#4d5a6d'>(${esc(row.source)})</span>`;
+                })
+                .join(', ');
+            const rationale = [
+                r.likelihoodRationale ? `L: ${esc(r.likelihoodRationale)}` : '',
+                r.impactRationale ? `I: ${esc(r.impactRationale)}` : '',
+            ]
+                .filter(Boolean)
+                .join('<br>');
+            const support = [
+                assumptionRefs ? `<div style='margin-top:3px'><span class='mono'>Assumptions:</span> ${assumptionRefs}</div>` : '',
+                rationale ? `<div style='margin-top:3px;color:#4d5a6d'>${rationale}</div>` : '',
+            ]
+                .filter(Boolean)
+                .join('');
+            return (
+                `<tr id='threat-${esc(r.threat)}'><td>${esc(r.asset)}</td><td>${esc(r.cias)}</td><td><b>${esc(r.threat)}</b> ${esc(r.title)} <span class=mono>${esc(r.stride)}</span></td>` +
                 `<td style='color:${band(scheme, r.initial).color}'>${r.initial} ${esc(r.initialBand)}</td><td>${esc(r.requirement) || '—'}</td>` +
                 `<td>${esc(r.control) || '—'}</td><td style='color:${band(scheme, r.residual).color}'>${r.residual} ${esc(r.residualBand)}</td>` +
-                `<td>${r.evidence ? r.evidence.split(' ').map((u) => `<a href='${esc(u)}'>link</a>`).join(' ') : '—'}</td><td>${esc(r.status)}${r.signoff ? `<br><span class=mono style='font-size:11px'>${esc(r.signoff)}</span>` : ''}${r.ratedBy ? `<br><span class=mono style='font-size:11px'>rated: ${esc(r.ratedBy)}</span>` : ''}</td></tr>`,
-        )
+                `<td>${r.evidence ? r.evidence.split(' ').map((u) => `<a href='${esc(u)}'>link</a>`).join(' ') : '—'}${support}</td><td>${esc(r.status)}${r.signoff ? `<br><span class=mono style='font-size:11px'>${esc(r.signoff)}</span>` : ''}${r.ratedBy ? `<br><span class=mono style='font-size:11px'>rated: ${esc(r.ratedBy)}</span>` : ''}</td></tr>`
+            );
+        })
         .join('');
 
     const assumptionSection = ['device', 'system', 'environment', 'operational']
         .map((k) => {
             const items = assumptions[k] || [];
             if (!items.length) return '';
-            return `<h3>${k[0].toUpperCase() + k.slice(1)} assumptions</h3><ul>${items.map((a) => `<li>${esc(a.text || a)}</li>`).join('')}</ul>`;
+            return `<h3>${k[0].toUpperCase() + k.slice(1)} assumptions</h3><ul>${items
+                .map((a) => {
+                    const cited = (assumptionCitedBy.get(a.id) || []).map((tid) => `<a href='#threat-${esc(tid)}' class='mono'>${esc(tid)}</a>`).join(', ');
+                    return `<li id='${esc(assumptionAnchor(a.id))}'><span class='mono'><b>${esc(a.id)}</b></span> — ${esc(a.text || a)}${cited ? `<br><span style='font-size:11px;color:#4d5a6d'>cited by: ${cited}</span>` : ''}</li>`;
+                })
+                .join('')}</ul>`;
         })
         .join('');
     const atk = (assumptions.attacker || [])
-        .map((a) => `<li><b>${esc(a.name)}</b> (cap ${a.capability}, ${esc(a.access)}): ${esc(a.text || '')}</li>`)
+        .map((a) => {
+            const cited = (assumptionCitedBy.get(a.id) || []).map((tid) => `<a href='#threat-${esc(tid)}' class='mono'>${esc(tid)}</a>`).join(', ');
+            return `<li id='${esc(assumptionAnchor(a.id))}'><span class='mono'><b>${esc(a.id)}</b></span> · <b>${esc(a.name)}</b> (cap ${a.capability}, ${esc(a.access)}): ${esc(a.text || '')}${cited ? `<br><span style='font-size:11px;color:#4d5a6d'>cited by: ${cited}</span>` : ''}</li>`;
+        })
         .join('');
     const assets = (system.assets || [])
         .map((a) => `<li>${esc(a.name)} (C${a.objectives?.confidentiality}/I${a.objectives?.integrity}/A${a.objectives?.availability}/S${a.objectives?.safety})${a.storage ? ` — <i>${esc(a.storage)}</i>` : ''}</li>`)
@@ -497,6 +663,14 @@ export async function buildReport(id) {
     const ifaceList = (system.interfaces || [])
         .map((i) => `<li><b>${esc(i.name)}</b> ${esc(i.protocol || '')} · ${esc(i.exposure)}${i.category ? ` · ${esc(i.category)}` : ''}</li>`)
         .join('');
+    const ucDiagrams = Array.isArray(useCases?.diagrams) ? useCases.diagrams : [];
+    const useCaseSection = project.reportOptions?.includeUseCases
+        ? ucDiagrams.length
+            ? `<h2>Use-case diagrams</h2>${ucDiagrams
+                .map((d) => `<h3>${esc(d.name || d.id)}</h3>${useCaseSvg(d)}`)
+                .join('')}`
+            : ''
+        : '';
     const reqRows = reqs
         .map(
             (r) =>
@@ -517,7 +691,10 @@ export async function buildReport(id) {
         )
         .join('');
     const treeList = (attackTrees?.trees || [])
-        .map((t) => `<li><b>${esc(t.id)}</b> ${esc(t.title)}${t.threatRef ? ` &rarr; ${esc(t.threatRef)}` : ''}</li>`)
+        .map((t) => {
+            const refs = [...new Set([...(t.threatRefs || []), ...(t.threatRef ? [t.threatRef] : [])])];
+            return `<li><b>${esc(t.id)}</b> ${esc(t.title)}${refs.length ? ` &rarr; ${esc(refs.join(', '))}` : ''}</li>`;
+        })
         .join('');
     const strideRows = strideCov
         .map((e) => `<tr${e.gaps ? " style='background:#fff7f0'" : ''}><td>${esc(e.id)} ${esc(e.name)} <span class=mono>${esc(e.kind)}</span></td>${e.cells.map((c) => `<td style='text-align:center'>${c ? '✓' : '·'}</td>`).join('')}</tr>`)
@@ -560,6 +737,7 @@ export async function buildReport(id) {
         `<h2>Traceability matrix</h2><div class='trace-note'>This matrix shows the full chain from protected asset to assessed threat, required security response, implemented countermeasure, residual risk and linked evidence. Machine-readable exports are written alongside the report as <code>report/traceability.csv</code>, <code>report/traceability.json</code> and <code>${esc(sbomFile)}</code>.</div>` +
         `<table><tr><th>Asset</th><th>C/I/A/S</th><th>Threat</th><th>Initial</th><th>Requirement</th><th>Control</th><th>Residual</th><th>Evidence</th><th>Status</th></tr>${traceRows}</table>` +
         `<h2>Data flow diagram (all layers)</h2>${dfdHtml}` +
+        useCaseSection +
         tbSection +
         strideSection +
         strideTbSection +

@@ -1,5 +1,6 @@
 import { useStore, uid } from '../../state/store';
 import { Field, Chips, STRIDE, sortStride, RiskPill, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, Jump, HelpButton, confirmDelete, IdInput } from '../common';
+import { ID_PATTERN } from '../../lib/ids';
 import { riskOf } from '../../lib/risk';
 import { adId } from '../../lib/attackTree';
 import RiskCalculator from './RiskCalculator';
@@ -20,13 +21,23 @@ export default function ThreatsPanel() {
     const compOpts = (data.system.components || []).map((c) => ({ value: c.id, label: `${c.name}` }));
     const assetOpts = (data.system.assets || []).map((a) => ({ value: a.id, label: a.name }));
     const attackers = data.assumptions.attacker || [];
+    const assumptionRows = [
+        ...(data.assumptions.device || []).map((x) => ({ id: x.id, text: x.text || '', source: 'Device' })),
+        ...(data.assumptions.system || []).map((x) => ({ id: x.id, text: x.text || '', source: 'System' })),
+        ...(data.assumptions.environment || []).map((x) => ({ id: x.id, text: x.text || '', source: 'Environment' })),
+        ...(data.assumptions.operational || []).map((x) => ({ id: x.id, text: x.text || '', source: 'Operational' })),
+        ...(attackers || []).map((x) => ({ id: x.id, text: x.text || x.name || '', source: 'Attacker' })),
+    ];
+    const assumptionById = new Map(assumptionRows.map((x) => [x.id, x]));
+    const assumptionOpts = assumptionRows.map((x) => ({ value: x.id, label: `${x.id} · ${x.source}${x.text ? ` · ${x.text.slice(0, 64)}` : ''}` }));
 
     const trees = data.attackTrees?.trees || [];
-    const treeFor = (tid: string) => trees.find((x) => x.threatRef === tid);
+    const treeThreatRefs = (tree: any) => [...new Set([...(tree.threatRefs || []), ...(tree.threatRef ? [tree.threatRef] : [])])];
+    const treeFor = (tid: string) => trees.find((x) => treeThreatRefs(x).includes(tid));
     const makeTree = (t: Threat) => {
         if (!treeFor(t.id)) {
             const root = { id: adId(), kind: 'goal' as const, label: t.title, gate: 'OR' as const, children: [] };
-            save('attackTrees', { trees: [...trees, { id: uid('AT', trees.map((x) => x.id)), title: t.title, threatRef: t.id, root }] });
+            save('attackTrees', { trees: [...trees, { id: uid('AT', trees.map((x) => x.id)), title: t.title, threatRef: t.id, threatRefs: [t.id], root }] });
         }
         setView('attackTrees');
     };
@@ -156,6 +167,20 @@ export default function ThreatsPanel() {
                             <textarea value={t.impactRationale || ''} onChange={(e) => upd({ impactRationale: e.target.value })} />
                         </Field>
                     </div>
+                    <Field label="Supporting assumptions" hint="Cite assumptions that justify feasibility or the chosen risk rating.">
+                        <Chips options={assumptionOpts} value={t.assumptionRefs || []} onChange={(v) => upd({ assumptionRefs: v })} empty="No assumptions defined in step 02 yet." />
+                        {(t.assumptionRefs || []).length ? (
+                            <ul style={{ margin: '8px 0 0 18px' }}>
+                                {(t.assumptionRefs || []).map((aid) => {
+                                    const ref = assumptionById.get(aid);
+                                    const validId = ID_PATTERN.test(aid);
+                                    if (!validId) return <li key={aid}><b>{aid}</b> · invalid ID format</li>;
+                                    if (!ref) return <li key={aid}><b>{aid}</b> · assumption not found</li>;
+                                    return <li key={aid}><b>{aid}</b> ({ref.source}) · {ref.text || 'No detail text'}</li>;
+                                })}
+                            </ul>
+                        ) : null}
+                    </Field>
                 </details>
                 <RiskCalculator t={t} upd={upd} />
                 {t.status === 'accepted' && (
@@ -255,6 +280,7 @@ export default function ThreatsPanel() {
                                     </div>
                                     <div className="summary-links">
                                         {(t.stride || []).length ? <span className="tag stride">{sortStride(t.stride).join(' ')}</span> : null}
+                                        {(t.assumptionRefs || []).length ? <span className="tag">Assumptions: {t.assumptionRefs.join(', ')}</span> : null}
                                         <span className="lbl">Mitigated by:</span>
                                         {cmsFor(t.id).length ? cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} />) : <span className="hint">none</span>}
                                         {(t.assets || []).length ? (

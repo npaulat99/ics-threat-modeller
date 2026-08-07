@@ -5,6 +5,7 @@ import Inspector from './components/Inspector';
 import WizardBar from './components/WizardBar';
 import DfdView from './components/dfd/DfdView';
 import ProjectPanel from './components/panels/ProjectPanel';
+import UseCasesPanel from './components/panels/UseCasesPanel';
 import AssumptionsPanel from './components/panels/AssumptionsPanel';
 import SystemPanel from './components/panels/SystemPanel';
 import ThreatsPanel from './components/panels/ThreatsPanel';
@@ -19,6 +20,11 @@ import AssistantPanel from './components/panels/AssistantPanel';
 import KbPanel from './components/panels/KbPanel';
 import SettingsModal from './components/SettingsModal';
 import StrideBoundaryEditor from './components/StrideBoundaryEditor';
+import TutorialOnboarding from './components/TutorialOnboarding';
+
+function promptNewProject(): string | null {
+    return window.prompt('New device / project name:', 'New device');
+}
 
 export default function App() {
     const data = useStore((s) => s.data);
@@ -35,6 +41,8 @@ export default function App() {
                 return <AssumptionsPanel />;
             case 'system':
                 return <SystemPanel />;
+            case 'useCases':
+                return <UseCasesPanel />;
             case 'threats':
                 return <ThreatsPanel />;
             case 'requirements':
@@ -80,7 +88,13 @@ export default function App() {
                             Create a project to begin, or copy a folder into <code>tra-webapp/projects/</code>. Each step is a JSON
                             file you can edit here or directly on disk — changes sync live.
                         </p>
-                        <button className="btn primary" onClick={() => newProject('New device')}>
+                        <button
+                            className="btn primary"
+                            onClick={async () => {
+                                const name = promptNewProject();
+                                if (name) await newProject(name);
+                            }}
+                        >
                             + New project
                         </button>
                     </div>
@@ -88,6 +102,7 @@ export default function App() {
             )}
             <SettingsModal />
             <StrideBoundaryEditor />
+            <TutorialOnboarding />
         </div>
     );
 }

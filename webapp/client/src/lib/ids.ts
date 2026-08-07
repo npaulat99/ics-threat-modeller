@@ -18,6 +18,10 @@ export function allIds(data: ProjectData): { id: string; kind: string }[] {
     push(data.countermeasures?.countermeasures, 'countermeasure');
     push(data.attackTrees?.trees, 'attack tree');
     push(data.defects?.defects, 'defect');
+    push(data.assumptions?.device, 'assumption');
+    push(data.assumptions?.system, 'assumption');
+    push(data.assumptions?.environment, 'assumption');
+    push(data.assumptions?.operational, 'assumption');
     push(data.assumptions?.attacker, 'attacker profile');
     // DFD nodes share their id-space, except a trust-boundary node deliberately reuses the id of
     // its system trust boundary (they are the same entity) — skip that alias.
@@ -55,7 +59,7 @@ export function viewOfId(data: ProjectData, id: string): ViewKey | null {
     if (has(data.countermeasures?.countermeasures)) return 'countermeasures';
     if (has(data.attackTrees?.trees)) return 'attackTrees';
     if (has(data.defects?.defects)) return 'defects';
-    if (has(data.assumptions?.attacker)) return 'assumptions';
+    if (has(data.assumptions?.attacker) || has(data.assumptions?.device) || has(data.assumptions?.system) || has(data.assumptions?.environment) || has(data.assumptions?.operational)) return 'assumptions';
     if ((data.dfd?.flows || []).some((f) => f?.id === id) || has(data.dfd?.nodes)) return 'dfd';
     return null;
 }

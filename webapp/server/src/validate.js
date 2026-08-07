@@ -7,9 +7,10 @@ import { residual } from './risk.js';
 const arr = (x) => (Array.isArray(x) ? x : []);
 const PROX = { remote: 1, adjacent: 2, local: 3, physical: 4 };
 const reqProx = (e) => (e >= 4 ? 1 : e === 3 ? 2 : e === 2 ? 3 : 4);
+const ID_PATTERN = /^[A-Za-z0-9 _\-:.]+$/;
 const DEFAULT_ACCEPTABLE_RISK = 12;
 
-export function validate({ project = {}, assumptions = {}, system = {}, threats = {}, requirements = {}, countermeasures = {}, dfd = {}, attackTrees = {}, defects = {} } = {}) {
+export function validate({ project = {}, assumptions = {}, system = {}, threats = {}, requirements = {}, countermeasures = {}, dfd = {}, useCases = {}, attackTrees = {}, defects = {} } = {}) {
     const issues = [];
     const add = (severity, message, key) => issues.push({ severity, message, key: key ?? message });
     const threatList = arr(threats.threats ?? threats);
@@ -21,6 +22,13 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
     const assetIds = new Set(arr(system.assets).map((a) => a.id));
     const ifaceIds = new Set(interfaces.map((i) => i.id));
     const attackers = arr(assumptions.attacker);
+    const assumptionIds = new Set([
+        ...arr(assumptions.device).map((x) => x.id),
+        ...arr(assumptions.system).map((x) => x.id),
+        ...arr(assumptions.environment).map((x) => x.id),
+        ...arr(assumptions.operational).map((x) => x.id),
+        ...attackers.map((x) => x.id),
+    ].filter(Boolean));
     const attackerById = new Map(attackers.map((a) => [a.id, a]));
     const tIds = new Set(threatList.map((t) => t.id));
     const cmIds = new Set(cmList.map((c) => c.id));
@@ -62,6 +70,10 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
         if (t.attackerRef && !attackerById.has(t.attackerRef)) add('error', `${t.id}: references unknown attacker profile '${t.attackerRef}'.`);
         for (const iface of arr(t.interfaceRefs)) if (!ifaceIds.has(iface)) add('error', `${t.id}: references unknown interface '${iface}'.`);
         if (t.interfaceRef && !ifaceIds.has(t.interfaceRef)) add('error', `${t.id}: references unknown interface '${t.interfaceRef}'.`);
+        for (const aid of arr(t.assumptionRefs)) {
+            if (!ID_PATTERN.test(aid)) add('error', `${t.id}: references invalid assumption ID '${aid}'.`);
+            else if (!assumptionIds.has(aid)) add('error', `${t.id}: references unknown assumption '${aid}'.`);
+        }
         const atk = t.attackerRef ? attackerById.get(t.attackerRef) : null;
         const exposure = t.likelihoodFactors?.exposure;
         const exploit = t.likelihoodFactors?.exploitability;
@@ -90,6 +102,21 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
                 add('warning', `${t.id}: rigorous mode requires the exposure / exploitability factors to be set.`);
             if (!t.ratedBy) add('warning', `${t.id}: rigorous mode requires the rater to be recorded (ratedBy).`);
         }
+    }
+
+    for (const i of interfaces) {
+        if (typeof i.hidden !== 'undefined' && typeof i.hidden !== 'boolean') {
+            add('warning', `Interface '${i.id || i.name || 'unknown'}': hidden must be a boolean when set.`);
+        }
+    }
+
+    const diagrams = Array.isArray(useCases?.diagrams) ? useCases.diagrams : [];
+    if (diagrams.length > 0 && !project.reportOptions?.includeUseCases) {
+        add(
+            'notice',
+            `Use-case diagrams exist (${diagrams.length}) but report inclusion is disabled. Accept this notice if the exclusion is intentional.`,
+            'usecases-excluded',
+        );
     }
 
     const reqCms = new Set(reqList.flatMap((r) => arr(r.satisfiedByCM)));
@@ -159,8 +186,11 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
         if ((d.status === 'open' || d.status === 'triaged') && (d.severity === 'high' || d.severity === 'critical') && d.threatRef)
             add('warning', `${d.id}: open ${d.severity} defect — re-assess the linked threat '${d.threatRef}'.`);
     }
-    for (const tr of arr(attackTrees.trees))
-        if (tr.threatRef && !tIds.has(tr.threatRef)) add('error', `Attack tree '${tr.id}' references unknown threat '${tr.threatRef}'.`);
+    for (const tr of arr(attackTrees.trees)) {
+        const refs = [...new Set([...arr(tr.threatRefs), ...(tr.threatRef ? [tr.threatRef] : [])])];
+        for (const ref of refs)
+            if (!tIds.has(ref)) add('error', `Attack tree '${tr.id}' references unknown threat '${ref}'.`);
+    }
 
     return issues;
 }

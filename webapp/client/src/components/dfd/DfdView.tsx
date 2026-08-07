@@ -201,6 +201,19 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
 
     const compById = useMemo(() => new Map((data.system.components || []).map((c) => [c.id, c])), [data.system.components]);
     const compName = (ref?: string) => (ref ? compById.get(ref)?.name || '' : '');
+    const visibleIfaceIds = useMemo(() => {
+        const ids = new Set<string>();
+        const interfaces = (data.system.interfaces || []).filter((itf) => !itf.hidden);
+        if (currentParent == null) {
+            for (const itf of interfaces) ids.add(itf.id);
+            return ids;
+        }
+        for (const f of dfd.flows) {
+            if (f.from === currentParent && interfaces.some((itf) => itf.id === f.to)) ids.add(f.to);
+            if (f.to === currentParent && interfaces.some((itf) => itf.id === f.from)) ids.add(f.from);
+        }
+        return ids;
+    }, [currentParent, dfd.flows, data.system.interfaces]);
     const riskFor = (node: DfdNode) => {
         if (!node.componentRef) return null;
         const rel = threats.filter((t) => (t.components || []).includes(node.componentRef!));
@@ -229,6 +242,8 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
         return null;
     };
 
+    const targetOf = useMemo(() => (data.system.interfaces || []).map((itf) => targetForComponent(itf.component)), [data.system.interfaces, dfd.nodes, currentParent]);
+
     const placedReal = () => realNodes.map((n) => ({ id: n.id, x: n.x ?? 0, y: n.y ?? 0, ...sizeOf(n.type) }));
 
     const buildNodes = () => {
@@ -252,8 +267,7 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
         const TB_PAD = 34; // side / bottom padding around members
         const TB_LABEL_H = 24; // reserved header strip for the boundary name
         const TB_GAP = 10; // gaps between label / chips / members
-        const targetOf = ifaces.map((itf) => targetForComponent(itf.component));
-        const ifaceVisible = ifaces.map((_itf, i) => targetOf[i] != null);
+        const ifaceVisible = ifaces.map((itf) => visibleIfaceIds.has(itf.id));
 
         // Group the visible interfaces by the trust boundary that contains their target (or by the
         // bare target node when it is not inside a boundary on this layer).
@@ -346,7 +360,7 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             const sibIds = new Set(dfd.nodes.filter((n) => (n.parent ?? null) === parentOfP && n.id !== currentParent && n.type !== 'trust-boundary').map((n) => n.id));
             const ifaceIdSet = new Set(ifaces.map((it) => it.id));
             const parentIfaceIds = new Set(ifaces.filter((it) => it.component === Pcomp).map((it) => it.id));
-            const visibleIfaceHere = new Set(ifaces.filter((it) => targetForComponent(it.component)).map((it) => it.id));
+            const visibleIfaceHere = visibleIfaceIds;
             const nodeById = new Map(dfd.nodes.map((n) => [n.id, n]));
             const internalHas = (id: string) => real.some((r) => r.id === id);
             const portMap = new Map<string, { in: boolean; out: boolean; labels: string[] }>();
@@ -530,7 +544,7 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
                 selected: n.id === selectedNodeId,
                 draggable: !connMode,
                 connectable: true,
-                data: { label: n.label, dtype: n.type, sub: compName(n.componentRef), risk: riskFor(n), hasChildren, connMode },
+                data: { label: n.componentRef ? compName(n.componentRef) || n.label : n.label, dtype: n.type, sub: compName(n.componentRef), risk: riskFor(n), hasChildren, connMode },
             });
         });
         return out;
@@ -728,6 +742,21 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             selectNode(id);
             return;
         }
+        if (type === 'external-entity') {
+            const id = uid('N-', dfd.nodes.map((n) => n.id));
+            const node: DfdNode = {
+                id,
+                label: 'New external entity',
+                type,
+                layer,
+                parent: currentParent,
+                x: 120 + (visible.length % 4) * 230,
+                y: 110 + Math.floor(visible.length / 4) * 170,
+            };
+            save('dfd', { ...dfd, nodes: [...dfd.nodes, node] });
+            selectNode(id);
+            return;
+        }
         const compId = uid('C-', data.system.components.map((c) => c.id));
         const parentComp = currentParent ? dfd.nodes.find((n) => n.id === currentParent)?.componentRef : null;
         const comp = {
@@ -785,6 +814,7 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
 
     const selectedIfaceIds = new Set(
         (data.system.interfaces || [])
+            .filter((itf) => !itf.hidden)
             .filter((itf) => selectedNodeId && !selectedNodeId.startsWith('iface:') && targetForComponent(itf.component) === selectedNodeId)
             .map((itf) => itf.id),
     );

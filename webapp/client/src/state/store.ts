@@ -7,9 +7,20 @@
 //   - When a JSON file is edited externally, the backend pushes an {type:'artifact'}
 //     message which `applyArtifact` merges back into state — so the UI tracks the files live.
 import { create } from 'zustand';
-import type { ProjectData, ProjectSummary, RiskScheme, StepKey, ViewKey } from '../types';
+import type { LaunchConfig, ProjectData, ProjectSummary, RiskScheme, StepKey, ViewKey } from '../types';
+import { tutorialStorageKey } from '../tutorial/tutorialData';
 
 const norm = (v: string | null | undefined) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+const isPlaceholderComponentName = (label: string | undefined) => {
+    const l = norm(label);
+    return l === 'newcomponent' || l === 'newprocess' || l === 'newmultiprocess' || l === 'newstore' || l === 'newexternalentity' || l === 'newdevice';
+};
+const isPlaceholderDfdLabel = (label: string | undefined) => {
+    const l = norm(label);
+    return l === 'newcomponent' || l === 'newexternalentity' || l === 'newtrustboundary' || l === 'newboundary' || l === 'newprocess' || l === 'newmultiprocess' || l === 'newstore';
+};
+const DEVICE_HOUSING_ID = 'TB-1';
+const DEVICE_HOUSING_NAME = 'Device housing';
 const suffixNum = (id?: string | null) => {
     const m = String(id || '').match(/(\d+)$/);
     return m ? Number(m[1]) : null;
@@ -166,7 +177,7 @@ function reconcileSystemDfd(system: any, dfd: any, authoritative: 'system' | 'df
         const parentNode = comp.parent ? nodesByComponent.get(comp.parent) : null;
         node.layer = comp.layer;
         node.parent = parentNode?.id ?? null;
-        if (!node.label || norm(node.label) === norm(comp.id)) node.label = comp.name;
+        if (!node.label || norm(node.label) === norm(comp.id) || isPlaceholderDfdLabel(node.label)) node.label = comp.name;
     }
 
     const tbNodes = nodes.filter((n: any) => n.type === 'trust-boundary');
@@ -212,10 +223,11 @@ function reconcileDfdSystem(system: any, dfd: any) {
 
     const nextComponents = componentNodes.map((node: any) => {
         const existing: any = existingComponents.get(node.componentRef) || {};
+        const preserveExistingName = !!existing.name && isPlaceholderComponentName(node.label) && norm(existing.name) !== norm(node.label);
         return {
             ...existing,
             id: node.componentRef,
-            name: node.label || existing.name || node.componentRef,
+            name: preserveExistingName ? existing.name : node.label || existing.name || node.componentRef,
             kind: existing.kind || (node.type === 'store' ? 'store' : node.type === 'external-entity' ? 'external-entity' : node.type === 'multiprocess' ? 'multiprocess' : 'software'),
             layer: Number(node.layer) || 1,
             parent: node.parent ? ((nodeById.get(node.parent) as any)?.componentRef ?? null) : null,
@@ -247,6 +259,11 @@ function reconcileDfdSystem(system: any, dfd: any) {
                 .map((nodeId: string) => (nodeById.get(nodeId) as any)?.componentRef)
                 .filter(Boolean),
         }));
+
+    const deviceComponent = (nextComponents as any[]).find((c) => c.kind === 'device') || (system?.components || []).find((c: any) => c.kind === 'device');
+    if (deviceComponent && !nextTrustBoundaries.some((tb) => tb.id === DEVICE_HOUSING_ID)) {
+        nextTrustBoundaries.unshift({ id: DEVICE_HOUSING_ID, name: DEVICE_HOUSING_NAME, members: [deviceComponent.id] });
+    }
 
     return {
         ...(system || {}),
@@ -282,7 +299,7 @@ const saveTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 // rapid edits to the same step within a short window coalesce into one undo step so typing or
 // dragging does not produce dozens of tiny steps. undo()/redo() restore a snapshot and push the
 // changed artifacts to the backend.
-const STEP_KEYS: StepKey[] = ['project', 'assumptions', 'system', 'dfd', 'threats', 'requirements', 'countermeasures', 'attackTrees', 'defects'];
+const STEP_KEYS: StepKey[] = ['project', 'assumptions', 'system', 'dfd', 'useCases', 'threats', 'requirements', 'countermeasures', 'attackTrees', 'defects'];
 let undoStack: ProjectData[] = [];
 let redoStack: ProjectData[] = [];
 let histStep = '';
@@ -304,8 +321,35 @@ function pushHistory(prev: ProjectData, step: string) {
     useStore.setState({ undoDepth: undoStack.length, redoDepth: 0 });
 }
 
+function ensureDeviceHousing(system: any, dfd: any) {
+    const deviceComponent = (system?.components || []).find((c: any) => c.kind === 'device');
+    if (!deviceComponent) return { system, dfd };
+    const systemBoundaries = [...(system?.trustBoundaries || [])];
+    if (!systemBoundaries.some((tb: any) => tb.id === DEVICE_HOUSING_ID)) {
+        systemBoundaries.unshift({ id: DEVICE_HOUSING_ID, name: DEVICE_HOUSING_NAME, members: [deviceComponent.id] });
+    }
+    const dfdNodes = [...(dfd?.nodes || [])];
+    const hasNode = dfdNodes.some((n: any) => n.type === 'trust-boundary' && n.id === DEVICE_HOUSING_ID);
+    if (!hasNode) {
+        const deviceNode = dfdNodes.find((n: any) => n.componentRef === deviceComponent.id);
+        if (deviceNode) {
+            dfdNodes.unshift({
+                id: DEVICE_HOUSING_ID,
+                label: DEVICE_HOUSING_NAME,
+                type: 'trust-boundary',
+                layer: 1,
+                parent: null,
+                x: deviceNode.x ?? 200,
+                y: (deviceNode.y ?? 200) - 80,
+                members: [deviceNode.id],
+            });
+        }
+    }
+    return { system: { ...(system || {}), trustBoundaries: systemBoundaries }, dfd: { ...(dfd || {}), nodes: dfdNodes } };
+}
+
 function restoreSnapshot(target: ProjectData, current: ProjectData) {
-    useStore.setState({ data: target, selectedNodeId: null, selectedEdgeId: null });
+    useStore.setState({ data: target, selectedNodeId: null, selectedEdgeId: null, ucSelection: null });
     const id = useStore.getState().activeId;
     if (!id) return;
     useStore.setState({ saveState: 'saving' });
@@ -339,23 +383,34 @@ interface Store {
     dfdPath: string[];
     selectedNodeId: string | null;
     selectedEdgeId: string | null;
+    ucDiagramId: string | null;
+    ucSelection: { type: 'entity' | 'connection' | 'group'; id: string } | null;
     strideBoundaryId: string | null;
     settingsOpen: boolean;
     focus: { view: string; id: string } | null;
     lastSavedAt: number;
     saveState: 'idle' | 'saving' | 'saved' | 'offline';
+    tutorialPromptOpen: boolean;
+    tutorialWalkthroughOpen: boolean;
 
     init(): Promise<void>;
     refreshProjects(): Promise<void>;
     refreshKb(): Promise<void>;
     selectProject(id: string): Promise<void>;
-    newProject(name: string): Promise<void>;
+    newProject(name: string): Promise<string>;
+    startTutorial(): void;
+    skipTutorial(): void;
+    closeTutorial(): void;
+    openTutorial(): void;
+    openTutorialPrompt(): void;
     setView(v: ViewKey | 'dashboard' | 'kb' | 'assistant'): void;
     goto(view: string, id?: string): void;
     setTheme(t: 'light' | 'dark'): void;
     setDfdPath(path: string[]): void;
     selectNode(id: string | null): void;
     selectEdge(id: string | null): void;
+    setUcDiagram(id: string | null): void;
+    selectUcItem(sel: { type: 'entity' | 'connection' | 'group'; id: string } | null): void;
     openStrideBoundary(id: string | null): void;
     openSettings(v: boolean): void;
     drillInto(id: string): void;
@@ -382,11 +437,15 @@ export const useStore = create<Store>((set, get) => ({
     dfdPath: [],
     selectedNodeId: null,
     selectedEdgeId: null,
+    ucDiagramId: null,
+    ucSelection: null,
     strideBoundaryId: null,
     settingsOpen: false,
     focus: null,
     lastSavedAt: 0,
     saveState: 'idle',
+    tutorialPromptOpen: false,
+    tutorialWalkthroughOpen: false,
     undoDepth: 0,
     redoDepth: 0,
 
@@ -400,15 +459,20 @@ export const useStore = create<Store>((set, get) => ({
                 e.returnValue = '';
             }
         });
-        const [scheme, kb, bugBar, projects] = await Promise.all([
+        const [scheme, kb, bugBar, projects, config] = await Promise.all([
             getJSON<RiskScheme>('/api/risk-scheme').catch(() => null),
             getJSON<any>('/api/kb').catch(() => null),
             getJSON<any>('/api/bug-bar').catch(() => null),
             getJSON<ProjectSummary[]>('/api/projects').catch(() => []),
+            getJSON<LaunchConfig>('/api/config').catch(() => ({ preselectProjectId: null })),
         ]);
         set({ scheme, kb, bugBar, theme: saved, projects });
         connect();
-        if (projects.length) await get().selectProject(projects[0].id);
+        if (projects.length) {
+            const preferred = config?.preselectProjectId;
+            const selected = preferred && projects.some((p) => p.id === preferred) ? preferred : projects[0].id;
+            await get().selectProject(selected);
+        }
     },
 
     async refreshProjects() {
@@ -423,7 +487,7 @@ export const useStore = create<Store>((set, get) => ({
 
     async selectProject(id) {
         const data = await getJSON<ProjectData>(`/api/projects/${id}`);
-        set({ activeId: id, data, dfdPath: [], selectedNodeId: null, selectedEdgeId: null });
+        set({ activeId: id, data, dfdPath: [], selectedNodeId: null, selectedEdgeId: null, ucDiagramId: null, ucSelection: null });
         clearHistory();
         subscribe(id);
     },
@@ -433,6 +497,44 @@ export const useStore = create<Store>((set, get) => ({
         await get().refreshProjects();
         await get().selectProject(id);
         set({ activeView: 'project' });
+        try {
+            if (!localStorage.getItem(tutorialStorageKey)) {
+                set({ tutorialPromptOpen: true, tutorialWalkthroughOpen: false });
+            }
+        } catch {
+            /* ignore localStorage access errors */
+        }
+        return id;
+    },
+
+    startTutorial() {
+        try {
+            localStorage.setItem(tutorialStorageKey, 'started');
+        } catch {
+            /* ignore localStorage access errors */
+        }
+        set({ tutorialPromptOpen: false, tutorialWalkthroughOpen: true });
+    },
+
+    skipTutorial() {
+        try {
+            localStorage.setItem(tutorialStorageKey, 'skipped');
+        } catch {
+            /* ignore localStorage access errors */
+        }
+        set({ tutorialPromptOpen: false, tutorialWalkthroughOpen: false });
+    },
+
+    closeTutorial() {
+        set({ tutorialPromptOpen: false, tutorialWalkthroughOpen: false });
+    },
+
+    openTutorial() {
+        set({ tutorialPromptOpen: false, tutorialWalkthroughOpen: true });
+    },
+
+    openTutorialPrompt() {
+        set({ tutorialPromptOpen: true, tutorialWalkthroughOpen: false });
     },
 
     setView(v) {
@@ -458,6 +560,12 @@ export const useStore = create<Store>((set, get) => ({
     },
     selectEdge(id) {
         set({ selectedEdgeId: id, selectedNodeId: null });
+    },
+    setUcDiagram(id) {
+        set({ ucDiagramId: id, ucSelection: null });
+    },
+    selectUcItem(sel) {
+        set({ ucSelection: sel });
     },
     openStrideBoundary(id) {
         set({ strideBoundaryId: id });
@@ -485,6 +593,9 @@ export const useStore = create<Store>((set, get) => ({
             nextData.system = reconcileDfdSystem(nextData.system, nextData.dfd);
             nextData.dfd = reconcileSystemDfd(nextData.system, nextData.dfd, 'dfd');
         }
+        const enforced = ensureDeviceHousing(nextData.system, nextData.dfd);
+        nextData.system = enforced.system;
+        nextData.dfd = enforced.dfd;
         set({ data: nextData });
         const id = get().activeId;
         if (!id) return;
@@ -549,7 +660,15 @@ export const useStore = create<Store>((set, get) => ({
             countermeasures: {
                 countermeasures: (data.countermeasures.countermeasures || []).map((c) => ({ ...c, id: m(c.id), components: arr(c.components), addresses: (c.addresses || []).map((a) => ({ ...a, threat: a.threat === oldId ? newId : a.threat })) })),
             },
-            attackTrees: { trees: (data.attackTrees?.trees || []).map((t) => ({ ...t, id: m(t.id), threatRef: t.threatRef === oldId ? newId : t.threatRef, root: mapNode(t.root) })) },
+            attackTrees: {
+                trees: (data.attackTrees?.trees || []).map((t) => ({
+                    ...t,
+                    id: m(t.id),
+                    threatRef: t.threatRef === oldId ? newId : t.threatRef,
+                    threatRefs: (t.threatRefs || []).map((r: string) => (r === oldId ? newId : r)),
+                    root: mapNode(t.root),
+                })),
+            },
             defects: { defects: (data.defects?.defects || []).map((d) => ({ ...d, id: m(d.id), component: d.component === oldId ? newId : d.component })) },
             assumptions: { ...data.assumptions, attacker: (data.assumptions.attacker || []).map((a) => ({ ...a, id: m(a.id) })) },
             dfd: {
@@ -590,6 +709,8 @@ export const useStore = create<Store>((set, get) => ({
     applyArtifact(step, value) {
         const data = get().data;
         if (!data) return;
+        const activeTag = (document.activeElement as HTMLElement | null)?.tagName;
+        if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') return;
         if (JSON.stringify((data as any)[step]) === JSON.stringify(value)) return;
         set({ data: { ...data, [step]: value } });
     },

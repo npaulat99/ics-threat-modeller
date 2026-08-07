@@ -128,6 +128,14 @@ app.get('/api/projects/:id/git/status', async (req, res) => res.json(await gitSt
 
 app.get('/api/projects', async (_req, res) => res.json(await listProjects()));
 
+app.get('/api/config', async (_req, res) => {
+    const requested = process.env.TRA_PRESELECT_PROJECT || null;
+    if (!requested) return res.json({ preselectProjectId: null });
+    const projects = await listProjects();
+    const isValid = projects.some((p) => p.id === requested);
+    res.json({ preselectProjectId: isValid ? requested : null });
+});
+
 app.post('/api/projects', async (req, res) => {
     const id = await scaffoldProject(req.body?.name || 'New device');
     broadcastProjects();

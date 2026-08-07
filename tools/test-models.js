@@ -6,6 +6,7 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const DfdModel = require(path.join(root, "vscode-extension/media/dfd-model.js"));
 const AtModel = require(path.join(root, "vscode-extension/media/attacktree-model.js"));
+const RiskModel = require(path.join(root, "vscode-extension/media/risk-model.js"));
 
 function hasTraFixtures(projectDir) {
   return fs.existsSync(path.join(projectDir, "04-dfd/dfd.json")) && fs.existsSync(path.join(projectDir, "07-attack-trees/attack-trees.json"));
@@ -39,13 +40,45 @@ function discoverProjectDir() {
   );
 }
 
-const projectDir = discoverProjectDir();
-
 let passed = 0;
 function ok(name, cond) { assert.ok(cond, "FAIL: " + name); passed++; }
 
+/* ---------- Optional fixture smoke checks ---------- */
+let projectDir = null;
+try {
+  projectDir = discoverProjectDir();
+} catch {
+  // Synthetic fixtures below keep this test deterministic even when no sample project is present.
+}
+
+if (projectDir) {
+  const fixtureDfd = JSON.parse(fs.readFileSync(path.join(projectDir, "04-dfd/dfd.json"), "utf8"));
+  ok("fixture dfd has nodes array", Array.isArray(fixtureDfd.nodes));
+  ok("fixture dfd has flows array", Array.isArray(fixtureDfd.flows));
+
+  const fixtureTrees = JSON.parse(fs.readFileSync(path.join(projectDir, "07-attack-trees/attack-trees.json"), "utf8"));
+  ok("fixture attack-trees has trees array", Array.isArray(fixtureTrees.trees));
+}
+
 /* ---------- DFD model ---------- */
-const dfd = JSON.parse(fs.readFileSync(path.join(projectDir, "04-dfd/dfd.json"), "utf8"));
+const dfd = {
+  nodes: [
+    { id: "TB-ENC", label: "Device housing", type: "trust-boundary", layer: 1, parent: null, members: ["N-DEV"] },
+    { id: "N-DCS", label: "DCS", type: "external-entity", layer: 1, parent: null },
+    { id: "N-PHONE", label: "Phone", type: "external-entity", layer: 1, parent: null },
+    { id: "N-DEV", label: "Device", type: "process", layer: 1, parent: null },
+    { id: "N-MCU", label: "MCU", type: "process", layer: 2, parent: "N-DEV" },
+    { id: "N-BT", label: "BLE", type: "process", layer: 2, parent: "N-DEV" },
+    { id: "N-HART", label: "HART", type: "store", layer: 2, parent: "N-DEV" },
+    { id: "N-CFG", label: "Config", type: "store", layer: 2, parent: "N-DEV" },
+    { id: "TB-CORE", label: "Core", type: "trust-boundary", layer: 2, parent: "N-DEV", members: ["N-MCU", "N-CFG"] },
+  ],
+  flows: [
+    { id: "F1", from: "N-DCS", to: "N-DEV", label: "cmd" },
+    { id: "F2", from: "N-DEV", to: "N-PHONE", label: "status" },
+    { id: "F3", from: "N-MCU", to: "N-CFG", label: "load" },
+  ],
+};
 
 const rootSibs = DfdModel.siblings(dfd, null).map((n) => n.id);
 ok("root siblings exclude trust boundary", JSON.stringify(rootSibs) === JSON.stringify(["N-DCS", "N-PHONE", "N-DEV"]));
@@ -87,10 +120,40 @@ ok("delete removes flows touching removed nodes", !d3.flows.some((f) => ["N-DEV"
 ok("delete cleans trust-boundary members", d3.nodes.filter((n) => n.id === "TB-ENC").every((tb) => !(tb.members || []).includes("N-DEV")));
 
 /* ---------- Attack-defense tree model (schema-identical to the webapp) ---------- */
-const atreeDoc = JSON.parse(fs.readFileSync(path.join(projectDir, "07-attack-trees/attack-trees.json"), "utf8"));
-const tree = atreeDoc.trees[0];
+const tree = {
+  id: "AT-1",
+  title: "Unauthorized firmware change",
+  root: {
+    id: "g1",
+    kind: "goal",
+    label: "Compromise firmware",
+    gate: "OR",
+    children: [
+      {
+        id: "s1",
+        kind: "step",
+        label: "Access internal wiring",
+        gate: "AND",
+        access: 5,
+        skill: 3,
+        children: [
+          { id: "ss1", kind: "substep", label: "Probe wiring", access: 4, skill: 3, children: [] },
+          { id: "cm1", kind: "countermeasure", label: "Tamper seal", countermeasureRef: "CM1", children: [] },
+        ],
+      },
+      {
+        id: "s2",
+        kind: "step",
+        label: "Exploit update channel",
+        gate: "AND",
+        access: 3,
+        skill: 4,
+        children: [],
+      },
+    ],
+  },
+};
 
-ok("attack-trees.json holds a trees array", Array.isArray(atreeDoc.trees) && !!tree.root);
 ok("root is a goal node", tree.root.kind === "goal");
 ok("find locates a node", AtModel.find(tree.root, "ss1").label.includes("wiring"));
 ok("parentOf is correct", AtModel.parentOf(tree.root, "ss1").id === "s1");
@@ -125,7 +188,6 @@ ok("render returns sized svg", r.width > 0 && r.height > 0 && r.svg.includes("da
 ok("render shows gate label", r.svg.includes(">OR<") || r.svg.includes(">AND<"));
 
 /* ---------- Risk model ---------- */
-const RiskModel = require(path.join(root, "vscode-extension/media/risk-model.js"));
 ok("band Low", RiskModel.band(3, null).name === "Low");
 ok("band High", RiskModel.band(16, null).name === "High");
 ok("band Critical", RiskModel.band(25, null).name === "Critical");

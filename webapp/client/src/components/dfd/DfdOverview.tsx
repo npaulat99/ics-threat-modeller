@@ -27,7 +27,7 @@ export default function DfdOverview({ onOpen }: { onOpen: (nodeId: string, path:
     const threats = data.threats.threats || [];
     const cms = data.countermeasures.countermeasures || [];
     const compById = new Map((data.system.components || []).map((c) => [c.id, c]));
-    const interfaces = data.system.interfaces || [];
+    const interfaces = (data.system.interfaces || []).filter((it) => !it.hidden);
     const deviceName = data.project.device?.name || data.project.title || 'Device';
 
     const childrenOf = (pid: string | null) => dfd.nodes.filter((n) => (n.parent ?? null) === pid);

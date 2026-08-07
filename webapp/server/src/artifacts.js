@@ -17,6 +17,7 @@ export const STEP_FILES = {
     assumptions: '02-assumptions/assumptions.json',
     system: '03-system-assets/system.json',
     dfd: '04-dfd/dfd.json',
+    useCases: '04b-use-cases/use-cases.json',
     threats: '06-threats/threats.json',
     requirements: '05-requirements/requirements.json',
     countermeasures: '08-countermeasures/countermeasures.json',
@@ -34,6 +35,7 @@ export const DEFAULTS = {
     assumptions: () => ({ device: [], system: [], environment: [], operational: [], attacker: [] }),
     system: () => ({ components: [], interfaces: [], trustBoundaries: [], assets: [] }),
     dfd: () => ({ nodes: [], flows: [] }),
+    useCases: () => ({ diagrams: [] }),
     threats: () => ({ threats: [] }),
     requirements: () => ({ requirements: [] }),
     countermeasures: () => ({ countermeasures: [] }),
@@ -437,7 +439,7 @@ export async function scaffoldProject(name) {
     await writeArtifact(slug, 'system', {
         components: [{ id: 'C-DEV', name, kind: 'device', layer: 1, parent: null, trustZone: 'device' }],
         interfaces: [],
-        trustBoundaries: [],
+        trustBoundaries: [{ id: 'TB-1', name: 'Device housing', members: ['C-DEV'] }],
         assets: [
             {
                 id: 'AS-1',
@@ -449,9 +451,13 @@ export async function scaffoldProject(name) {
         ],
     });
     await writeArtifact(slug, 'dfd', {
-        nodes: [{ id: 'N-DEV', label: name, type: 'process', layer: 1, parent: null, componentRef: 'C-DEV', x: 320, y: 200 }],
+        nodes: [
+            { id: 'N-DEV', label: name, type: 'process', layer: 1, parent: null, componentRef: 'C-DEV', x: 320, y: 200 },
+            { id: 'TB-1', label: 'Device housing', type: 'trust-boundary', layer: 1, parent: null, x: 210, y: 120, members: ['N-DEV'] },
+        ],
         flows: [],
     });
+    await writeArtifact(slug, 'useCases', { diagrams: [] });
     await writeArtifact(slug, 'threats', { threats: [] });
     await writeArtifact(slug, 'countermeasures', { countermeasures: [] });
     await writeArtifact(slug, 'attackTrees', { trees: [] });

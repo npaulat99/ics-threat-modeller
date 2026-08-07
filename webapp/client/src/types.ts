@@ -1,5 +1,5 @@
 // Shared TypeScript types mirroring the TRA JSON schemas (tra/.assets/schema/*).
-export type StepKey = 'project' | 'assumptions' | 'system' | 'dfd' | 'threats' | 'requirements' | 'countermeasures' | 'attackTrees' | 'defects';
+export type StepKey = 'project' | 'assumptions' | 'system' | 'dfd' | 'useCases' | 'threats' | 'requirements' | 'countermeasures' | 'attackTrees' | 'defects';
 export type ViewKey = StepKey | 'review' | 'versions';
 export type ChangeReason = 'initial' | 'functional changes' | 'new vulnerabilities' | 'regular reassessment';
 
@@ -88,6 +88,50 @@ export interface Project {
 /** Report-generation toggles (Settings) — what optional sections to include in the HTML report. */
 export interface ReportOptions {
     includeStrideBoundaryAnalysis?: boolean; // include the per-trust-boundary STRIDE strengths/weaknesses tables
+    includeUseCases?: boolean; // include persisted use-case diagrams in the generated report
+}
+
+export type UseCaseEntityKind = 'actor' | 'misuse-actor' | 'action' | 'misuse-action';
+export type UseCaseArrow = 'none' | 'forward' | 'backward' | 'both';
+
+export interface UseCaseEntity {
+    id: string;
+    kind: UseCaseEntityKind;
+    name: string;
+    x?: number;
+    y?: number;
+}
+
+export interface UseCaseConnection {
+    id: string;
+    from: string;
+    to: string;
+    dashed?: boolean;
+    arrow?: UseCaseArrow;
+    label?: string;
+}
+
+export interface UseCaseGroup {
+    id: string;
+    name: string;
+    members: string[];
+    x?: number;
+    y?: number;
+    w?: number;
+    h?: number;
+}
+
+export interface UseCaseDiagram {
+    id: string;
+    name: string;
+    entities: UseCaseEntity[];
+    connections: UseCaseConnection[];
+    groups: UseCaseGroup[];
+    drawioXml?: string;
+}
+
+export interface UseCasesDoc {
+    diagrams: UseCaseDiagram[];
 }
 
 export const DEFAULT_ACCEPTABLE_RISK = 12;
@@ -140,6 +184,7 @@ export interface Interface {
     exposure: 'physical' | 'local' | 'adjacent' | 'remote';
     tag?: string; // short chip tag shown in the DFD (e.g. BLE, HMI, JTAG)
     protocol?: string;
+    hidden?: boolean; // optional DFD presentation flag (true = hidden from step-04 rendering)
 }
 export interface TrustBoundary {
     id: string;
@@ -238,6 +283,7 @@ export interface Threat {
     impact: number;
     likelihoodRationale?: string;
     impactRationale?: string;
+    assumptionRefs?: string[]; // assumption IDs that justify threat feasibility/risk assessment
     interfaceRef?: string; // primary interface/attack vector id (system.interfaces) the threat enters through
     interfaceRefs?: string[]; // additional affected interfaces/vectors assessed together with the same threat
     interfaceLabel?: string; // free-text interface/vector when not in the interface list
@@ -322,7 +368,8 @@ export interface AdNode {
 export interface AttackTree {
     id: string;
     title: string;
-    threatRef?: string; // the threat this tree decomposes
+    threatRef?: string; // legacy single-link field (kept for backward compatibility)
+    threatRefs?: string[]; // preferred: 0..n linked threats this tree decomposes
     description?: string;
     root: AdNode;
 }
@@ -335,6 +382,7 @@ export interface ProjectData {
     assumptions: Assumptions;
     system: SystemDef;
     dfd: Dfd;
+    useCases: UseCasesDoc;
     threats: ThreatsDoc;
     requirements: RequirementsDoc;
     countermeasures: CountermeasuresDoc;
@@ -380,6 +428,10 @@ export interface ProjectSummary {
     device: DeviceInfo | null;
     status: string;
     slTarget: string;
+}
+
+export interface LaunchConfig {
+    preselectProjectId: string | null;
 }
 
 export interface RiskBand {

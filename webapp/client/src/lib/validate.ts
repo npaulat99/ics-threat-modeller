@@ -7,7 +7,7 @@
 // accepted by the user (project.acceptedNotices); accepted notices are no longer open points.
 import type { ProjectData } from '../types';
 import { DEFAULT_ACCEPTABLE_RISK } from '../types';
-import { idCollisions } from './ids';
+import { ID_PATTERN, idCollisions } from './ids';
 import { residual } from './risk';
 
 export type IssueSeverity = 'error' | 'warning' | 'notice';
@@ -43,6 +43,13 @@ export function validate(data: ProjectData): Issue[] {
     const assetIds = new Set((data.system?.assets || []).map((a) => a.id));
     const ifaceIds = new Set(interfaces.map((i) => i.id));
     const attackers = data.assumptions?.attacker || [];
+    const assumptionIds = new Set([
+        ...(data.assumptions?.device || []).map((x) => x.id),
+        ...(data.assumptions?.system || []).map((x) => x.id),
+        ...(data.assumptions?.environment || []).map((x) => x.id),
+        ...(data.assumptions?.operational || []).map((x) => x.id),
+        ...attackers.map((x) => x.id),
+    ].filter(Boolean));
     const attackerById = new Map(attackers.map((a) => [a.id, a]));
     const tIds = new Set(threats.map((t) => t.id));
     const cmIds = new Set(cms.map((c) => c.id));
@@ -63,6 +70,10 @@ export function validate(data: ProjectData): Issue[] {
         if (t.attackerRef && !attackerById.has(t.attackerRef)) add('error', `${t.id}: references unknown attacker profile '${t.attackerRef}'.`);
         for (const iface of t.interfaceRefs || []) if (!ifaceIds.has(iface)) add('error', `${t.id}: references unknown interface '${iface}'.`);
         if (t.interfaceRef && !ifaceIds.has(t.interfaceRef)) add('error', `${t.id}: references unknown interface '${t.interfaceRef}'.`);
+        for (const aid of t.assumptionRefs || []) {
+            if (!ID_PATTERN.test(aid)) add('error', `${t.id}: references invalid assumption ID '${aid}'.`);
+            else if (!assumptionIds.has(aid)) add('error', `${t.id}: references unknown assumption '${aid}'.`);
+        }
         const atk = t.attackerRef ? attackerById.get(t.attackerRef) : null;
         const exposure = t.likelihoodFactors?.exposure;
         const exploit = t.likelihoodFactors?.exploitability;
@@ -164,7 +175,18 @@ export function validate(data: ProjectData): Issue[] {
         if ((d.status === 'open' || d.status === 'triaged') && (d.severity === 'high' || d.severity === 'critical') && d.threatRef)
             add('warning', `${d.id}: open ${d.severity} defect — re-assess the linked threat '${d.threatRef}'.`);
     }
-    for (const tr of data.attackTrees?.trees || [])
-        if (tr.threatRef && !tIds.has(tr.threatRef)) add('error', `Attack tree '${tr.id}' references unknown threat '${tr.threatRef}'.`);
+    for (const tr of data.attackTrees?.trees || []) {
+        const refs = [...new Set([...(tr.threatRefs || []), ...(tr.threatRef ? [tr.threatRef] : [])])];
+        for (const ref of refs) if (!tIds.has(ref)) add('error', `Attack tree '${tr.id}' references unknown threat '${ref}'.`);
+    }
+
+    const ucDiagrams = data.useCases?.diagrams || [];
+    if (ucDiagrams.length > 0 && !project.reportOptions?.includeUseCases) {
+        add(
+            'notice',
+            `Use-case diagrams exist (${ucDiagrams.length}) but report inclusion is disabled. Accept this notice if the exclusion is intentional.`,
+            'usecases-excluded',
+        );
+    }
     return issues;
 }
