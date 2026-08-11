@@ -1,0 +1,244 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://embedrisk.example/schemas/tra-knowledge.schema.json",
+    "title": "EmbedRisk .tra-knowledge.json sidecar",
+    "description": "AI-only structured knowledge persistence file for one TRA project (see .ai/knowledge/knowledge-schema.md). Not part of the shared TRA step-file schema in webapp/client/src/types.ts, and never read by webapp/server or vscode-extension.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schemaVersion",
+        "projectId",
+        "updatedAt",
+        "interview",
+        "confirmedContext"
+    ],
+    "properties": {
+        "schemaVersion": {
+            "const": 1,
+            "description": "Fixed at 1 for this version of the schema."
+        },
+        "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Matches 01-project-description/project.json projectId."
+        },
+        "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "interview": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "openQuestions",
+                "answeredQuestions"
+            ],
+            "properties": {
+                "currentStep": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "Step key currently being worked on (e.g. '03-system-assets'), or null."
+                },
+                "completedSteps": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "openQuestions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/openQuestion"
+                    }
+                },
+                "answeredQuestions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/answeredQuestion"
+                    }
+                }
+            }
+        },
+        "confirmedContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Confirmed context not yet promoted into an official step file, grouped by category.",
+            "properties": {
+                "assets": {
+                    "$ref": "#/$defs/contextEntryList"
+                },
+                "communicationPaths": {
+                    "$ref": "#/$defs/contextEntryList"
+                },
+                "trustBoundaries": {
+                    "$ref": "#/$defs/contextEntryList"
+                },
+                "authenticationMethods": {
+                    "$ref": "#/$defs/contextEntryList"
+                },
+                "maintenanceAccess": {
+                    "$ref": "#/$defs/contextEntryList"
+                },
+                "availabilityRequirements": {
+                    "$ref": "#/$defs/contextEntryList"
+                },
+                "constraints": {
+                    "$ref": "#/$defs/contextEntryList"
+                }
+            }
+        },
+        "decisionLog": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/decisionLogEntry"
+            }
+        }
+    },
+    "$defs": {
+        "openQuestion": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "id",
+                "step",
+                "question"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "step": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "category": {
+                    "type": "string"
+                },
+                "question": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "askedAt": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "format": "date-time"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "pending",
+                        "answered",
+                        "deferred"
+                    ]
+                }
+            }
+        },
+        "answeredQuestion": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "id",
+                "question",
+                "answer",
+                "kind"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "step": {
+                    "type": "string"
+                },
+                "question": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "answer": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "answeredAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "fact",
+                        "assumption",
+                        "recommendation-accepted",
+                        "recommendation-rejected"
+                    ],
+                    "description": "fact = user-stated or read from a project file; assumption = user-confirmed working assumption; recommendation-* = an AI proposal the user accepted or rejected. Never a bare AI inference."
+                }
+            }
+        },
+        "contextEntryList": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "note"
+                ],
+                "properties": {
+                    "note": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "sourceQuestionId": {
+                        "type": "string",
+                        "description": "Points back into interview.answeredQuestions[].id."
+                    },
+                    "promotedTo": {
+                        "type": "string",
+                        "description": "e.g. '03-system-assets/system.json#AS-3' once this entry is captured in an official step file."
+                    }
+                }
+            }
+        },
+        "decisionLogEntry": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "date",
+                "change",
+                "affectedFiles",
+                "approvedBy"
+            ],
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "change": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "affectedFiles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "rationale": {
+                    "type": "string"
+                },
+                "approvedBy": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "approvedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            }
+        }
+    }
+}

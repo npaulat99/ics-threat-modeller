@@ -5,7 +5,17 @@ One file per TRA project, stored at `<project-root>/.tra-knowledge.json` (siblin
 mechanism described in [.ai/README.md](../README.md): AI session memory for a project, not a TRA
 artifact, and not read by the webapp or VS Code extension.
 
-An example instance is at [.ai/examples/example.tra-knowledge.json](../examples/example.tra-knowledge.json).
+The **formal, authoritative schema** is
+[.ai/knowledge/tra-knowledge.schema.json](./tra-knowledge.schema.json) (JSON Schema draft 2020-12).
+This page is a prose walkthrough of it — if the two ever disagree, the JSON Schema file wins. Check
+a file against it with:
+
+```sh
+node tools/validate-knowledge-file.mjs <project-root>/.tra-knowledge.json
+```
+
+An example instance is at [.ai/examples/example.tra-knowledge.json](../examples/example.tra-knowledge.json)
+(it validates cleanly against the schema).
 
 ## Top-level shape
 
@@ -86,3 +96,10 @@ An example instance is at [.ai/examples/example.tra-knowledge.json](../examples/
 - Not validated by `webapp/server/src/validate.js` and not rendered in `report/index.html`. If a
   future need arises to surface interview provenance in the report, that is a schema change to the
   official artifacts, not an extension of this file.
+
+## Validating a knowledge file
+
+`tools/validate-knowledge-file.mjs` is a small, dependency-free structural check (no JSON-Schema
+library involved, matching the hand-written style of `webapp/server/src/validate.js`) that enforces
+the required fields and fixed vocabularies from `tra-knowledge.schema.json`. Exit code is non-zero if
+any issue is found, so it is safe to use as a pre-commit or CI check on `.tra-knowledge.json` files.

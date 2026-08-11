@@ -19,6 +19,10 @@ applies whether you are the TRA Facilitator or invoked directly for a quick edit
 - Every id (component, interface, trust boundary, asset, threat, requirement, countermeasure, attack
   tree, defect, attacker profile, DFD node) must match `^[A-Za-z0-9 _\-:.]+$` and be **unique across
   the whole project**, not just within its own file — id-space is shared project-wide.
+- **One documented exception**: a `04-dfd/dfd.json` node of `type: trust-boundary` is allowed, and
+  expected, to reuse the id of the matching `03-system-assets/system.json` trust boundary it
+  represents — they are the same entity viewed from two files, not a duplicate. Do not "fix" this by
+  renaming one of them; it is exactly what `webapp/server/src/validate.js` allows.
 - Prefer short, stable, human-readable ids with a step-scoped prefix already used in the project
   (e.g. `AS-` assets, `T` threats, `CM-`/`ATK-` etc.) — check existing ids in the project before
   inventing a new prefix.

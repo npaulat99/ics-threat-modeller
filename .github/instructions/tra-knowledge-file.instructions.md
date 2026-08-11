@@ -9,7 +9,10 @@ This file lives at the root of a TRA project folder, next to `01-project-descrip
 `webapp/server/src/validate.js` never checks it. It exists only so a Copilot session does not
 re-ask the user questions already answered in a previous session.
 
-Full schema reference: [.ai/knowledge/knowledge-schema.md](../../.ai/knowledge/knowledge-schema.md).
+Formal schema: [.ai/knowledge/tra-knowledge.schema.json](../../.ai/knowledge/tra-knowledge.schema.json)
+(JSON Schema draft 2020-12; required/optional fields and fixed vocabularies are authoritative there).
+Prose walkthrough: [.ai/knowledge/knowledge-schema.md](../../.ai/knowledge/knowledge-schema.md). Check
+a file against the schema with `node tools/validate-knowledge-file.mjs <path-to-.tra-knowledge.json>`.
 
 ## Rules
 

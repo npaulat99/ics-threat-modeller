@@ -21,6 +21,7 @@
         "format:check": "npm --workspace client run build",
         "open": "node bin/embedrisk.js",
         "test": "node test/embedrisk.test.mjs",
+        "validate": "node server/src/validate-cli.js",
         "start": "node server/src/index.js",
         "serve": "npm run build && npm start"
     },

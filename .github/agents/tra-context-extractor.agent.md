@@ -21,7 +21,9 @@ that is out of scope for context extraction.
 - **Components** (`system.components`) and **interfaces** (`system.interfaces`): kind, layer,
   exposure (`physical|local|adjacent|remote`), protocol.
 - **Trust boundaries** (`system.trustBoundaries` and DFD `trust-boundary` nodes): members, what
-  crosses them (`dfd.flows` with `crossesBoundary`).
+  crosses them (`dfd.flows` with `crossesBoundary`). A DFD `trust-boundary` node sharing its id with
+  a `system.trustBoundaries` entry is the same entity in two files, not a duplicate id — do not
+  report it as one.
 - **Communication paths**: DFD flows (`from`, `to`, `label`, `crossesBoundary`).
 - **Attacker assumptions** (`assumptions.attacker`): capability, access, motivation.
 - **Device/system/environment/operational assumptions**.

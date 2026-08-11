@@ -20,7 +20,7 @@ non-executable, human-facing parts: this README, the knowledge-file schema, and 
 | Agents | [.github/agents/](../.github/agents/) | Personas with restricted tools, see below |
 | Prompts | [.github/prompts/](../.github/prompts/) | One-off, parameterized tasks, run via `/` in chat |
 | Instructions | [.github/instructions/](../.github/instructions/) | Auto-attached rules for TRA JSON / knowledge-file edits |
-| Knowledge-file schema | [.ai/knowledge/knowledge-schema.md](./knowledge/knowledge-schema.md) | The `.tra-knowledge.json` sidecar format |
+| Knowledge-file schema | [.ai/knowledge/tra-knowledge.schema.json](./knowledge/tra-knowledge.schema.json) (formal) + [knowledge-schema.md](./knowledge/knowledge-schema.md) (walkthrough) | The `.tra-knowledge.json` sidecar format |
 | Examples | [.ai/examples/](./examples/) | A worked interview excerpt, a review report, a sample knowledge file |
 
 ## Agents
@@ -59,7 +59,9 @@ VS Code extension never read it, and `webapp/server/src/validate.js` never valid
 purely so a Copilot session remembers what has already been asked and answered, across sessions,
 without re-interviewing the user.
 
-It stores, per [.ai/knowledge/knowledge-schema.md](./knowledge/knowledge-schema.md):
+It stores, per [.ai/knowledge/tra-knowledge.schema.json](./knowledge/tra-knowledge.schema.json) (the
+formal schema; [.ai/knowledge/knowledge-schema.md](./knowledge/knowledge-schema.md) is a prose
+walkthrough of it):
 
 - the open/answered interview question queue (tagged `fact`, `assumption`,
   `recommendation-accepted`, or `recommendation-rejected`),
@@ -109,23 +111,39 @@ to all agents, not just the Facilitator — see each agent file's own constraint
 
 ## Testing and validating the framework
 
-Because these are prompt-engineered behaviors, not code, validate them by exercising the workflow
-rather than unit-testing prose:
+Because these are prompt-engineered behaviors, not code, most validation exercises the workflow
+rather than unit-testing prose — but two parts of the framework *are* plain executable checks:
+
+- **Schema/plausibility validator, runnable directly**: `node webapp/server/src/validate-cli.js
+  <path-to-project-folder>` (from the repository root), or `npm run validate -- <path-to-project>`
+  from [webapp/](../webapp/) (e.g. `npm run validate -- projects/test`). It loads a project's step
+  files exactly as the server does and runs the same `validate()` from
+  [webapp/server/src/validate.js](../webapp/server/src/validate.js) — no file writes, safe for CI.
+  Compare its output to what the `tra-reviewer` agent reports on the same project; a mismatch means
+  an agent instruction has drifted from the actual schema in `webapp/client/src/types.ts`.
+- **Knowledge-file schema check**: `node tools/validate-knowledge-file.mjs
+  <path-to-.tra-knowledge.json>` checks a sidecar file against
+  [.ai/knowledge/tra-knowledge.schema.json](./knowledge/tra-knowledge.schema.json).
+- **Framework acceptance check**: `node tools/test-tra-framework.mjs` statically verifies the
+  approval-gate mechanism (only `tra-facilitator` has the `edit` tool; every other agent is
+  read-only), that the approval-gate wording is present and consistent between the Facilitator and
+  `tra-json-editing.instructions.md`, that the one-question-at-a-time interview rule is documented,
+  and that the DFD trust-boundary id-alias exception is stated consistently. It falsifies a broken
+  approval gate (e.g. someone adding `edit` to a subagent, or dropping the "no exception" wording)
+  without requiring a live model run.
+
+The remaining behaviors still require exercising the workflow in chat:
 
 - **Dry-run the Facilitator** against [webapp/projects/test](../webapp/projects/test/) (a
   deliberately sparse example project) and confirm it: asks one question at a time, creates
   `.tra-knowledge.json` without asking, and stops for approval before writing any step file.
-- **Compare the Reviewer's findings** against
-  [webapp/server/src/validate.js](../webapp/server/src/validate.js) run on the same project (`node`
-  scripts already exist server-side) — the two should agree on errors/warnings; discrepancies mean
-  an agent instruction has drifted from the actual schema in `webapp/client/src/types.ts`.
 - **Cross-session memory check**: answer a few interview questions, end the session, start a new one
   on the same project, and confirm the Facilitator does not re-ask anything already recorded in
   `.tra-knowledge.json`.
-- **Approval-gate check**: ask the Facilitator to make a change and then, mid-conversation, ask it to
-  "just do it" without confirming — it must still stop and ask for explicit approval.
+- **Approval-gate check (live)**: ask the Facilitator to make a change and then, mid-conversation,
+  ask it to "just do it" without confirming — it must still stop and ask for explicit approval.
 - **Schema drift check**: whenever `webapp/client/src/types.ts` or `webapp/server/src/validate.js`
-  changes, re-check
+  changes, re-run `node tools/test-tra-framework.mjs` and re-check
   [tra-json-editing.instructions.md](../.github/instructions/tra-json-editing.instructions.md) and
   the Threat Analyst / Mitigation Advisor / Reviewer agent bodies for field names that no longer
   match.

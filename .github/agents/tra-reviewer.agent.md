@@ -15,7 +15,9 @@ domain plausibility judgment a linter cannot express:
   `derivedFromThreat`/`satisfiedByCM` on a requirement, every `threatRef`/`component` on a defect,
   every `crossesBoundary` on a DFD flow — must resolve to an existing id. IDs must be unique
   project-wide (a component, asset, threat, requirement, countermeasure, attack tree, defect,
-  attacker profile, and DFD node all share one id-space).
+  attacker profile, and DFD node all share one id-space) — **except** a DFD node of
+  `type: trust-boundary`, which intentionally reuses the id of the system trust boundary it
+  represents (same entity, not a duplicate); do not flag that specific pairing as an error.
 - **Coverage**: every non-device/external-entity component and every interface should be referenced
   by at least one threat; every high/critical threat (likelihood x impact >= 12) needs a derived
   requirement unless `status: accepted`.
