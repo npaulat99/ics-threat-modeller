@@ -19,6 +19,7 @@ A TRA project is a folder with one JSON artifact per step: `01-project-descripti
 - **Module conventions differ by package.** `webapp/server` is plain ESM JavaScript (`"type": "module"`, explicit `.js` import extensions, no build step). `webapp/client` is TypeScript + React + Vite, using `zustand` for state (`client/src/state/store.ts`) and `@xyflow/react` for the DFD canvas. `vscode-extension/src` is TypeScript compiled with the extension's own build; `vscode-extension/media` is unbundled vanilla JS served to webviews. Match the existing module style of the file you're editing rather than introducing a new one.
 - **No repo-wide linter/formatter is configured.** Match the surrounding code's formatting, quote style, and semicolon usage within each package rather than reformatting whole files.
 - **Domain vocabulary matters.** Use STRIDE categories, CVSS v4.0 vectors, IEC 62443 terminology, and the 5x5 Likelihood x Impact risk matrix with CIA + Safety impact dimensions consistently with existing knowledge-base entries and docs — this is TRA/security-engineering domain content, not generic app data.
+- **AI-assisted TRA workflow.** For interviewing users, reviewing, or sparring on TRA content itself (as opposed to writing tool code), use the agents in [.github/agents/](agents/) and prompts in [.github/prompts/](prompts/) — see [.ai/README.md](../.ai/README.md) for the full framework, including the `.tra-knowledge.json` per-project sidecar file and its mandatory approval gate before any TRA JSON write.
 
 ## General principles
 
