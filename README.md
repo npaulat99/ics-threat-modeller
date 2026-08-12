@@ -87,6 +87,22 @@ Read [docs/HOW-TO-TRA.md](docs/HOW-TO-TRA.md) for:
 - a practical step-by-step modeling workflow,
 - a short list of high-value further reading.
 
+## AI-assisted TRA workflow
+
+This repository also ships a GitHub Copilot agent/prompt framework (under `.github/agents/`,
+`.github/prompts/`, `.github/instructions/`) that can interview an engineer through a TRA, review a
+project for consistency, or spar on assumptions — see [.ai/README.md](.ai/README.md) for the full
+framework.
+
+**Write policy**: the TRA Facilitator agent writes to a project's step JSON files by default, as
+soon as a change is ready, rather than pausing for a separate approval message before every write.
+This is a deliberate choice: the intended workspace is VS Code with git integration alongside the
+EmbedRisk webapp, so every change is already easily reverted and tracked — even purely locally,
+without a remote — through git history. The webapp itself only ever inspects whatever is already
+written to the JSON files (it is a viewer/editor for a TRA, not an approval mechanism), so gating
+writes in chat added friction without a matching safety benefit. If you'd rather review changes
+before they're written, just tell the agent so during the session.
+
 ## Methodology and compliance context
 
 EmbedRisk is designed to support secure product development workflows aligned with IEC 62443-4-1 and related regulatory expectations (for example, CRA-aligned traceability and evidence generation).

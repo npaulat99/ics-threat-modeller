@@ -31,6 +31,15 @@ domain plausibility judgment a linter cannot express:
   `verified` needs a `verificationUrl`.
 - **Assumption contradictions**: two assumptions or an assumption vs. a rated threat that cannot both
   be true (e.g. an "air-gapped" operational assumption alongside a threat rated for a remote attacker).
+- **Protocol-limitation classification**: for a threat rooted in a communication protocol's own
+  capability gap (e.g. Modbus RTU's lack of source authentication), check whether `classification`/
+  `responsibility` is set and plausible (see [.ai/README.md](../../.ai/README.md)'s "Protocol
+  limitations vs. product vulnerabilities" section) — flag as a notice, not an error, if unset, since
+  it may simply not have been classified yet. Flag as a warning if implausible: e.g.
+  `classification: product-vulnerability` for a limitation the protocol itself fundamentally lacks
+  (no fix exists at the component level), or a `protocol-limitation`/`deployment-risk` threat with no
+  `deploymentConstraints` despite having a non-`accepted` status. Never recommend removing such a
+  threat because its ultimate impact lands outside the component.
 
 ## Report format
 

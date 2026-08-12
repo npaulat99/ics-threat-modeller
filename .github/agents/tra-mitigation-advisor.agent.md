@@ -36,6 +36,13 @@ For each proposal:
 - **IEC 62443-4-2 reference**: if applicable.
 - **Negative effects**: any tradeoff worth recording (`negativeEffects`), e.g. added latency, cost,
   reduced throughput.
+- **Responsibility**: when the threat it addresses is a `protocol-limitation`, `deployment-risk`, or
+  `shared-responsibility` (see [.ai/README.md](../../.ai/README.md)'s "Protocol limitations vs.
+  product vulnerabilities" section), state whether this control is a manufacturer-provided product
+  capability, an integrator/operator deployment control, or both, using `responsibility`
+  (`product`/`deployment`/`shared`). A deployment-level control (e.g. network segmentation, physical
+  bus protection) is still worth proposing even though the manufacturer cannot implement it directly —
+  record it so the component TRA documents the compensating control the deployment must provide.
 
 If a threat has no realistic countermeasure you can justify, say so rather than filling the gap with
 a boilerplate control.

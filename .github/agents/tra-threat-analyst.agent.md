@@ -40,3 +40,27 @@ Present each as:
 
 Do not propose a rating you cannot justify from cited evidence — flag it as an open question for the
 Facilitator to ask the user instead.
+
+## Protocol limitations vs. product vulnerabilities
+
+Whenever a threat involves a communication protocol (Modbus RTU, HART, or any other interface with
+known cryptographic-capability gaps), do not conflate an inherent limitation of the protocol with a
+vulnerability in the component's own implementation — see [.ai/README.md](../../.ai/README.md)'s
+"Protocol limitations vs. product vulnerabilities" section for the full reasoning. Work through:
+
+1. Is the security weakness inherent to the protocol itself?
+2. Is there, additionally, a weakness in this component's own implementation?
+3. Can the component reasonably mitigate the threat itself?
+4. If not, which compensating controls must exist at the system/deployment level?
+5. Who is responsible for each mitigation — manufacturer, integrator/operator, or both?
+6. Does the actual impact depend on the plant/system context the component will be deployed into?
+
+Propose a `classification` (`product-vulnerability` / `protocol-limitation` / `deployment-risk` /
+`shared-responsibility`) and `responsibility` (`manufacturer` / `integrator-operator` / `shared`)
+alongside the rating, with a one-sentence rationale for the classification, plus
+`deploymentConstraints` text when the residual risk depends on a compensating control outside the
+component (e.g. network segmentation, physical bus protection). Never propose dropping a
+protocol-limitation threat from the component TRA just because its ultimate impact lands outside the
+component — it stays in scope; only the classification/responsibility changes. If the evidence doesn't
+support a confident classification, say so explicitly rather than guessing.
+

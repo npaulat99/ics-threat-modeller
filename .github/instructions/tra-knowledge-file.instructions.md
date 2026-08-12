@@ -1,5 +1,5 @@
 ---
-description: "Use when reading or writing a project's .tra-knowledge.json sidecar file — the AI-only structured knowledge persistence mechanism for EmbedRisk TRA projects. Explains its purpose, schema, and why it is exempt from the TRA JSON approval gate."
+description: "Use when reading or writing a project's .tra-knowledge.json sidecar file — the AI-only structured knowledge persistence mechanism for EmbedRisk TRA projects. Explains its purpose, schema, and why it is exempt from the TRA JSON write policy."
 applyTo: "**/.tra-knowledge.json"
 ---
 # The `.tra-knowledge.json` sidecar file
@@ -17,8 +17,10 @@ a file against the schema with `node tools/validate-knowledge-file.mjs <path-to-
 ## Rules
 
 - Safe to create and update without user approval — it is AI working memory, not a TRA artifact.
-  The approval gate in
-  [tra-json-editing.instructions.md](./tra-json-editing.instructions.md) does not apply to it.
+  The write policy in
+  [tra-json-editing.instructions.md](./tra-json-editing.instructions.md) (default-write, with an
+  explicit-review opt-in) does not apply to it — always write it freely, even if the user has asked
+  to review official step-file writes first.
 - Never store secrets, credentials, or sensitive personal data in it — it is a plain, git-trackable
   JSON file intended to be readable in code review like any other project file.
 - Always tag stored information as one of: `fact` (explicitly stated by the user or read from a

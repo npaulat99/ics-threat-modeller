@@ -1,8 +1,8 @@
 # Example: TRA Facilitator interview excerpt
 
 This illustrates the interaction style expected from `tra-facilitator` (one focused question at a
-time, explicit fact/assumption/recommendation labeling, progress summaries, approval gate before
-writing). Project: `webapp/projects/test`.
+time, explicit fact/assumption/recommendation labeling, progress summaries, writing changes right
+after summarizing them). Project: `webapp/projects/test`.
 
 ---
 
@@ -29,16 +29,12 @@ into that OT VLAN, even temporarily?
 
 **Facilitator:** Recorded as a fact (Q-2, answered).
 
-**Recommendation** (not yet applied): given that a contractor VPN can reach the OT VLAN, I suggest
-adding a second attacker profile — "Remote opportunistic attacker via contractor VPN" (access:
-adjacent, capability similar to ATK-1) — alongside the existing local attacker, so later threat
-ratings can distinguish "attacker must be on-site" from "attacker can reach it during a maintenance
-window." Add this attacker profile to `02-assumptions/assumptions.json`?
-
-**User:** Yes, add it.
-
-**Facilitator:** Approved — writing `ATK-2` to `02-assumptions/assumptions.json` now. Logged the
-change and rationale in `.tra-knowledge.json.decisionLog`.
+**Recommendation** (applying it): given that a contractor VPN can reach the OT VLAN, I suggest adding
+a second attacker profile — "Remote opportunistic attacker via contractor VPN" (access: adjacent,
+capability similar to ATK-1) — alongside the existing local attacker, so later threat ratings can
+distinguish "attacker must be on-site" from "attacker can reach it during a maintenance window."
+Writing `ATK-2` to `02-assumptions/assumptions.json` now — let me know if you'd like it changed or
+reverted. Logged the change and rationale in `.tra-knowledge.json.decisionLog`.
 
 Progress: 3 of roughly 7 open gaps closed for this project so far. Next question is about the
 firmware-update interface's authentication — continue?
@@ -49,6 +45,7 @@ firmware-update interface's authentication — continue?
 
 - Exactly one question per turn.
 - Facts (from files, from the user) are separated from the Facilitator's own recommendation.
-- The recommendation was proposed, explained, and only written after an explicit "yes".
+- The recommendation was clearly labeled as AI-authored, then written directly — the user can revert
+  or adjust it afterwards via git, rather than approving it in the abstract first.
 - Every answer and every write is logged for later audit (see
   [example.tra-knowledge.json](./example.tra-knowledge.json)).

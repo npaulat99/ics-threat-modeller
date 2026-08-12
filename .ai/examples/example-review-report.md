@@ -41,5 +41,6 @@ real project content.
 
 1. Fix the two errors first (broken reference, duplicate id) — these block a trustworthy report.
 2. Take the exposure/attacker mismatch (`T5`) and the unmitigated-but-marked-mitigated threat (`T7`)
-   to the TRA Facilitator for a targeted correction, each requiring explicit approval before writing.
+   to the TRA Facilitator for a targeted correction — it will write the fix directly and log it, so
+   review it afterwards via git like any other change.
 3. Decide whether the standalone requirement notice should be accepted or linked to a threat.
