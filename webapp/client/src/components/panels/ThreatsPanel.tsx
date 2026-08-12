@@ -124,12 +124,42 @@ export default function ThreatsPanel() {
                         </Field>
                     </div>
                 </div>
+                <div className="grid2">
+                    <Field label="Classification">
+                        <select value={t.classification || ''} onChange={(e) => upd({ classification: e.target.value || undefined })}>
+                            <option value="">— none —</option>
+                            <option value="product-vulnerability">product-vulnerability</option>
+                            <option value="protocol-limitation">protocol-limitation</option>
+                            <option value="deployment-risk">deployment-risk</option>
+                            <option value="shared-responsibility">shared-responsibility</option>
+                        </select>
+                    </Field>
+                    <Field label="Responsibility">
+                        <select value={t.responsibility || ''} onChange={(e) => upd({ responsibility: e.target.value || undefined })}>
+                            <option value="">— none —</option>
+                            <option value="manufacturer">manufacturer</option>
+                            <option value="integrator-operator">integrator-operator</option>
+                            <option value="shared">shared</option>
+                        </select>
+                    </Field>
+                </div>
+                <Field label="Classification rationale">
+                    <textarea value={t.classificationRationale || ''} onChange={(e) => upd({ classificationRationale: e.target.value || undefined })} />
+                </Field>
+                {(t.classification === 'protocol-limitation' || t.classification === 'deployment-risk' || t.classification === 'shared-responsibility') && (
+                    <Field
+                        label="Deployment constraints"
+                        hint="Compensating controls required outside this component (segmentation, physical protection, gateway architecture, monitoring) for the residual risk to be acceptable in an actual deployment."
+                    >
+                        <textarea value={t.deploymentConstraints || ''} onChange={(e) => upd({ deploymentConstraints: e.target.value || undefined })} />
+                    </Field>
+                )}
 
                 <Field label="Affected components" hint={orphan ? 'A threat must affect at least one component.' : undefined}>
                     <Chips options={compOpts} value={t.components || []} onChange={(v) => upd({ components: v })} empty="Define components in step 03 first." />
                 </Field>
                 <details className="calc">
-                    <summary>More details — assets, attacker, interface, rationale</summary>
+                    <summary>More details — assets, attacker, interface, assumptions</summary>
                     <div className="grid3">
                         <Field label="Affected assets">
                             <Chips options={assetOpts} value={t.assets || []} onChange={(v) => upd({ assets: v })} empty="No assets yet." />
@@ -167,40 +197,6 @@ export default function ThreatsPanel() {
                         <Field label="Impact rationale">
                             <textarea value={t.impactRationale || ''} onChange={(e) => upd({ impactRationale: e.target.value })} />
                         </Field>
-                    </div>
-                    <div className="grid2">
-                        <Field label="Classification">
-                            <select value={t.classification || ''} onChange={(e) => upd({ classification: e.target.value || undefined })}>
-                                <option value="">— none —</option>
-                                <option value="product-vulnerability">product-vulnerability</option>
-                                <option value="protocol-limitation">protocol-limitation</option>
-                                <option value="deployment-risk">deployment-risk</option>
-                                <option value="shared-responsibility">shared-responsibility</option>
-                            </select>
-                        </Field>
-                        <Field label="Responsibility">
-                            <select value={t.responsibility || ''} onChange={(e) => upd({ responsibility: e.target.value || undefined })}>
-                                <option value="">— none —</option>
-                                <option value="manufacturer">manufacturer</option>
-                                <option value="integrator-operator">integrator-operator</option>
-                                <option value="shared">shared</option>
-                            </select>
-                        </Field>
-                    </div>
-                    <div className="grid2">
-                        <Field label="Classification rationale">
-                            <textarea value={t.classificationRationale || ''} onChange={(e) => upd({ classificationRationale: e.target.value || undefined })} />
-                        </Field>
-                        {(t.classification === 'protocol-limitation' || t.classification === 'deployment-risk' || t.classification === 'shared-responsibility') ? (
-                            <Field
-                                label="Deployment constraints"
-                                hint="Compensating controls required outside this component (segmentation, physical protection, gateway architecture, monitoring) for the residual risk to be acceptable in an actual deployment."
-                            >
-                                <textarea value={t.deploymentConstraints || ''} onChange={(e) => upd({ deploymentConstraints: e.target.value || undefined })} />
-                            </Field>
-                        ) : (
-                            <div />
-                        )}
                     </div>
                     <Field label="Supporting assumptions" hint="Cite assumptions that justify feasibility or the chosen risk rating.">
                         <Chips options={assumptionOpts} value={t.assumptionRefs || []} onChange={(v) => upd({ assumptionRefs: v })} empty="No assumptions defined in step 02 yet." />
@@ -329,6 +325,8 @@ export default function ThreatsPanel() {
                                     </div>
                                     <div className="summary-links">
                                         {(t.stride || []).length ? <span className="tag stride">{sortStride(t.stride).join(' ')}</span> : null}
+                                        {t.classification ? <span className="tag">Class: {t.classification}</span> : null}
+                                        {t.responsibility ? <span className="tag">Resp: {t.responsibility}</span> : null}
                                         {(t.assumptionRefs || []).length ? <span className="tag">Assumptions: {t.assumptionRefs.join(', ')}</span> : null}
                                         <span className="lbl">Mitigated by:</span>
                                         {cmsFor(t.id).length ? cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} />) : <span className="hint">none</span>}
