@@ -270,6 +270,11 @@ export interface Dfd {
 }
 
 export type Stride = 'S' | 'T' | 'R' | 'I' | 'D' | 'E';
+// Root-cause classification, distinguishing an inherent limitation of the communication
+// technology from an actual weakness in this component's own implementation — see
+// .ai/README.md's "Protocol limitations vs. product vulnerabilities" section for the reasoning.
+export type ThreatClassification = 'product-vulnerability' | 'protocol-limitation' | 'deployment-risk' | 'shared-responsibility';
+export type MitigationResponsibility = 'manufacturer' | 'integrator-operator' | 'shared';
 export interface Threat {
     id: string;
     title: string;
@@ -302,7 +307,15 @@ export interface Threat {
     acceptedBy?: string; // residual-risk sign-off owner (required when status = accepted)
     acceptanceRationale?: string; // justification for accepting the residual risk
     reviewDate?: string; // next lifecycle re-assessment date (YYYY-MM-DD)
+    // Root-cause boundary (optional; unset = not yet classified, treat as an open question, not
+    // as an implicit 'product-vulnerability'). See .ai/README.md for the full reasoning and the
+    // "an inherent protocol limitation is not automatically a product vulnerability" principle.
+    classification?: ThreatClassification;
+    classificationRationale?: string; // why this classification was chosen, esp. for anything other than product-vulnerability
+    responsibility?: MitigationResponsibility; // who owns the residual mitigation for this threat
+    deploymentConstraints?: string; // compensating controls/conditions required outside the product boundary (network segmentation, physical protection, gateway architecture, monitoring, ...) for residual risk to be acceptable in an actual deployment
 }
+
 export interface ThreatsDoc {
     threats: Threat[];
 }
@@ -335,6 +348,7 @@ export interface Countermeasure {
     ticketUrl?: string; // required once status is implemented/verified — proof of implementation
     ticketUrls?: string[]; // optional additional implementation tickets linked to the same control
     verificationUrl?: string; // link to the verification/test evidence
+    responsibility?: 'product' | 'deployment' | 'shared'; // who implements this control: a manufacturer-provided product capability, an integrator/operator deployment control, or both
 }
 export interface CountermeasuresDoc {
     countermeasures: Countermeasure[];

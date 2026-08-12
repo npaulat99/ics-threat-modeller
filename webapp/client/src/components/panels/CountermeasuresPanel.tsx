@@ -224,12 +224,20 @@ export default function CountermeasuresPanel() {
                     </div>
                 )}
 
-                <div className="grid2">
+                <div className="grid3">
                     <Field label="Affected components">
                         <Chips options={compOpts} value={c.components || []} onChange={(v) => upd({ components: v })} />
                     </Field>
                     <Field label="IEC 62443 reference (optional)">
                         <input value={c.iec62443Ref || ''} onChange={(e) => upd({ iec62443Ref: e.target.value })} placeholder="CR 1.2 / FR1" />
+                    </Field>
+                    <Field label="Responsibility">
+                        <select value={c.responsibility || ''} onChange={(e) => upd({ responsibility: e.target.value || undefined })}>
+                            <option value="">— none —</option>
+                            <option value="product">product</option>
+                            <option value="deployment">deployment</option>
+                            <option value="shared">shared</option>
+                        </select>
                     </Field>
                 </div>
                 <Field label="Description">

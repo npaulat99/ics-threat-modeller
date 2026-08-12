@@ -20,7 +20,7 @@
         "lint": "npm test && npm --workspace client run typecheck && node --check bin/embedrisk.js && node --check server/src/index.js",
         "format:check": "npm --workspace client run build",
         "open": "node bin/embedrisk.js",
-        "test": "node test/embedrisk.test.mjs",
+        "test": "node test/embedrisk.test.mjs && node test/validation.test.mjs && node test/dfd-layer-visibility.test.mjs",
         "validate": "node server/src/validate-cli.js",
         "start": "node server/src/index.js",
         "serve": "npm run build && npm start"

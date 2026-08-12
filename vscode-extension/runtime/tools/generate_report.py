@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """TRA report generator (zero dependencies). Mirrors tools/generate-report.mjs.
 Usage: python tools/generate_report.py <project-dir>"""
+import html as html_lib
 import json, os, sys
 from pathlib import Path
 
@@ -139,14 +140,20 @@ for inst, sname in [(project, "tra-project"), (ass, "assumptions"), (sys_def, "s
 rows = ""
 for t in threats:
     r = t["likelihood"] * t["impact"]; rl, ri = residual(t); rr = rl * ri
-    rows += f"<tr><td>{t['id']}</td><td>{t['title']}</td><td>{''.join(t['stride'])}</td><td>{t['likelihood']}x{t['impact']}=<b style='color:{band(r)['color']}'>{r} {band(r)['name']}</b></td><td>{rl}x{ri}=<b style='color:{band(rr)['color']}'>{rr} {band(rr)['name']}</b></td><td>{t['status']}</td></tr>"
+    classification = [
+        f"<b>Classification:</b> {html_lib.escape(str(t.get('classification') or '—'), quote=True)}",
+        f"<b>Responsibility:</b> {html_lib.escape(str(t.get('responsibility') or '—'), quote=True)}",
+    ]
+    if t.get("deploymentConstraints"):
+        classification.append(f"<b>Deployment constraints:</b> {html_lib.escape(str(t['deploymentConstraints']), quote=True)}")
+    rows += f"<tr><td>{html_lib.escape(str(t['id']), quote=True)}</td><td>{html_lib.escape(str(t['title']), quote=True)}</td><td>{html_lib.escape(''.join(t['stride']), quote=True)}</td><td>{'<br>'.join(classification)}</td><td>{t['likelihood']}x{t['impact']}=<b style='color:{band(r)['color']}'>{r} {band(r)['name']}</b></td><td>{rl}x{ri}=<b style='color:{band(rr)['color']}'>{rr} {band(rr)['name']}</b></td><td>{html_lib.escape(str(t['status']), quote=True)}</td></tr>"
 
 assets = "".join(f"<li>{a['name']} (C{a['objectives']['confidentiality']}/I{a['objectives']['integrity']}/A{a['objectives']['availability']}/S{a['objectives']['safety']})</li>" for a in sys_def["assets"])
 atk = "".join(f"<li><b>{a['name']}</b> cap {a['capability']}, {a['access']}: {a['text']}</li>" for a in ass["attacker"])
 cmrows = "".join(f"<li><b>{c['id']}</b> {c['title']} → {', '.join(a['threat'] for a in c['addresses'])} ({c.get('status','')})</li>" for c in cms)
 
 def _esc(s):
-    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return html_lib.escape(str(s), quote=True)
 
 def _tree_ul(node):
     kids = node.get("children") or []
@@ -181,7 +188,7 @@ html = (f"<!doctype html><meta charset=utf8><title>TRA {project['title']}</title
         f"<p><b>Scope:</b> {project['scope'].get('boundary','')}</p>"
         f"<h2>Data flow diagram (layer 1)</h2>{dfd_svg(dfd)}"
         f"<h2>Attacker profiles</h2><ul>{atk}</ul><h2>Assets</h2><ul>{assets}</ul>"
-        f"<h2>Threats &amp; risk</h2><table><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>Initial</th><th>Residual</th><th>Status</th></tr>{rows}</table>"
+        f"<h2>Threats &amp; risk</h2><table><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>Classification</th><th>Initial</th><th>Residual</th><th>Status</th></tr>{rows}</table>"
         f"<h2>Countermeasures</h2><ul>{cmrows}</ul>"
         f"{trees_section}"
         f"<h2>Plausibility check</h2>{warn}")

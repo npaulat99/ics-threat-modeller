@@ -37,6 +37,9 @@ export default function DashboardPanel() {
     const defects = data.defects?.defects || [];
     const openDefects = defects.filter((d) => d.status !== 'fixed' && d.status !== 'wont-fix');
     const highNoReq = threats.filter((t) => (t.likelihood || 0) * (t.impact || 0) >= 12 && t.status !== 'accepted' && !reqs.some((r) => (r.derivedFromThreat || []).includes(t.id)));
+    const protocolLimitations = threats.filter((t) => t.classification === 'protocol-limitation').length;
+    const deploymentRisks = threats.filter((t) => t.classification === 'deployment-risk').length;
+    const sharedResponsibility = threats.filter((t) => t.classification === 'shared-responsibility').length;
 
     return (
         <div className="panel" style={{ maxWidth: 1140 }}>
@@ -61,6 +64,9 @@ export default function DashboardPanel() {
                 <Stat label="Assets" value={assets.length} onClick={() => setView('system')} />
                 <Stat label="Threats" value={threats.length} onClick={() => setView('threats')} />
                 <Stat label="Open threats" value={openThreats.length} warn={openThreats.length > 0} onClick={() => setView('threats')} />
+                <Stat label="Protocol limits" value={protocolLimitations} onClick={() => setView('threats')} />
+                <Stat label="Deployment risks" value={deploymentRisks} onClick={() => setView('threats')} />
+                <Stat label="Shared controls" value={sharedResponsibility} onClick={() => setView('threats')} />
                 <Stat label="Requirements" value={reqs.length} onClick={() => setView('requirements')} />
                 <Stat label="High threats w/o req." value={highNoReq.length} warn={highNoReq.length > 0} onClick={() => setView('threats')} />
                 <Stat label="Countermeasures" value={implementedCms.length} onClick={() => setView('countermeasures')} />

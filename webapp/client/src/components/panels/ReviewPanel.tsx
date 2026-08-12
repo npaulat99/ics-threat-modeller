@@ -26,6 +26,9 @@ export default function ReviewPanel() {
     const sbomUrl = data.project?.sbom?.url;
     const threats = data.threats.threats || [];
     const cms = data.countermeasures.countermeasures || [];
+    const protocolLimitations = threats.filter((t) => t.classification === 'protocol-limitation').length;
+    const deploymentRisks = threats.filter((t) => t.classification === 'deployment-risk').length;
+    const sharedResponsibility = threats.filter((t) => t.classification === 'shared-responsibility').length;
     const [html, setHtml] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
 
@@ -168,6 +171,9 @@ export default function ReviewPanel() {
 
             <div className="card">
                 <h3>Threats &amp; risk</h3>
+                <p className="hint" style={{ marginTop: 0 }}>
+                    Classification summary: {protocolLimitations} protocol-limitation, {deploymentRisks} deployment-risk, {sharedResponsibility} shared-responsibility.
+                </p>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                         <tr style={{ textAlign: 'left', color: 'var(--text-dim)', fontSize: 12 }}>

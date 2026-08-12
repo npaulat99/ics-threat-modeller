@@ -89,7 +89,12 @@ const rows = threats.map((t) => {
     return `<a href="#${esc(assumptionAnchor(aid))}">${esc(aid)}</a> (${esc(a.source)})`;
   }).join(', ');
   const rationale = [t.likelihoodRationale ? `L: ${esc(t.likelihoodRationale)}` : '', t.impactRationale ? `I: ${esc(t.impactRationale)}` : ''].filter(Boolean).join('<br>');
-  return `<tr id="threat-${esc(t.id)}"><td>${esc(t.id)}</td><td>${esc(t.title)}</td><td>${esc((t.stride || []).join(""))}</td><td>${refs || '—'}</td><td>${rationale || '—'}</td><td>${t.likelihood}x${t.impact}=<b style="color:${band(r).color}">${r} ${band(r).name}</b></td><td>${rr.l}x${rr.i}=<b style="color:${band(rrv).color}">${rrv} ${band(rrv).name}</b></td><td>${esc(t.status || '')}</td></tr>`;
+  const classification = [
+    `<b>Classification:</b> ${esc(t.classification || '—')}`,
+    `<b>Responsibility:</b> ${esc(t.responsibility || '—')}`,
+    t.deploymentConstraints ? `<b>Deployment constraints:</b> ${esc(t.deploymentConstraints)}` : '',
+  ].filter(Boolean).join('<br>');
+  return `<tr id="threat-${esc(t.id)}"><td>${esc(t.id)}</td><td>${esc(t.title)}</td><td>${esc((t.stride || []).join(""))}</td><td>${refs || '—'}</td><td>${rationale || '—'}</td><td>${classification}</td><td>${t.likelihood}x${t.impact}=<b style="color:${band(r).color}">${r} ${band(r).name}</b></td><td>${rr.l}x${rr.i}=<b style="color:${band(rrv).color}">${rrv} ${band(rrv).name}</b></td><td>${esc(t.status || '')}</td></tr>`;
 }).join("");
 
 const ucRows = (useCases.diagrams || []).map((d) =>
@@ -114,7 +119,7 @@ const html = `<!doctype html><meta charset=utf8><title>TRA ${project.title}</tit
 <h2>Attacker profiles</h2><ul>${atkRows}</ul>
 ${assRows ? `<h2>Assumptions</h2>${assRows}` : ''}
 <h2>Assets</h2><ul>${sys.assets.map((a) => `<li>${a.name} (C${a.objectives.confidentiality}/I${a.objectives.integrity}/A${a.objectives.availability}/S${a.objectives.safety})</li>`).join("")}</ul>
-<h2>Threats & risk</h2><table><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>Assumptions</th><th>Rationale</th><th>Initial</th><th>Residual</th><th>Status</th></tr>${rows}</table>
+<h2>Threats & risk</h2><table><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>Assumptions</th><th>Rationale</th><th>Classification</th><th>Initial</th><th>Residual</th><th>Status</th></tr>${rows}</table>
 ${project.reportOptions?.includeUseCases ? `<h2>Use-case diagrams</h2>${ucRows ? `<ul>${ucRows}</ul>` : '<p>No use-case diagrams defined.</p>'}` : ''}
 <h2>Plausibility check</h2>${issues.length ? `<ul class=warn>${issues.map((i) => `<li>${i}</li>`).join("")}</ul>` : "<p>No issues found.</p>"}`;
 

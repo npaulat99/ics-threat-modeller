@@ -91,8 +91,13 @@ const rows = threats.map((t) => {
     return `<a href="#${esc(assumptionAnchor(aid))}">${esc(aid)}</a> (${esc(a.source)})`;
   }).join(', ');
   const rationale = [t.likelihoodRationale ? `L: ${esc(t.likelihoodRationale)}` : '', t.impactRationale ? `I: ${esc(t.impactRationale)}` : ''].filter(Boolean).join('<br>');
+  const classification = [
+    `<b>Classification:</b> ${esc(t.classification || '—')}`,
+    `<b>Responsibility:</b> ${esc(t.responsibility || '—')}`,
+    t.deploymentConstraints ? `<b>Deployment constraints:</b> ${esc(t.deploymentConstraints)}` : '',
+  ].filter(Boolean).join('<br>');
   return `<tr id="threat-${esc(t.id)}"><td>${esc(t.id)}</td><td>${esc(t.title)}</td><td>${esc((t.stride || []).join(''))}</td>` +
-    `<td>${refs || '—'}</td><td>${rationale || '—'}</td>` +
+    `<td>${refs || '—'}</td><td>${rationale || '—'}</td><td>${classification}</td>` +
     `<td>${t.likelihood}×${t.impact}=<b style="color:${band(r).color}">${r} ${esc(band(r).name)}</b></td>` +
     `<td>${rr.l}×${rr.i}=<b style="color:${band(rrv).color}">${rrv} ${esc(band(rrv).name)}</b></td>` +
     `<td>${esc(t.status || 'open')}${t.status === 'accepted' && t.acceptedBy ? ` · <i>${esc(t.acceptedBy)}</i>` : ''}</td></tr>`;
@@ -183,7 +188,7 @@ const html = `<!doctype html><meta charset=utf8><title>TRA ${esc(project.title |
 <h2>Attacker profiles</h2><ul>${atkRows}</ul>
 ${assRows ? `<h2>Assumptions</h2>${assRows}` : ''}
 <h2>Assets</h2><ul>${(sys.assets || []).map(a => `<li>${esc(a.name)} (C${a.objectives?.confidentiality}/I${a.objectives?.integrity}/A${a.objectives?.availability}/S${a.objectives?.safety})</li>`).join('')}</ul>
-<h2>Threats &amp; risk</h2><table><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>Assumptions</th><th>Rationale</th><th>Initial risk</th><th>Residual risk</th><th>Status</th></tr>${rows}</table>
+<h2>Threats &amp; risk</h2><table><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>Assumptions</th><th>Rationale</th><th>Classification</th><th>Initial risk</th><th>Residual risk</th><th>Status</th></tr>${rows}</table>
 <h2>Countermeasures</h2><ul>${cmRows || '<li>None defined.</li>'}</ul>
 ${reqRows ? `<h2>Security requirements</h2><table><tr><th>ID</th><th>Requirement</th><th>Standard ref</th><th>From threats</th><th>Satisfied by</th></tr>${reqRows}</table>` : ''}
 ${project.reportOptions?.includeUseCases ? `<h2>Use-case diagrams</h2>${useCaseRows ? `<ul>${useCaseRows}</ul>` : '<p>No use-case diagrams defined.</p>'}` : ''}
