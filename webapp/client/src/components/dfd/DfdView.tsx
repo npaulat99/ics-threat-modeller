@@ -22,7 +22,7 @@ import { useStore, uid } from '../../state/store';
 import { nodeTypes } from './nodes';
 import DfdOverview from './DfdOverview';
 import { riskOf } from '../../lib/risk';
-import { deriveVisibleInterfaceIds, flowBelongsToLayerContext, resolveTargetNodeId } from './layerVisibility.js';
+import { deriveVisibleInterfaceIds, flowBelongsToLayerContext, isParentChildNodeFlow, resolveTargetNodeId } from './layerVisibility.js';
 import { cx, confirmDelete } from '../common';
 import type { Dfd, DfdNode, DfdNodeType } from '../../types';
 import { routeAround, roundedPath, labelPtOnPolyline } from '@shared/dfdEngine.js';
@@ -677,6 +677,10 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             const from = strip(c.source);
             const to = strip(c.target);
             if (from === to) return;
+            if (isParentChildNodeFlow({ from, to }, dfd.nodes)) {
+                window.alert('A container and its own nested component can never be connected directly — model the connection between siblings inside the child layer instead.');
+                return;
+            }
             const label = window.prompt('Label this data flow — what data or command does it carry? (required)', '');
             if (!label || !label.trim()) return;
             const id = uid('F', dfd.flows.map((f) => f.id));
@@ -688,10 +692,14 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
         (oldEdge: any, conn: any) => {
             if (!conn.source || !conn.target) return;
             const strip = (x: string) => (x.startsWith('iface:') ? x.slice(6) : x);
+            const from = strip(conn.source);
+            const to = strip(conn.target);
+            if (isParentChildNodeFlow({ from, to }, dfd.nodes)) {
+                window.alert('A container and its own nested component can never be connected directly — model the connection between siblings inside the child layer instead.');
+                return;
+            }
             persist({
-                flows: dfd.flows.map((f) =>
-                    f.id === oldEdge.id ? { ...f, from: strip(conn.source), to: strip(conn.target), sourceHandle: conn.sourceHandle || undefined, targetHandle: conn.targetHandle || undefined } : f,
-                ),
+                flows: dfd.flows.map((f) => (f.id === oldEdge.id ? { ...f, from, to, sourceHandle: conn.sourceHandle || undefined, targetHandle: conn.targetHandle || undefined } : f)),
             });
         },
         [dfd],

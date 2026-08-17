@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { deriveVisibleInterfaceIds, flowBelongsToLayerContext, isDeviceBoundaryInterfaceFlow } from '../client/src/components/dfd/layerVisibility.js';
+import { deriveVisibleInterfaceIds, flowBelongsToLayerContext, isDeviceBoundaryInterfaceFlow, isParentChildNodeFlow } from '../client/src/components/dfd/layerVisibility.js';
 
 function baseFixture() {
     const components = [
@@ -137,5 +137,41 @@ testDeviceBoundaryExceptionAppliesOnlyToRootDeviceLayer();
 testL2DeviceBoundaryShowsExternalInterfaceFlow();
 testL3DoesNotShowDescendantInterfaceWithoutContextFlow();
 testExplicitHandoffMakesInterfaceVisible();
+
+function testParentChildNodeFlowNeverBelongsToAnyLayer() {
+    const fixture = baseFixture();
+    // A flow directly between a container node and its own nested child (e.g. MCU -> Firmware)
+    // must never be treated as belonging to a layer, whether viewed from the parent's layer (where
+    // the container endpoint is trivially visible) or from inside the child's own layer.
+    const parentChildFlow = { id: 'F-PC', from: 'N-MCU', to: 'N-FW' };
+    assert.equal(isParentChildNodeFlow(parentChildFlow, fixture.nodes), true);
+
+    assert.equal(
+        flowBelongsToLayerContext({
+            flow: parentChildFlow,
+            currentParent: 'N-DEV',
+            visibleRealNodeIds: new Set(['N-MCU']),
+            visibleIfaceIds: new Set(),
+            nodes: fixture.nodes,
+            compById: fixture.compById,
+            interfaces: fixture.interfaces,
+        }),
+        false,
+    );
+    assert.equal(
+        flowBelongsToLayerContext({
+            flow: parentChildFlow,
+            currentParent: 'N-MCU',
+            visibleRealNodeIds: new Set(['N-FW']),
+            visibleIfaceIds: new Set(),
+            nodes: fixture.nodes,
+            compById: fixture.compById,
+            interfaces: fixture.interfaces,
+        }),
+        false,
+    );
+}
+
+testParentChildNodeFlowNeverBelongsToAnyLayer();
 
 console.log('dfd layer visibility tests passed');

@@ -21,6 +21,27 @@ function isDescendantOrSelf(componentId, ancestorId, compById) {
     return false;
 }
 
+function isNodeAncestor(ancestorId, nodeId, nodes) {
+    const byId = new Map((nodes || []).map((node) => [node.id, node]));
+    let current = byId.get(nodeId)?.parent ?? null;
+    const seen = new Set();
+    while (current != null && !seen.has(current)) {
+        if (current === ancestorId) return true;
+        seen.add(current);
+        current = byId.get(current)?.parent ?? null;
+    }
+    return false;
+}
+
+// A flow whose two endpoints are DFD nodes in a parent/child relationship (e.g. a container and its
+// own nested sub-component) can never belong to a single layer view — the two ends are never visible
+// as peers at the same time. Left unguarded, such a flow leaks into the parent's layer (because the
+// container endpoint is trivially visible there) and produces a nonsensical self-port when viewed
+// inside the child layer itself.
+export function isParentChildNodeFlow(flow, nodes) {
+    return isNodeAncestor(flow.from, flow.to, nodes) || isNodeAncestor(flow.to, flow.from, nodes);
+}
+
 export function isDeviceBoundaryInterfaceFlow({ currentParent, nodes, compById, interfaces, interfaceId, otherEndpointId }) {
     const parentNode = (nodes || []).find((node) => node.id === currentParent);
     const parentComponent = parentNode?.componentRef ? compById.get(parentNode.componentRef) : null;
@@ -56,6 +77,7 @@ export function deriveVisibleInterfaceIds({ currentParent, interfaces, flows, no
 }
 
 export function flowBelongsToLayerContext({ flow, currentParent, visibleRealNodeIds, visibleIfaceIds, nodes, compById, interfaces }) {
+    if (isParentChildNodeFlow(flow, nodes)) return false;
     const flowFromDeviceBoundary = isDeviceBoundaryInterfaceFlow({
         currentParent,
         nodes,
