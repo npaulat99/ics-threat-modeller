@@ -1,0 +1,9 @@
+{
+  "threats_compact": 81,
+  "mitigations_compact": 89,
+  "threats_compact_kb": 42.1,
+  "mitigations_compact_kb": 19.4,
+  "avg_capec_per_threat": 8.9,
+  "cwe_to_owasp_entries": 236,
+  "cwe_to_owasp_kb": 8.9
+}

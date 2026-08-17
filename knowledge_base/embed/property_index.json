@@ -1,0 +1,613 @@
+[
+  {
+    "property_id": "PID-11",
+    "property": "Device includes a microprocessor",
+    "category": "Hardware",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-101",
+      "TID-102",
+      "TID-103",
+      "TID-105"
+    ]
+  },
+  {
+    "property_id": "PID-12",
+    "property": "Device includes Memory/Storage (external to CPU)",
+    "category": "Hardware",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": []
+  },
+  {
+    "property_id": "PID-121",
+    "property": "Device includes buses for external memory/storage",
+    "category": "Hardware",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-12",
+    "threats": [
+      "TID-106"
+    ]
+  },
+  {
+    "property_id": "PID-122",
+    "property": "Device includes discrete chips/devices that have access to the same physical memory",
+    "category": "Hardware",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-12",
+    "threats": [
+      "TID-107"
+    ]
+  },
+  {
+    "property_id": "PID-123",
+    "property": "Device includes ROM, VRAM, or removable Storage",
+    "category": "Hardware",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-12",
+    "threats": [
+      "TID-108"
+    ]
+  },
+  {
+    "property_id": "PID-124",
+    "property": "Device includes Random Access Memory (RAM) chips",
+    "category": "Hardware",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-12",
+    "threats": [
+      "TID-109"
+    ]
+  },
+  {
+    "property_id": "PID-1241",
+    "property": "Device includes DDR DRAM",
+    "category": "Hardware",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-124",
+    "threats": [
+      "TID-110"
+    ]
+  },
+  {
+    "property_id": "PID-13",
+    "property": "Device includes peripheral chips and integrated data buses",
+    "category": "Hardware",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-113",
+      "TID-114"
+    ]
+  },
+  {
+    "property_id": "PID-14",
+    "property": "Device includes external peripheral interconnects (e.g., USB, Serial)",
+    "category": "Hardware",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-111",
+      "TID-118"
+    ]
+  },
+  {
+    "property_id": "PID-15",
+    "property": "Device includes a hardware access port (e.g., UART, JTAG)",
+    "category": "Hardware",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-115",
+      "TID-116",
+      "TID-119"
+    ]
+  },
+  {
+    "property_id": "PID-21",
+    "property": "Device includes a bootloader",
+    "category": "System Software",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-201"
+    ]
+  },
+  {
+    "property_id": "PID-22",
+    "property": "Device includes a debugging capabilities",
+    "category": "System Software",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-224"
+    ]
+  },
+  {
+    "property_id": "PID-23",
+    "property": "Device includes OS/kernel",
+    "category": "System Software",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-202",
+      "TID-218"
+    ]
+  },
+  {
+    "property_id": "PID-231",
+    "property": "Device includes an operating system that uses drivers/modules that can be loaded",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-23",
+    "threats": [
+      "TID-203"
+    ]
+  },
+  {
+    "property_id": "PID-232",
+    "property": "Device includes separate users/processes with access to different OS data or functions",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-23",
+    "threats": []
+  },
+  {
+    "property_id": "PID-2321",
+    "property": "Device lacks an access enforcement/privilege mechanism",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-232",
+    "threats": [
+      "TID-204"
+    ]
+  },
+  {
+    "property_id": "PID-2322",
+    "property": "Device deploys an access enforcement/privilege mechanism",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-232",
+    "threats": []
+  },
+  {
+    "property_id": "PID-23221",
+    "property": "Device includes and enforces OS user accounts",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-2322",
+    "threats": [
+      "TID-205",
+      "TID-219"
+    ]
+  },
+  {
+    "property_id": "PID-23222",
+    "property": "Device includes a memory management model, including protections of memory access (read-only/, executable, writable)",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-2322",
+    "threats": [
+      "TID-206",
+      "TID-223"
+    ]
+  },
+  {
+    "property_id": "PID-24",
+    "property": "Device includes virtualization and containers",
+    "category": "System Software",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": []
+  },
+  {
+    "property_id": "PID-241",
+    "property": "Device includes containers",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-24",
+    "threats": [
+      "TID-207"
+    ]
+  },
+  {
+    "property_id": "PID-242",
+    "property": "Device includes hypervisor",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-24",
+    "threats": [
+      "TID-208",
+      "TID-209"
+    ]
+  },
+  {
+    "property_id": "PID-25",
+    "property": "Device includes software/hardware root of trust",
+    "category": "System Software",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": []
+  },
+  {
+    "property_id": "PID-251",
+    "property": "Root of Trust is physically accessible or is not immutable",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-25",
+    "threats": [
+      "TID-214"
+    ]
+  },
+  {
+    "property_id": "PID-252",
+    "property": "Root of Trust is immutable",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-25",
+    "threats": [
+      "TID-220"
+    ]
+  },
+  {
+    "property_id": "PID-26",
+    "property": "Device lacks firmware/software update support",
+    "category": "System Software",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-210"
+    ]
+  },
+  {
+    "property_id": "PID-27",
+    "property": "Device includes support for firmware/software updates",
+    "category": "System Software",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": []
+  },
+  {
+    "property_id": "PID-271",
+    "property": "Device has firmware or software that is not cryptographically checked for integrity validation",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-27",
+    "threats": [
+      "TID-211"
+    ]
+  },
+  {
+    "property_id": "PID-272",
+    "property": "Device includes cryptographic firmware/software integrity protection mechanisms",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-27",
+    "threats": [
+      "TID-214",
+      "TID-330"
+    ]
+  },
+  {
+    "property_id": "PID-2721",
+    "property": "Device includes a shared key for firmware integrity validation",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-272",
+    "threats": [
+      "TID-212"
+    ]
+  },
+  {
+    "property_id": "PID-2722",
+    "property": "Device includes digitally signed firmware (with private key)",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-272",
+    "threats": [
+      "TID-213"
+    ]
+  },
+  {
+    "property_id": "PID-273",
+    "property": "Device has unencrypted firmware updates",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-27",
+    "threats": [
+      "TID-215"
+    ]
+  },
+  {
+    "property_id": "PID-274",
+    "property": "Device includes user firmware/software version selection during updates",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-27",
+    "threats": [
+      "TID-216"
+    ]
+  },
+  {
+    "property_id": "PID-275",
+    "property": "Device includes remotely-initiated firmware/software updates",
+    "category": "System Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-27",
+    "threats": [
+      "TID-217"
+    ]
+  },
+  {
+    "property_id": "PID-28",
+    "property": "Device stores logs of system events and information",
+    "category": "System Software",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-225",
+      "TID-226"
+    ]
+  },
+  {
+    "property_id": "PID-31",
+    "property": "Application-level software is present and running on the device",
+    "category": "Application Software",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-301"
+    ]
+  },
+  {
+    "property_id": "PID-311",
+    "property": "Device includes the usage of a web/HTTP applications",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-31",
+    "threats": [
+      "TID-319",
+      "TID-320",
+      "TID-321",
+      "TID-322",
+      "TID-323",
+      "TID-324",
+      "TID-325"
+    ]
+  },
+  {
+    "property_id": "PID-312",
+    "property": "Device includes programming languages and libraries",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-31",
+    "threats": []
+  },
+  {
+    "property_id": "PID-3121",
+    "property": "Device includes support for object oriented programming languages(e.g., Java, Python, PHP, C++)",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-312",
+    "threats": [
+      "TID-326"
+    ]
+  },
+  {
+    "property_id": "PID-3122",
+    "property": "Device includes support for manual memory management programming languages (e.g. C, C++)",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-312",
+    "threats": [
+      "TID-327"
+    ]
+  },
+  {
+    "property_id": "PID-32",
+    "property": "Device includes the ability to deploy custom or external programs (e.g., ladder logic, compiled binaries)",
+    "category": "Application Software",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-302"
+    ]
+  },
+  {
+    "property_id": "PID-321",
+    "property": "Device includes ability to deploy custom programs from engineering software or IDE",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-32",
+    "threats": [
+      "TID-303"
+    ]
+  },
+  {
+    "property_id": "PID-322",
+    "property": "Device includes a program runtime environment for custom or external programs",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-32",
+    "threats": [
+      "TID-304"
+    ]
+  },
+  {
+    "property_id": "PID-323",
+    "property": "Device includes support for program executable formats",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-32",
+    "threats": []
+  },
+  {
+    "property_id": "PID-3231",
+    "property": "Device includes ability to run custom/external programs as native binary without a confined/restricted environment",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-323",
+    "threats": [
+      "TID-305"
+    ]
+  },
+  {
+    "property_id": "PID-3232",
+    "property": "Device includes ability to run custom/external programs/processes through an execution sandboxed environment",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-323",
+    "threats": [
+      "TID-306"
+    ]
+  },
+  {
+    "property_id": "PID-324",
+    "property": "Device includes support for \"program uploads\" to retrieve programs from the device from an engineering workstation",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-32",
+    "threats": [
+      "TID-307",
+      "TID-308",
+      "TID-309"
+    ]
+  },
+  {
+    "property_id": "PID-33",
+    "property": "Device includes interactive applications, services, or user interfaces",
+    "category": "Application Software",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": []
+  },
+  {
+    "property_id": "PID-331",
+    "property": "Device includes unauthenticated services",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-33",
+    "threats": [
+      "TID-310"
+    ]
+  },
+  {
+    "property_id": "PID-332",
+    "property": "Device includes authenticated services",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-33",
+    "threats": [
+      "TID-311",
+      "TID-312",
+      "TID-313",
+      "TID-328"
+    ]
+  },
+  {
+    "property_id": "PID-3321",
+    "property": "Device includes passwords to authenticate the users",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-332",
+    "threats": [
+      "TID-314",
+      "TID-315",
+      "TID-329"
+    ]
+  },
+  {
+    "property_id": "PID-3322",
+    "property": "Device includes cryptographic mechanism to authenticate users and sessions",
+    "category": "Application Software",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-332",
+    "threats": [
+      "TID-316",
+      "TID-317",
+      "TID-318",
+      "TID-330",
+      "TID-411"
+    ]
+  },
+  {
+    "property_id": "PID-34",
+    "property": "Device stores logs of application events and information",
+    "category": "Application Software",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-225",
+      "TID-226"
+    ]
+  },
+  {
+    "property_id": "PID-41",
+    "property": "Device exposes remote network services",
+    "category": "Networking",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-222",
+      "TID-310",
+      "TID-401",
+      "TID-404",
+      "TID-405",
+      "TID-407"
+    ]
+  },
+  {
+    "property_id": "PID-411",
+    "property": "Device exposes remote services with the ability to send, receive, view or modify sensitive information or configurations",
+    "category": "Networking",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-41",
+    "threats": []
+  },
+  {
+    "property_id": "PID-4111",
+    "property": "Device lacks protocol support for message authentication",
+    "category": "Networking",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-411",
+    "threats": [
+      "TID-406"
+    ]
+  },
+  {
+    "property_id": "PID-4112",
+    "property": "Device lacks protocol support for message encryption",
+    "category": "Networking",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-411",
+    "threats": [
+      "TID-408"
+    ]
+  },
+  {
+    "property_id": "PID-4113",
+    "property": "Device includes cryptographic functions for sensitive data, such as encryption or authentication",
+    "category": "Networking",
+    "is_subproperty": true,
+    "parent": "EMB3D-PID-411",
+    "threats": [
+      "TID-221",
+      "TID-316",
+      "TID-317",
+      "TID-318",
+      "TID-410",
+      "TID-411"
+    ]
+  },
+  {
+    "property_id": "PID-42",
+    "property": "Device includes procedure to forward or route network messages",
+    "category": "Networking",
+    "is_subproperty": false,
+    "parent": null,
+    "threats": [
+      "TID-412"
+    ]
+  }
+]

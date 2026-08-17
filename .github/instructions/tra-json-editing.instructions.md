@@ -82,6 +82,30 @@ ancestor-lookup chip rendering all resolve interface ids this way).
   the trust boundary the flow crosses (usually the one containing the interface's resolved
   component), same as for a node-to-node flow.
 
+### Only model what a user could draw through the actual UI
+
+Editing the raw JSON gives you capabilities the webapp/extension UI does not expose to a real user —
+do not use that extra reach. A `dfd.flows[]` entry (and, by extension, a `dfd.nodes[]`/`portPos`
+entry) must only ever represent a connection a user could actually create by drag-connecting two
+entities that are simultaneously rendered on the **same layer view** in the DFD editor. Concretely:
+
+- Before adding a flow between an interface and a node, check both endpoints' effective layer: an
+  interface resolves to the nearest ancestor node that is a **direct child of the layer currently
+  being viewed** (see `resolveTargetNodeId` in `webapp/client/src/components/dfd/layerVisibility.js`).
+  Only connect the interface to that resolved node (or to an external entity at layer 1) — never to
+  a node nested one or more layers deeper than that resolution point, even if such a node happens to
+  exist in `system.json`/`dfd.json`. A real user drilling into a layer never sees that deeper node
+  and its own children simultaneously with the interface chip, so they could never draw that edge.
+- If you need to depict what an attacker could reach *after* crossing an interface into a deeply
+  nested internal asset (e.g. a debug interface's reach into secure key storage two layers down),
+  that is attack-tree/threat-rationale content (`07-attack-trees/attack-trees.json`,
+  `Threat.likelihoodRationale`), not a DFD flow — the DFD models normal data flow per layer, it does
+  not model post-compromise reachability.
+- The same principle applies to any other structured content you edit directly as JSON: only ever
+  produce a state a user could reach with the tools/buttons the webapp or extension UI actually
+  offers (drag-connect, drill-into, add-node, the property panels) for that step. Do not add content
+  that requires knowledge of the raw schema a normal user wouldn't have.
+
 ## Traceability chain
 
 Keep every new entry connected to the chain **asset -> threat -> risk rating -> requirement ->
