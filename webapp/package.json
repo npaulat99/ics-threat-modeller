@@ -28,6 +28,9 @@
     "devDependencies": {
         "concurrently": "^9.1.0"
     },
+    "overrides": {
+        "nanoid": "^3.3.18"
+    },
     "engines": {
         "node": ">=20"
     }
