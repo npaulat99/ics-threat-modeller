@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://embedrisk.example/schemas/tra-knowledge.schema.json",
+    "$id": "urn:embedrisk:schema:tra-knowledge:1",
     "title": "EmbedRisk .tra-knowledge.json sidecar",
     "description": "AI-only structured knowledge persistence file for one TRA project (see .ai/knowledge/knowledge-schema.md). Not part of the shared TRA step-file schema in webapp/client/src/types.ts, and never read by webapp/server or vscode-extension.",
     "type": "object",

@@ -492,7 +492,7 @@ export default function ProjectPanel() {
                     <summary className="hint" style={{ cursor: 'pointer' }}>Advanced git settings</summary>
                     <div className="row">
                         <Field label="Repository URL">
-                            <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://devops.example/_git/project" />
+                            <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://git.invalid/_git/project" />
                         </Field>
                         <Field label="Work branch">
                             <input value={workBranch} onChange={(e) => setWorkBranch(e.target.value)} placeholder="docs/test-infrastructure" />
