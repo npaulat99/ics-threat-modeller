@@ -1,0 +1,724 @@
+{
+"_titles": {
+"OWASP-A01-2025": "A01:2025 Broken Access Control",
+"OWASP-A02-2025": "A02:2025 Security Misconfiguration",
+"OWASP-A03-2025": "A03:2025 Software Supply Chain Failures",
+"OWASP-A04-2025": "A04:2025 Cryptographic Failures",
+"OWASP-A05-2025": "A05:2025 Injection",
+"OWASP-A06-2025": "A06:2025 Insecure Design",
+"OWASP-A07-2025": "A07:2025 Authentication Failures",
+"OWASP-A08-2025": "A08:2025 Software or Data Integrity Failures",
+"OWASP-A09-2025": "A09:2025 Security Logging & Alerting Failures",
+"OWASP-A10-2025": "A10:2025 Mishandling of Exceptional Conditions"
+},
+"map": {
+"CWE-1021": [
+"OWASP-A06-2025"
+],
+"CWE-103": [
+"OWASP-A05-2025"
+],
+"CWE-104": [
+"OWASP-A05-2025"
+],
+"CWE-1104": [
+"OWASP-A03-2025"
+],
+"CWE-112": [
+"OWASP-A05-2025"
+],
+"CWE-1125": [
+"OWASP-A06-2025"
+],
+"CWE-113": [
+"OWASP-A05-2025"
+],
+"CWE-114": [
+"OWASP-A05-2025"
+],
+"CWE-115": [
+"OWASP-A05-2025"
+],
+"CWE-116": [
+"OWASP-A05-2025"
+],
+"CWE-117": [
+"OWASP-A09-2025"
+],
+"CWE-1240": [
+"OWASP-A04-2025"
+],
+"CWE-1241": [
+"OWASP-A04-2025"
+],
+"CWE-1275": [
+"OWASP-A01-2025"
+],
+"CWE-129": [
+"OWASP-A05-2025"
+],
+"CWE-1329": [
+"OWASP-A03-2025"
+],
+"CWE-1390": [
+"OWASP-A07-2025"
+],
+"CWE-1391": [
+"OWASP-A07-2025"
+],
+"CWE-1392": [
+"OWASP-A07-2025"
+],
+"CWE-1393": [
+"OWASP-A07-2025"
+],
+"CWE-1395": [
+"OWASP-A03-2025"
+],
+"CWE-15": [
+"OWASP-A02-2025"
+],
+"CWE-159": [
+"OWASP-A05-2025"
+],
+"CWE-183": [
+"OWASP-A06-2025"
+],
+"CWE-20": [
+"OWASP-A05-2025"
+],
+"CWE-200": [
+"OWASP-A01-2025"
+],
+"CWE-201": [
+"OWASP-A01-2025"
+],
+"CWE-209": [
+"OWASP-A10-2025"
+],
+"CWE-215": [
+"OWASP-A10-2025"
+],
+"CWE-219": [
+"OWASP-A01-2025"
+],
+"CWE-22": [
+"OWASP-A01-2025"
+],
+"CWE-221": [
+"OWASP-A09-2025"
+],
+"CWE-223": [
+"OWASP-A09-2025"
+],
+"CWE-23": [
+"OWASP-A01-2025"
+],
+"CWE-234": [
+"OWASP-A10-2025"
+],
+"CWE-235": [
+"OWASP-A10-2025"
+],
+"CWE-248": [
+"OWASP-A10-2025"
+],
+"CWE-252": [
+"OWASP-A10-2025"
+],
+"CWE-256": [
+"OWASP-A06-2025"
+],
+"CWE-258": [
+"OWASP-A07-2025"
+],
+"CWE-259": [
+"OWASP-A07-2025"
+],
+"CWE-260": [
+"OWASP-A02-2025"
+],
+"CWE-261": [
+"OWASP-A04-2025"
+],
+"CWE-266": [
+"OWASP-A06-2025"
+],
+"CWE-269": [
+"OWASP-A06-2025"
+],
+"CWE-274": [
+"OWASP-A10-2025"
+],
+"CWE-276": [
+"OWASP-A01-2025"
+],
+"CWE-280": [
+"OWASP-A10-2025"
+],
+"CWE-281": [
+"OWASP-A01-2025"
+],
+"CWE-282": [
+"OWASP-A01-2025"
+],
+"CWE-283": [
+"OWASP-A01-2025"
+],
+"CWE-284": [
+"OWASP-A01-2025"
+],
+"CWE-285": [
+"OWASP-A01-2025"
+],
+"CWE-286": [
+"OWASP-A06-2025"
+],
+"CWE-287": [
+"OWASP-A07-2025"
+],
+"CWE-288": [
+"OWASP-A07-2025"
+],
+"CWE-289": [
+"OWASP-A07-2025"
+],
+"CWE-290": [
+"OWASP-A07-2025"
+],
+"CWE-291": [
+"OWASP-A07-2025"
+],
+"CWE-293": [
+"OWASP-A07-2025"
+],
+"CWE-294": [
+"OWASP-A07-2025"
+],
+"CWE-295": [
+"OWASP-A07-2025"
+],
+"CWE-296": [
+"OWASP-A04-2025"
+],
+"CWE-297": [
+"OWASP-A07-2025"
+],
+"CWE-298": [
+"OWASP-A07-2025"
+],
+"CWE-299": [
+"OWASP-A07-2025"
+],
+"CWE-300": [
+"OWASP-A07-2025"
+],
+"CWE-302": [
+"OWASP-A07-2025"
+],
+"CWE-303": [
+"OWASP-A07-2025"
+],
+"CWE-304": [
+"OWASP-A07-2025"
+],
+"CWE-305": [
+"OWASP-A07-2025"
+],
+"CWE-306": [
+"OWASP-A07-2025"
+],
+"CWE-307": [
+"OWASP-A07-2025"
+],
+"CWE-308": [
+"OWASP-A07-2025"
+],
+"CWE-309": [
+"OWASP-A07-2025"
+],
+"CWE-311": [
+"OWASP-A06-2025"
+],
+"CWE-312": [
+"OWASP-A06-2025"
+],
+"CWE-313": [
+"OWASP-A06-2025"
+],
+"CWE-315": [
+"OWASP-A02-2025"
+],
+"CWE-316": [
+"OWASP-A06-2025"
+],
+"CWE-319": [
+"OWASP-A04-2025"
+],
+"CWE-321": [
+"OWASP-A04-2025"
+],
+"CWE-322": [
+"OWASP-A04-2025"
+],
+"CWE-323": [
+"OWASP-A04-2025"
+],
+"CWE-324": [
+"OWASP-A04-2025"
+],
+"CWE-325": [
+"OWASP-A04-2025"
+],
+"CWE-326": [
+"OWASP-A04-2025"
+],
+"CWE-327": [
+"OWASP-A04-2025"
+],
+"CWE-328": [
+"OWASP-A04-2025"
+],
+"CWE-329": [
+"OWASP-A04-2025"
+],
+"CWE-330": [
+"OWASP-A04-2025"
+],
+"CWE-331": [
+"OWASP-A04-2025"
+],
+"CWE-332": [
+"OWASP-A04-2025"
+],
+"CWE-334": [
+"OWASP-A04-2025"
+],
+"CWE-335": [
+"OWASP-A04-2025"
+],
+"CWE-336": [
+"OWASP-A04-2025"
+],
+"CWE-337": [
+"OWASP-A04-2025"
+],
+"CWE-338": [
+"OWASP-A04-2025"
+],
+"CWE-340": [
+"OWASP-A04-2025"
+],
+"CWE-342": [
+"OWASP-A04-2025"
+],
+"CWE-345": [
+"OWASP-A08-2025"
+],
+"CWE-346": [
+"OWASP-A07-2025"
+],
+"CWE-347": [
+"OWASP-A04-2025"
+],
+"CWE-350": [
+"OWASP-A07-2025"
+],
+"CWE-352": [
+"OWASP-A01-2025"
+],
+"CWE-353": [
+"OWASP-A08-2025"
+],
+"CWE-359": [
+"OWASP-A01-2025"
+],
+"CWE-36": [
+"OWASP-A01-2025"
+],
+"CWE-362": [
+"OWASP-A06-2025"
+],
+"CWE-369": [
+"OWASP-A10-2025"
+],
+"CWE-377": [
+"OWASP-A01-2025"
+],
+"CWE-379": [
+"OWASP-A01-2025"
+],
+"CWE-382": [
+"OWASP-A06-2025"
+],
+"CWE-384": [
+"OWASP-A07-2025"
+],
+"CWE-390": [
+"OWASP-A10-2025"
+],
+"CWE-391": [
+"OWASP-A10-2025"
+],
+"CWE-394": [
+"OWASP-A10-2025"
+],
+"CWE-396": [
+"OWASP-A10-2025"
+],
+"CWE-397": [
+"OWASP-A10-2025"
+],
+"CWE-402": [
+"OWASP-A01-2025"
+],
+"CWE-419": [
+"OWASP-A06-2025"
+],
+"CWE-424": [
+"OWASP-A01-2025"
+],
+"CWE-425": [
+"OWASP-A01-2025"
+],
+"CWE-426": [
+"OWASP-A08-2025"
+],
+"CWE-427": [
+"OWASP-A08-2025"
+],
+"CWE-434": [
+"OWASP-A06-2025"
+],
+"CWE-436": [
+"OWASP-A06-2025"
+],
+"CWE-441": [
+"OWASP-A01-2025"
+],
+"CWE-444": [
+"OWASP-A06-2025"
+],
+"CWE-447": [
+"OWASP-A03-2025"
+],
+"CWE-451": [
+"OWASP-A06-2025"
+],
+"CWE-454": [
+"OWASP-A06-2025"
+],
+"CWE-460": [
+"OWASP-A10-2025"
+],
+"CWE-470": [
+"OWASP-A05-2025"
+],
+"CWE-472": [
+"OWASP-A06-2025"
+],
+"CWE-476": [
+"OWASP-A10-2025"
+],
+"CWE-477": [
+"OWASP-A03-2025"
+],
+"CWE-478": [
+"OWASP-A10-2025"
+],
+"CWE-484": [
+"OWASP-A10-2025"
+],
+"CWE-489": [
+"OWASP-A02-2025"
+],
+"CWE-493": [
+"OWASP-A05-2025"
+],
+"CWE-494": [
+"OWASP-A08-2025"
+],
+"CWE-497": [
+"OWASP-A01-2025"
+],
+"CWE-5": [
+"OWASP-A02-2025"
+],
+"CWE-500": [
+"OWASP-A05-2025"
+],
+"CWE-501": [
+"OWASP-A06-2025"
+],
+"CWE-502": [
+"OWASP-A08-2025"
+],
+"CWE-506": [
+"OWASP-A08-2025"
+],
+"CWE-509": [
+"OWASP-A08-2025"
+],
+"CWE-521": [
+"OWASP-A07-2025"
+],
+"CWE-522": [
+"OWASP-A06-2025"
+],
+"CWE-523": [
+"OWASP-A04-2025"
+],
+"CWE-525": [
+"OWASP-A06-2025"
+],
+"CWE-526": [
+"OWASP-A02-2025"
+],
+"CWE-532": [
+"OWASP-A09-2025"
+],
+"CWE-538": [
+"OWASP-A01-2025"
+],
+"CWE-539": [
+"OWASP-A06-2025"
+],
+"CWE-540": [
+"OWASP-A01-2025"
+],
+"CWE-547": [
+"OWASP-A02-2025"
+],
+"CWE-548": [
+"OWASP-A01-2025"
+],
+"CWE-550": [
+"OWASP-A10-2025"
+],
+"CWE-552": [
+"OWASP-A01-2025"
+],
+"CWE-564": [
+"OWASP-A05-2025"
+],
+"CWE-565": [
+"OWASP-A08-2025"
+],
+"CWE-566": [
+"OWASP-A01-2025"
+],
+"CWE-59": [
+"OWASP-A01-2025"
+],
+"CWE-601": [
+"OWASP-A01-2025"
+],
+"CWE-602": [
+"OWASP-A06-2025"
+],
+"CWE-61": [
+"OWASP-A01-2025"
+],
+"CWE-610": [
+"OWASP-A05-2025"
+],
+"CWE-611": [
+"OWASP-A02-2025"
+],
+"CWE-613": [
+"OWASP-A07-2025"
+],
+"CWE-614": [
+"OWASP-A02-2025"
+],
+"CWE-620": [
+"OWASP-A07-2025"
+],
+"CWE-628": [
+"OWASP-A06-2025"
+],
+"CWE-636": [
+"OWASP-A10-2025"
+],
+"CWE-639": [
+"OWASP-A01-2025"
+],
+"CWE-640": [
+"OWASP-A07-2025"
+],
+"CWE-642": [
+"OWASP-A06-2025"
+],
+"CWE-643": [
+"OWASP-A05-2025"
+],
+"CWE-646": [
+"OWASP-A06-2025"
+],
+"CWE-65": [
+"OWASP-A01-2025"
+],
+"CWE-653": [
+"OWASP-A06-2025"
+],
+"CWE-656": [
+"OWASP-A06-2025"
+],
+"CWE-657": [
+"OWASP-A06-2025"
+],
+"CWE-668": [
+"OWASP-A01-2025"
+],
+"CWE-676": [
+"OWASP-A06-2025"
+],
+"CWE-693": [
+"OWASP-A06-2025"
+],
+"CWE-703": [
+"OWASP-A10-2025"
+],
+"CWE-73": [
+"OWASP-A06-2025"
+],
+"CWE-732": [
+"OWASP-A01-2025"
+],
+"CWE-74": [
+"OWASP-A05-2025"
+],
+"CWE-749": [
+"OWASP-A01-2025"
+],
+"CWE-754": [
+"OWASP-A10-2025"
+],
+"CWE-755": [
+"OWASP-A10-2025"
+],
+"CWE-756": [
+"OWASP-A10-2025"
+],
+"CWE-757": [
+"OWASP-A04-2025"
+],
+"CWE-759": [
+"OWASP-A04-2025"
+],
+"CWE-76": [
+"OWASP-A05-2025"
+],
+"CWE-760": [
+"OWASP-A04-2025"
+],
+"CWE-77": [
+"OWASP-A05-2025"
+],
+"CWE-776": [
+"OWASP-A02-2025"
+],
+"CWE-778": [
+"OWASP-A09-2025"
+],
+"CWE-78": [
+"OWASP-A05-2025"
+],
+"CWE-780": [
+"OWASP-A04-2025"
+],
+"CWE-79": [
+"OWASP-A05-2025"
+],
+"CWE-798": [
+"OWASP-A07-2025"
+],
+"CWE-799": [
+"OWASP-A06-2025"
+],
+"CWE-80": [
+"OWASP-A05-2025"
+],
+"CWE-807": [
+"OWASP-A06-2025"
+],
+"CWE-829": [
+"OWASP-A08-2025"
+],
+"CWE-83": [
+"OWASP-A05-2025"
+],
+"CWE-830": [
+"OWASP-A08-2025"
+],
+"CWE-841": [
+"OWASP-A06-2025"
+],
+"CWE-86": [
+"OWASP-A05-2025"
+],
+"CWE-862": [
+"OWASP-A01-2025"
+],
+"CWE-863": [
+"OWASP-A01-2025"
+],
+"CWE-88": [
+"OWASP-A05-2025"
+],
+"CWE-89": [
+"OWASP-A05-2025"
+],
+"CWE-90": [
+"OWASP-A05-2025"
+],
+"CWE-91": [
+"OWASP-A05-2025"
+],
+"CWE-915": [
+"OWASP-A08-2025"
+],
+"CWE-916": [
+"OWASP-A04-2025"
+],
+"CWE-918": [
+"OWASP-A01-2025"
+],
+"CWE-922": [
+"OWASP-A01-2025"
+],
+"CWE-926": [
+"OWASP-A08-2025"
+],
+"CWE-93": [
+"OWASP-A05-2025"
+],
+"CWE-94": [
+"OWASP-A05-2025"
+],
+"CWE-940": [
+"OWASP-A07-2025"
+],
+"CWE-941": [
+"OWASP-A07-2025"
+],
+"CWE-942": [
+"OWASP-A02-2025"
+],
+"CWE-95": [
+"OWASP-A05-2025"
+],
+"CWE-96": [
+"OWASP-A05-2025"
+],
+"CWE-97": [
+"OWASP-A05-2025"
+],
+"CWE-98": [
+"OWASP-A05-2025"
+],
+"CWE-99": [
+"OWASP-A05-2025"
+]
+}
+}

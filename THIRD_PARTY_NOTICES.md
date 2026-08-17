@@ -42,6 +42,49 @@ When distributing this repository, package, or binary artifacts:
 - Do not state or imply that all files are GPLv3-only.
 - If you modify vendored draw.io files, document modifications and keep upstream notices intact.
 
+## Knowledge base datasets (`knowledge_base/`)
+
+The `knowledge_base/` folder contains data derived from the following external sources. These
+datasets are **not** under GPLv3. They retain their respective upstream licenses and are accessed
+by EmbedRisk code at runtime only (runtime data coupling — no static linking or compilation).
+
+### EMB3D™ — The MITRE Corporation
+
+- **Required notice:** ©2026 The MITRE Corporation. This work is reproduced and distributed with
+  the permission of The MITRE Corporation.
+- **License:** MITRE custom permissive license. Derivative works permitted with attribution.
+  Notify [EMB3D@mitre.org](mailto:EMB3D@mitre.org) of use.
+- **Upstream:** https://emb3d.mitre.org
+
+### CAPEC™ — Common Attack Pattern Enumeration and Classification
+
+- **Copyright:** © The MITRE Corporation. CAPEC™ is a trademark of The MITRE Corporation.
+- **License:** MITRE custom permissive license. Derivative works permitted with attribution.
+- **Upstream:** https://capec.mitre.org
+
+### CWE™ — Common Weakness Enumeration
+
+- **Copyright:** © The MITRE Corporation. CWE™ is a trademark of The MITRE Corporation.
+- **License:** MITRE custom permissive license. Free to use for any research, development, or
+  commercial purpose with attribution.
+- **Upstream:** https://cwe.mitre.org
+
+### ESTM — Embedded Systems Techniques Matrix
+
+- **Copyright:** ©2025 The MITRE Corporation. All rights reserved.
+- **Distribution:** Distribution Statement A — Approved for public release: distribution is
+  unlimited. (Case 25-2080, Contract FA8702-24-C-0001.)
+- **Upstream:** Produced by The MITRE Corporation under U.S. Government contract.
+
+### OWASP Top Ten 2025
+
+- **Copyright:** © Copyright 2021–2025 OWASP Top 10 Team.
+- **License:** [Creative Commons Attribution 3.0 Unported (CC BY 3.0)](http://creativecommons.org/licenses/by/3.0/deed.en_US).
+- **Upstream:** https://owasp.org/Top10/
+
+Full verbatim disclaimer blocks, complete license summaries, and redistribution obligations for all
+datasets are in [`knowledge_base/README.md`](knowledge_base/README.md).
+
 ## Practical scope statement
 
 Unless explicitly stated otherwise in a file or subdirectory, repository-authored files are intended to be under GPLv3. Third-party folders and files remain under their upstream licenses.

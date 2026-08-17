@@ -19,7 +19,7 @@ Both tools focus on structured, traceable assessments for IEC 62443-oriented pro
 |---|---|
 | [webapp/](webapp/) | TRA web application (React + Node): guided workflow, layered DFD canvas, risk logic, report generation |
 | [vscode-extension/](vscode-extension/) | EmbedRisk VS Code extension: guided wizard, native DFD and attack-tree editors, report command |
-| [knowledge-base/](knowledge-base/) | Reusable OT attacker, threat, and countermeasure examples |
+| [knowledge_base/](knowledge_base/) | Embedded OT threat knowledge base (EMB3D, CWE, CAPEC, ESTM, OWASP) |
 | [tools/](tools/) | Utility scripts (DFD conversion, report generation, model tests) |
 
 ## What EmbedRisk supports
@@ -87,6 +87,22 @@ Read [docs/HOW-TO-TRA.md](docs/HOW-TO-TRA.md) for:
 - a practical step-by-step modeling workflow,
 - a short list of high-value further reading.
 
+## AI-assisted TRA workflow
+
+This repository also ships a GitHub Copilot agent/prompt framework (under `.github/agents/`,
+`.github/prompts/`, `.github/instructions/`) that can interview an engineer through a TRA, review a
+project for consistency, or spar on assumptions — see [.ai/README.md](.ai/README.md) for the full
+framework.
+
+**Write policy**: the TRA Facilitator agent writes to a project's step JSON files by default, as
+soon as a change is ready, rather than pausing for a separate approval message before every write.
+This is a deliberate choice: the intended workspace is VS Code with git integration alongside the
+EmbedRisk webapp, so every change is already easily reverted and tracked — even purely locally,
+without a remote — through git history. The webapp itself only ever inspects whatever is already
+written to the JSON files (it is a viewer/editor for a TRA, not an approval mechanism), so gating
+writes in chat added friction without a matching safety benefit. If you'd rather review changes
+before they're written, just tell the agent so during the session.
+
 ## Methodology and compliance context
 
 EmbedRisk is designed to support secure product development workflows aligned with IEC 62443-4-1 and related regulatory expectations (for example, CRA-aligned traceability and evidence generation).
@@ -101,10 +117,32 @@ The risk method uses:
 
 The repository-level examples in [knowledge-base/](knowledge-base/) are intended as starter content. Teams should adapt and extend them with product-specific attacker assumptions, threat patterns, and approved controls.
 
+## Data Attribution & AI Context
+
+The `knowledge_base/` folder contains datasets derived from third-party sources used by the AI-assisted
+TRA workflow. These datasets are **not** under GPLv3; each retains its upstream license. The key
+sources and their required attributions are:
+
+| Dataset | Rights holder | License |
+|---|---|---|
+| EMB3D™ | The MITRE Corporation | MITRE custom (permissive); notify [EMB3D@mitre.org](mailto:EMB3D@mitre.org) |
+| CAPEC™ | The MITRE Corporation | MITRE custom (permissive) |
+| CWE™ | The MITRE Corporation | MITRE custom (permissive) |
+| ESTM | The MITRE Corporation / U.S. Government | Distribution Statement A (unlimited release) |
+| OWASP Top Ten 2025 | OWASP Top 10 Team | [CC BY 3.0 Unported](http://creativecommons.org/licenses/by/3.0/deed.en_US) |
+
+**Required EMB3D notice:** ©2026 The MITRE Corporation. This work is reproduced and distributed
+with the permission of The MITRE Corporation.
+
+Full attribution text, verbatim disclaimer blocks, and redistribution obligations are in
+[knowledge_base/README.md](knowledge_base/README.md). Third-party software notices are in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## License
 
 EmbedRisk repository-authored code is licensed under GNU GPLv3. See [LICENSE](LICENSE).
 
-This repository also ships third-party materials (notably the optional vendored draw.io webapp in `vscode-extension/media/drawio/`) that remain under their own upstream licenses.
+This repository also ships third-party materials (notably the optional vendored draw.io webapp in
+`vscode-extension/media/drawio/`) that remain under their own upstream licenses.
 
 For details and distribution obligations, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

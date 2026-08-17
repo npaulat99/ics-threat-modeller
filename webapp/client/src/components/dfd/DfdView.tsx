@@ -22,6 +22,7 @@ import { useStore, uid } from '../../state/store';
 import { nodeTypes } from './nodes';
 import DfdOverview from './DfdOverview';
 import { riskOf } from '../../lib/risk';
+import { deriveVisibleInterfaceIds, flowBelongsToLayerContext, isParentChildNodeFlow, resolveTargetNodeId } from './layerVisibility.js';
 import { cx, confirmDelete } from '../common';
 import type { Dfd, DfdNode, DfdNodeType } from '../../types';
 import { routeAround, roundedPath, labelPtOnPolyline } from '@shared/dfdEngine.js';
@@ -201,19 +202,17 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
 
     const compById = useMemo(() => new Map((data.system.components || []).map((c) => [c.id, c])), [data.system.components]);
     const compName = (ref?: string) => (ref ? compById.get(ref)?.name || '' : '');
+    const targetForComponent = (compId?: string) => resolveTargetNodeId(compId, realNodes, compById);
     const visibleIfaceIds = useMemo(() => {
-        const ids = new Set<string>();
-        const interfaces = (data.system.interfaces || []).filter((itf) => !itf.hidden);
-        if (currentParent == null) {
-            for (const itf of interfaces) ids.add(itf.id);
-            return ids;
-        }
-        for (const f of dfd.flows) {
-            if (f.from === currentParent && interfaces.some((itf) => itf.id === f.to)) ids.add(f.to);
-            if (f.to === currentParent && interfaces.some((itf) => itf.id === f.from)) ids.add(f.from);
-        }
-        return ids;
-    }, [currentParent, dfd.flows, data.system.interfaces]);
+        return deriveVisibleInterfaceIds({
+            currentParent,
+            interfaces: data.system.interfaces || [],
+            flows: dfd.flows || [],
+            nodes: dfd.nodes || [],
+            visibleRealNodes: realNodes,
+            compById,
+        });
+    }, [currentParent, dfd.flows, dfd.nodes, data.system.interfaces, realNodes, compById]);
     const riskFor = (node: DfdNode) => {
         if (!node.componentRef) return null;
         const rel = threats.filter((t) => (t.components || []).includes(node.componentRef!));
@@ -226,23 +225,7 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
         return { count: rel.length, color: worst.color, title: `${rel.length} threat(s) · worst residual ${worst.score}` };
     };
 
-    // Resolve which visible node an interface attaches to on this layer: the node whose
-    // componentRef is the interface's component, or its nearest visible ancestor component.
-    // This is what makes an interface "refine" as you zoom in (e.g. JTAG -> device at L1,
-    // JTAG -> MCU at L2).
-    const targetForComponent = (compId?: string): string | null => {
-        let c: string | null | undefined = compId;
-        const seen = new Set<string>();
-        while (c && !seen.has(c)) {
-            seen.add(c);
-            const node = realNodes.find((n) => n.componentRef === c);
-            if (node) return node.id;
-            c = compById.get(c)?.parent ?? null;
-        }
-        return null;
-    };
-
-    const targetOf = useMemo(() => (data.system.interfaces || []).map((itf) => targetForComponent(itf.component)), [data.system.interfaces, dfd.nodes, currentParent]);
+    const targetOf = useMemo(() => (data.system.interfaces || []).map((itf) => targetForComponent(itf.component)), [data.system.interfaces, realNodes, compById]);
 
     const placedReal = () => realNodes.map((n) => ({ id: n.id, x: n.x ?? 0, y: n.y ?? 0, ...sizeOf(n.type) }));
 
@@ -362,16 +345,34 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             const parentIfaceIds = new Set(ifaces.filter((it) => it.component === Pcomp).map((it) => it.id));
             const visibleIfaceHere = visibleIfaceIds;
             const nodeById = new Map(dfd.nodes.map((n) => [n.id, n]));
-            const internalHas = (id: string) => real.some((r) => r.id === id);
+            const visibleRealNodeIds = new Set(real.map((node) => node.id));
+            const internalHas = (id: string) => visibleRealNodeIds.has(id);
+            const interfaceChipVisible = (id: string) => visibleIfaceHere.has(id) && !!targetForComponent(ifaces.find((itf) => itf.id === id)?.component);
+            const directVisible = (id: string) => internalHas(id) || interfaceChipVisible(id);
             const portMap = new Map<string, { in: boolean; out: boolean; labels: string[] }>();
             const addPort = (ep: string, dir: 'in' | 'out', label?: string) => {
-                if (visibleIfaceHere.has(ep) || internalHas(ep)) return; // already shown on this layer
+                if (directVisible(ep)) return;
                 const e = portMap.get(ep) || { in: false, out: false, labels: [] };
                 e[dir] = true;
                 if (label) e.labels.push(label);
                 portMap.set(ep, e);
             };
             for (const f of dfd.flows) {
+                const inLayerContext = flowBelongsToLayerContext({
+                    flow: f,
+                    currentParent,
+                    visibleRealNodeIds,
+                    visibleIfaceIds: visibleIfaceHere,
+                    nodes: dfd.nodes || [],
+                    compById,
+                    interfaces: ifaces,
+                });
+                if (!inLayerContext) continue;
+                const fromDirect = directVisible(f.from);
+                const toDirect = directVisible(f.to);
+                if (fromDirect !== toDirect) {
+                    addPort(fromDirect ? f.to : f.from, fromDirect ? 'out' : 'in', f.label);
+                }
                 const other = f.from === currentParent ? f.to : f.to === currentParent ? f.from : null;
                 if (other && (sibIds.has(other) || ifaceIdSet.has(other))) addPort(other, f.from === currentParent ? 'out' : 'in', f.label);
                 const fromParentIface = parentIfaceIds.has(f.from);
@@ -554,7 +555,7 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
         const out: any[] = [];
         const { boxes, portEndpointIds, ifacePortIds } = layoutRef.current;
         const ifaces = data.system.interfaces || [];
-        const visIface = new Set(ifaces.filter((itf) => targetForComponent(itf.component)).map((itf) => itf.id));
+        const visIface = visibleIfaceIds;
         const endpointVisible = (ep: string) => visibleIds.has(ep) || visIface.has(ep) || portEndpointIds.has(ep);
         const rfId = (ep: string) => (visIface.has(ep) || ifacePortIds.has(ep) ? `iface:${ep}` : ep);
         // Obstacle boxes for edge routing = every entity box on this layer (nodes, interface chips,
@@ -676,6 +677,10 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             const from = strip(c.source);
             const to = strip(c.target);
             if (from === to) return;
+            if (isParentChildNodeFlow({ from, to }, dfd.nodes)) {
+                window.alert('A container and its own nested component can never be connected directly — model the connection between siblings inside the child layer instead.');
+                return;
+            }
             const label = window.prompt('Label this data flow — what data or command does it carry? (required)', '');
             if (!label || !label.trim()) return;
             const id = uid('F', dfd.flows.map((f) => f.id));
@@ -687,10 +692,14 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
         (oldEdge: any, conn: any) => {
             if (!conn.source || !conn.target) return;
             const strip = (x: string) => (x.startsWith('iface:') ? x.slice(6) : x);
+            const from = strip(conn.source);
+            const to = strip(conn.target);
+            if (isParentChildNodeFlow({ from, to }, dfd.nodes)) {
+                window.alert('A container and its own nested component can never be connected directly — model the connection between siblings inside the child layer instead.');
+                return;
+            }
             persist({
-                flows: dfd.flows.map((f) =>
-                    f.id === oldEdge.id ? { ...f, from: strip(conn.source), to: strip(conn.target), sourceHandle: conn.sourceHandle || undefined, targetHandle: conn.targetHandle || undefined } : f,
-                ),
+                flows: dfd.flows.map((f) => (f.id === oldEdge.id ? { ...f, from, to, sourceHandle: conn.sourceHandle || undefined, targetHandle: conn.targetHandle || undefined } : f)),
             });
         },
         [dfd],

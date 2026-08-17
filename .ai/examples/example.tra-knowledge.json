@@ -1,0 +1,82 @@
+{
+    "schemaVersion": 1,
+    "projectId": "test",
+    "updatedAt": "2026-08-10T15:05:00Z",
+    "interview": {
+        "currentStep": "03-system-assets",
+        "completedSteps": [
+            "01-project-description",
+            "02-assumptions"
+        ],
+        "openQuestions": [
+            {
+                "id": "Q-4",
+                "step": "03-system-assets",
+                "category": "authenticationMethods",
+                "question": "What authenticates the firmware-update interface?",
+                "askedAt": null,
+                "status": "pending"
+            },
+            {
+                "id": "Q-5",
+                "step": "03-system-assets",
+                "category": "maintenanceAccess",
+                "question": "Is there a local service/debug port (UART/JTAG/SWD) exposed on the enclosure, and if so, is it disabled or protected in production units?",
+                "askedAt": null,
+                "status": "pending"
+            }
+        ],
+        "answeredQuestions": [
+            {
+                "id": "Q-1",
+                "step": "02-assumptions",
+                "question": "Is the device reachable from the plant IT network, or only the OT network?",
+                "answer": "Only the OT network, via a firewalled VLAN.",
+                "answeredAt": "2026-08-10T14:20:00Z",
+                "kind": "fact"
+            },
+            {
+                "id": "Q-2",
+                "step": "02-assumptions",
+                "question": "Should we assume a contractor VPN can reach the OT VLAN during maintenance windows?",
+                "answer": "Yes, that happens for planned maintenance a few times a year.",
+                "answeredAt": "2026-08-10T14:24:00Z",
+                "kind": "fact"
+            },
+            {
+                "id": "Q-3",
+                "step": "02-assumptions",
+                "question": "Given that, do you want to model a 'remote opportunistic attacker via contractor VPN' profile in addition to the local attacker?",
+                "answer": "Yes, add it.",
+                "answeredAt": "2026-08-10T14:30:00Z",
+                "kind": "recommendation-accepted"
+            }
+        ]
+    },
+    "confirmedContext": {
+        "assets": [],
+        "communicationPaths": [],
+        "trustBoundaries": [],
+        "authenticationMethods": [],
+        "maintenanceAccess": [
+            {
+                "note": "Contractor VPN reaches the OT VLAN during planned maintenance windows, a few times a year.",
+                "sourceQuestionId": "Q-2"
+            }
+        ],
+        "availabilityRequirements": [],
+        "constraints": []
+    },
+    "decisionLog": [
+        {
+            "date": "2026-08-10T15:00:00Z",
+            "change": "Added attacker profile ATK-2 (remote opportunistic attacker via contractor VPN) to 02-assumptions/assumptions.json",
+            "affectedFiles": [
+                "02-assumptions/assumptions.json"
+            ],
+            "rationale": "User confirmed a contractor VPN reaches the OT VLAN during maintenance windows (Q-2), and accepted modeling a corresponding attacker profile (Q-3).",
+            "approvedBy": "user",
+            "approvedAt": "2026-08-10T15:00:00Z"
+        }
+    ]
+}

@@ -33,6 +33,7 @@ export function openIssues(issues: Issue[], accepted?: string[]): Issue[] {
 export function validate(data: ProjectData): Issue[] {
     const issues: Issue[] = [];
     const add = (severity: IssueSeverity, message: string, key?: string) => issues.push({ severity, message, key: key ?? message });
+    const hasText = (value: unknown) => String(value || '').trim().length > 0;
     const project = data.project || ({} as any);
     const threats = data.threats?.threats || [];
     const cms = data.countermeasures?.countermeasures || [];
@@ -83,6 +84,12 @@ export function validate(data: ProjectData): Issue[] {
             add('warning', `${t.id}: exploit difficulty (${6 - exploit}) exceeds attacker ${atk.id}'s capability (${atk.capability}) — likelihood may be over-stated.`);
         if (t.status === 'accepted' && (!t.acceptedBy || !t.acceptanceRationale || !t.reviewDate))
             add('warning', `${t.id}: accepted residual risk requires a sign-off owner (acceptedBy), a rationale (acceptanceRationale) and a next-review date (reviewDate).`);
+        if ((t.stride || []).some((s) => s === 'S' || s === 'T' || s === 'I') && !t.classification)
+            add('notice', `${t.id}: classification is unset for a spoofing/tampering/information-disclosure threat; classify whether this is a product vulnerability, protocol limitation, deployment risk, or shared responsibility.`, `threat-classification:${t.id}`);
+        if ((t.classification === 'protocol-limitation' || t.classification === 'deployment-risk' || t.classification === 'shared-responsibility') && !hasText(t.deploymentConstraints) && t.status !== 'accepted' && t.status !== 'transferred')
+            add('warning', `${t.id}: ${t.classification} classification requires deploymentConstraints unless the risk is accepted or transferred.`);
+        if (t.classification === 'product-vulnerability' && t.responsibility === 'integrator-operator' && hasText(t.deploymentConstraints))
+            add('warning', `${t.id}: product-vulnerability with integrator-operator responsibility and deploymentConstraints is contradictory.`);
         if (t.reviewDate && t.reviewDate < today)
             add('warning', `${t.id}: re-assessment overdue (review date ${t.reviewDate}).`);
         if (t.status === 'mitigated') {
@@ -143,9 +150,12 @@ export function validate(data: ProjectData): Issue[] {
         for (const cm of r.satisfiedByCM || []) if (!cmIds.has(cm)) add('error', `${r.id}: satisfied by unknown countermeasure '${cm}'.`);
     }
     const reqThreats = new Set(reqs.flatMap((r) => r.derivedFromThreat || []));
-    for (const t of threats)
+    for (const t of threats) {
         if ((t.likelihood || 0) * (t.impact || 0) >= 12 && !reqThreats.has(t.id) && t.status !== 'accepted')
             add('warning', `${t.id}: high/critical threat has no security requirement derived from it.`);
+        if (t.status === 'transferred' && !reqThreats.has(t.id))
+            add('warning', `${t.id}: transferred risk requires a linked requirement documenting the risk transfer in the user guide.`);
+    }
 
     const parents = new Set(components.map((c) => c.parent).filter(Boolean) as string[]);
     const threatComps = new Set(threats.flatMap((t) => t.components || []));

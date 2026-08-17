@@ -588,6 +588,20 @@ export const useStore = create<Store>((set, get) => ({
         if (!data) return;
         if (!histSuppress) pushHistory(data, step);
         const nextData = { ...data, [step]: value } as ProjectData;
+        if (step === 'project') {
+            const deviceName = String(nextData.project?.device?.name || '').trim();
+            if (deviceName) {
+                const components = nextData.system?.components || [];
+                const rootDevice = components.find((component: any) => component.kind === 'device' && component.parent == null) || components.find((component: any) => component.kind === 'device');
+                if (rootDevice && rootDevice.name !== deviceName) {
+                    nextData.system = {
+                        ...nextData.system,
+                        components: components.map((component: any) => (component.id === rootDevice.id ? { ...component, name: deviceName } : component)),
+                    };
+                    nextData.dfd = reconcileSystemDfd(nextData.system, nextData.dfd, 'system');
+                }
+            }
+        }
         if (step === 'system') nextData.dfd = reconcileSystemDfd(nextData.system, nextData.dfd, 'system');
         if (step === 'dfd') {
             nextData.system = reconcileDfdSystem(nextData.system, nextData.dfd);
@@ -608,6 +622,16 @@ export const useStore = create<Store>((set, get) => ({
             if (latest) sendSave(id, step, (latest as any)[step]);
         }, 160);
         if (step === 'system') {
+            saveTimers.dfd = setTimeout(() => {
+                const latest = get().data;
+                if (latest) sendSave(id, 'dfd', latest.dfd);
+            }, 160);
+        }
+        if (step === 'project') {
+            saveTimers.system = setTimeout(() => {
+                const latest = get().data;
+                if (latest) sendSave(id, 'system', latest.system);
+            }, 160);
             saveTimers.dfd = setTimeout(() => {
                 const latest = get().data;
                 if (latest) sendSave(id, 'dfd', latest.dfd);

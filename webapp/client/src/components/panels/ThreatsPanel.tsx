@@ -73,6 +73,7 @@ export default function ThreatsPanel() {
         const upd = (patch: any) => setThreats(threats.map((x) => (x.id === t.id ? { ...x, ...patch } : x)));
         const orphan = !(t.components || []).length;
         const ifaceOpts = (data.system.interfaces || []).map((itf) => ({ value: itf.id, label: `${itf.name}${itf.protocol ? ` (${itf.protocol})` : ''}` }));
+        const transferReqs = (data.requirements?.requirements || []).filter((r) => (r.derivedFromThreat || []).includes(t.id));
         const interfaceRefs = t.interfaceRefs?.length ? t.interfaceRefs : t.interfaceRef && t.interfaceRef !== 'custom' ? [t.interfaceRef] : [];
         const setInterfaces = (next: string[]) => upd({ interfaceRefs: next, interfaceRef: next[0] || undefined });
         const splitByInterface = () => {
@@ -123,12 +124,42 @@ export default function ThreatsPanel() {
                         </Field>
                     </div>
                 </div>
+                <div className="grid2">
+                    <Field label="Classification">
+                        <select value={t.classification || ''} onChange={(e) => upd({ classification: e.target.value || undefined })}>
+                            <option value="">— none —</option>
+                            <option value="product-vulnerability">product-vulnerability</option>
+                            <option value="protocol-limitation">protocol-limitation</option>
+                            <option value="deployment-risk">deployment-risk</option>
+                            <option value="shared-responsibility">shared-responsibility</option>
+                        </select>
+                    </Field>
+                    <Field label="Responsibility">
+                        <select value={t.responsibility || ''} onChange={(e) => upd({ responsibility: e.target.value || undefined })}>
+                            <option value="">— none —</option>
+                            <option value="manufacturer">manufacturer</option>
+                            <option value="integrator-operator">integrator-operator</option>
+                            <option value="shared">shared</option>
+                        </select>
+                    </Field>
+                </div>
+                <Field label="Classification rationale">
+                    <textarea value={t.classificationRationale || ''} onChange={(e) => upd({ classificationRationale: e.target.value || undefined })} />
+                </Field>
+                {(t.classification === 'protocol-limitation' || t.classification === 'deployment-risk' || t.classification === 'shared-responsibility') && (
+                    <Field
+                        label="Deployment constraints"
+                        hint="Compensating controls required outside this component (segmentation, physical protection, gateway architecture, monitoring) for the residual risk to be acceptable in an actual deployment."
+                    >
+                        <textarea value={t.deploymentConstraints || ''} onChange={(e) => upd({ deploymentConstraints: e.target.value || undefined })} />
+                    </Field>
+                )}
 
                 <Field label="Affected components" hint={orphan ? 'A threat must affect at least one component.' : undefined}>
                     <Chips options={compOpts} value={t.components || []} onChange={(v) => upd({ components: v })} empty="Define components in step 03 first." />
                 </Field>
                 <details className="calc">
-                    <summary>More details — assets, attacker, interface, rationale</summary>
+                    <summary>More details — assets, attacker, interface, assumptions</summary>
                     <div className="grid3">
                         <Field label="Affected assets">
                             <Chips options={assetOpts} value={t.assets || []} onChange={(v) => upd({ assets: v })} empty="No assets yet." />
@@ -195,6 +226,19 @@ export default function ThreatsPanel() {
                             <input type="date" value={t.reviewDate || ''} onChange={(e) => upd({ reviewDate: e.target.value })} />
                         </Field>
                     </div>
+                )}
+                {t.status === 'transferred' && (
+                    <Field label="Risk transfer requirement" hint="Link a requirement in step 05 that documents how this transfer is described in the user guide.">
+                        {transferReqs.length ? (
+                            <div className="summary-links">
+                                {transferReqs.map((r) => (
+                                    <Jump key={r.id} view="requirements" id={r.id} label={`${r.id} · ${r.text}`} />
+                                ))}
+                            </div>
+                        ) : (
+                            <span className="hint">none linked</span>
+                        )}
+                    </Field>
                 )}
                 <div className="inline" style={{ marginTop: 8, flexWrap: 'wrap', gap: 6 }}>
                     <button className="btn sm" onClick={() => makeTree(t)}>
@@ -271,6 +315,7 @@ export default function ThreatsPanel() {
                                         <RiskPill score={r.initial} band={r.initialBand} title="Initial risk" />
                                         <span className="muted">→</span>
                                         <RiskPill score={r.residual} band={r.residualBand} title="Residual risk" />
+                                        <span className="tag">{t.status || 'open'}</span>
                                         <button className="btn sm" onClick={() => setEditingId(t.id)}>
                                             Edit
                                         </button>
@@ -280,6 +325,8 @@ export default function ThreatsPanel() {
                                     </div>
                                     <div className="summary-links">
                                         {(t.stride || []).length ? <span className="tag stride">{sortStride(t.stride).join(' ')}</span> : null}
+                                        {t.classification ? <span className="tag">Class: {t.classification}</span> : null}
+                                        {t.responsibility ? <span className="tag">Resp: {t.responsibility}</span> : null}
                                         {(t.assumptionRefs || []).length ? <span className="tag">Assumptions: {t.assumptionRefs.join(', ')}</span> : null}
                                         <span className="lbl">Mitigated by:</span>
                                         {cmsFor(t.id).length ? cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} />) : <span className="hint">none</span>}
