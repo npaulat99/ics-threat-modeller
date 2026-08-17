@@ -19,7 +19,7 @@ Both tools focus on structured, traceable assessments for IEC 62443-oriented pro
 |---|---|
 | [webapp/](webapp/) | TRA web application (React + Node): guided workflow, layered DFD canvas, risk logic, report generation |
 | [vscode-extension/](vscode-extension/) | EmbedRisk VS Code extension: guided wizard, native DFD and attack-tree editors, report command |
-| [knowledge-base/](knowledge-base/) | Reusable OT attacker, threat, and countermeasure examples |
+| [knowledge_base/](knowledge_base/) | Embedded OT threat knowledge base (EMB3D, CWE, CAPEC, ESTM, OWASP) |
 | [tools/](tools/) | Utility scripts (DFD conversion, report generation, model tests) |
 
 ## What EmbedRisk supports
@@ -117,10 +117,32 @@ The risk method uses:
 
 The repository-level examples in [knowledge-base/](knowledge-base/) are intended as starter content. Teams should adapt and extend them with product-specific attacker assumptions, threat patterns, and approved controls.
 
+## Data Attribution & AI Context
+
+The `knowledge_base/` folder contains datasets derived from third-party sources used by the AI-assisted
+TRA workflow. These datasets are **not** under GPLv3; each retains its upstream license. The key
+sources and their required attributions are:
+
+| Dataset | Rights holder | License |
+|---|---|---|
+| EMB3D™ | The MITRE Corporation | MITRE custom (permissive); notify [EMB3D@mitre.org](mailto:EMB3D@mitre.org) |
+| CAPEC™ | The MITRE Corporation | MITRE custom (permissive) |
+| CWE™ | The MITRE Corporation | MITRE custom (permissive) |
+| ESTM | The MITRE Corporation / U.S. Government | Distribution Statement A (unlimited release) |
+| OWASP Top Ten 2025 | OWASP Top 10 Team | [CC BY 3.0 Unported](http://creativecommons.org/licenses/by/3.0/deed.en_US) |
+
+**Required EMB3D notice:** ©2026 The MITRE Corporation. This work is reproduced and distributed
+with the permission of The MITRE Corporation.
+
+Full attribution text, verbatim disclaimer blocks, and redistribution obligations are in
+[knowledge_base/README.md](knowledge_base/README.md). Third-party software notices are in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## License
 
 EmbedRisk repository-authored code is licensed under GNU GPLv3. See [LICENSE](LICENSE).
 
-This repository also ships third-party materials (notably the optional vendored draw.io webapp in `vscode-extension/media/drawio/`) that remain under their own upstream licenses.
+This repository also ships third-party materials (notably the optional vendored draw.io webapp in
+`vscode-extension/media/drawio/`) that remain under their own upstream licenses.
 
 For details and distribution obligations, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
