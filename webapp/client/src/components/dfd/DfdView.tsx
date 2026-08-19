@@ -624,12 +624,17 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
         };
         const handleUse = new Map<string, number>();
         const shapeById = new Map(realNodes.map((node) => [node.id, node.type === 'process' || node.type === 'multiprocess']));
-        const allocateHandle = (nodeId: string, role: 's' | 't', preferred: string | undefined, from: Box, toward: Box) => {
+        const reserveHandle = (nodeId: string, role: 's' | 't', handle: string) => {
+            const key = handle.replace(/^[st]-/, '');
+            const usageKey = `${nodeId}:${role}:${key}`;
+            handleUse.set(usageKey, (handleUse.get(usageKey) || 0) + 1);
+            return `${role}-${key}`;
+        };
+        const allocateHandle = (nodeId: string, role: 's' | 't', from: Box, toward: Box) => {
             const closest = sideToward(from, toward);
             const closestIndex = HANDLE_RING.indexOf(closest);
             const allowed = [closest, HANDLE_RING[(closestIndex + 7) % 8], HANDLE_RING[(closestIndex + 1) % 8]];
-            const preferredKey = preferred?.replace(/^[st]-/, '');
-            const candidates = preferredKey && allowed.includes(preferredKey as any) ? [preferredKey, ...allowed.filter((key) => key !== preferredKey)] : allowed;
+            const candidates = [...allowed];
             candidates.sort((a, b) => {
                 const useDiff = (handleUse.get(`${nodeId}:${role}:${a}`) || 0) - (handleUse.get(`${nodeId}:${role}:${b}`) || 0);
                 if (useDiff) return useDiff;
@@ -657,15 +662,17 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             let sourceHandle: string;
             let targetHandle: string;
             let bidirectional = false;
-            if (paired && paired.from === targetId && paired.to === sourceId) {
-                sourceHandle = `s-${paired.targetKey}`;
-                targetHandle = `t-${paired.sourceKey}`;
+            const reversePaired = paired && paired.from === targetId && paired.to === sourceId;
+            if (flow.sourceHandle) sourceHandle = reserveHandle(sourceId, 's', flow.sourceHandle);
+            else if (reversePaired) sourceHandle = reserveHandle(sourceId, 's', paired.targetKey);
+            else sourceHandle = sourceBox && targetBox ? allocateHandle(sourceId, 's', sourceBox, targetBox) : 's-r';
+            if (flow.targetHandle) targetHandle = reserveHandle(targetId, 't', flow.targetHandle);
+            else if (reversePaired) targetHandle = reserveHandle(targetId, 't', paired.sourceKey);
+            else targetHandle = sourceBox && targetBox ? allocateHandle(targetId, 't', targetBox, sourceBox) : 't-l';
+            if (reversePaired) {
                 bidirectional = true;
-            } else {
-                sourceHandle = sourceBox && targetBox ? allocateHandle(sourceId, 's', flow.sourceHandle, sourceBox, targetBox) : flow.sourceHandle || 's-r';
-                targetHandle = sourceBox && targetBox ? allocateHandle(targetId, 't', flow.targetHandle, targetBox, sourceBox) : flow.targetHandle || 't-l';
-                if (!paired) pairHandles.set(key, { from: sourceId, to: targetId, sourceKey: sourceHandle.slice(2), targetKey: targetHandle.slice(2) });
             }
+            if (!paired) pairHandles.set(key, { from: sourceId, to: targetId, sourceKey: sourceHandle.slice(2), targetKey: targetHandle.slice(2) });
             if (!bidirectional) bidirectional = flows.some((candidate) => candidate.from === flow.to && candidate.to === flow.from);
             return { flow, sourceId, targetId, sourceBox, targetBox, sourceHandle, targetHandle, bidirectional };
         });
