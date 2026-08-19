@@ -42,7 +42,7 @@ export default function DashboardPanel() {
     const sharedResponsibility = threats.filter((t) => t.classification === 'shared-responsibility').length;
 
     return (
-        <div className="panel" style={{ maxWidth: 1140 }}>
+        <div className="panel">
             <div className="panelhead">
                 <h1>Compliance dashboard</h1>
                 <HelpButton title="IEC 62443-4-1 / CRA overview">

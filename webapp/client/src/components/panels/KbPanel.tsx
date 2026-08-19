@@ -58,7 +58,7 @@ export default function KbPanel() {
     const imported = kb?.imported || [];
 
     return (
-        <div className="panel" style={{ maxWidth: 1100 }}>
+        <div className="panel">
             <div className="panelhead">
                 <h1>Knowledge base</h1>
                 <HelpButton title="Knowledge base">
