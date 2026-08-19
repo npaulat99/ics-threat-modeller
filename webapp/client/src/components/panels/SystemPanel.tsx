@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore, uid } from '../../state/store';
-import { Field, Chips, ComboInput, useFocus, useEditMode, EditBackBar, ScaleSelect, OBJECTIVE_LEVELS, SelectedChips, Jump, HelpButton, confirmDelete, IdInput } from '../common';
+import { Field, TagSelect, ComboInput, useFocus, useEditMode, EditBackBar, ScaleSelect, OBJECTIVE_LEVELS, SelectedChips, Jump, HelpButton, confirmDelete, IdInput } from '../common';
 import type { Asset, Component, Interface, TrustBoundary } from '../../types';
 
 const KIND_OPTS = ['device', 'hardware', 'software', 'interface', 'external-entity', 'store'].map((v) => ({ value: v }));
@@ -197,7 +197,7 @@ export default function SystemPanel() {
                                         <Field label="Category">
                                             <ComboInput value={c.category} onChange={(v) => upd({ category: v || undefined })} options={CATEGORY_OPTS} placeholder="network…" />
                                         </Field>
-                                        <Field label="Chip tag" hint="Shown on the DFD node.">
+                                        <Field label="Chip tag" hint="Short label displayed on the DFD node.">
                                             <input value={c.tag || ''} onChange={(e) => upd({ tag: e.target.value })} placeholder="BLE, HMI, JTAG…" />
                                         </Field>
                                         <Field label="On component">
@@ -263,7 +263,7 @@ export default function SystemPanel() {
                                             )}
                                         </div>
                                         <Field label="Members">
-                                            <Chips options={compOpts} value={c.members || []} onChange={(v) => upd({ members: v })} />
+                                            <TagSelect options={compOpts} value={c.members || []} onChange={(v) => upd({ members: v })} />
                                         </Field>
                                         <button className="btn sm" onClick={() => openStrideBoundary(c.id)}>
                                             STRIDE strengths / weaknesses
@@ -287,7 +287,7 @@ export default function SystemPanel() {
                                     <div className="itemcard collapsed" key={c.id}>
                                         <div className="head">
                                             <span className="summary-id">{c.id}</span>
-                                            <span className="summary-title">{c.name}</span>
+                                            <span className="summary-title" title={c.name}>{c.name}</span>
                                             <button className="btn sm" onClick={() => openStrideBoundary(c.id)} title="Edit the STRIDE strengths/weaknesses analysis for this boundary">
                                                 STRIDE
                                             </button>
@@ -362,14 +362,14 @@ export default function SystemPanel() {
                                                 <input list="storages" value={c.storage || ''} onChange={(e) => upd({ storage: e.target.value })} placeholder="internal flash, secure element…" />
                                             </Field>
                                             <Field label="Held by components">
-                                                <Chips options={compOpts} value={c.components || []} onChange={(v) => upd({ components: v })} />
+                                                <TagSelect options={compOpts} value={c.components || []} onChange={(v) => upd({ components: v })} />
                                             </Field>
                                         </div>
                                         {threatsForAsset(c.id).length > 0 && (
                                             <div className="inline" style={{ flexWrap: 'wrap', gap: 6 }}>
                                                 <span className="hint">Threats:</span>
                                                 {threatsForAsset(c.id).map((t) => (
-                                                    <Jump key={t.id} view="threats" id={t.id} />
+                                                    <Jump key={t.id} view="threats" id={t.id} title={`${t.id} · ${t.title}`} />
                                                 ))}
                                             </div>
                                         )}
@@ -394,7 +394,7 @@ export default function SystemPanel() {
                                         <div id={`f-system-${c.id}`} className={'itemcard collapsed' + (focusId === c.id ? ' focused' : '')} key={c.id}>
                                             <div className="head">
                                                 <span className="summary-id">{c.id}</span>
-                                                <span className="summary-title">{c.name}</span>
+                                                <span className="summary-title" title={c.name}>{c.name}</span>
                                                 <span className="tag">{c.type || 'function'}</span>
                                                 <span className="tag" title="Confidentiality / Integrity / Availability / Safety">
                                                     C{o.confidentiality ?? 0}/I{o.integrity ?? 0}/A{o.availability ?? 0}/S{o.safety ?? 0}
@@ -413,7 +413,7 @@ export default function SystemPanel() {
                                                     <>
                                                         <span className="lbl">Threats:</span>
                                                         {threatsForAsset(c.id).map((t) => (
-                                                            <Jump key={t.id} view="threats" id={t.id} />
+                                                            <Jump key={t.id} view="threats" id={t.id} title={`${t.id} · ${t.title}`} />
                                                         ))}
                                                     </>
                                                 ) : null}

@@ -16,7 +16,6 @@ import ReviewPanel from './components/panels/ReviewPanel';
 import VersionsPanel from './components/panels/VersionsPanel';
 import DashboardPanel from './components/panels/DashboardPanel';
 import DefectsPanel from './components/panels/DefectsPanel';
-import AssistantPanel from './components/panels/AssistantPanel';
 import KbPanel from './components/panels/KbPanel';
 import SettingsModal from './components/SettingsModal';
 import StrideBoundaryEditor from './components/StrideBoundaryEditor';
@@ -59,8 +58,6 @@ export default function App() {
                 return <DashboardPanel />;
             case 'defects':
                 return <DefectsPanel />;
-            case 'assistant':
-                return <AssistantPanel />;
             case 'kb':
                 return <KbPanel />;
             default:
@@ -72,13 +69,13 @@ export default function App() {
         <div className="app">
             <TopBar />
             {data ? (
-                <div className={'layout' + (view === 'dashboard' || view === 'kb' || view === 'defects' || view === 'assistant' || view === 'versions' ? ' wide' : '')}>
+                <div className={'layout' + (view === 'dashboard' || view === 'kb' || view === 'defects' || view === 'versions' ? ' wide' : '')}>
                     <StepNav />
                     <main className={'main' + (view === 'dfd' ? ' is-dfd' : '')}>
                         {main()}
                         {view !== 'dfd' && <WizardBar />}
                     </main>
-                    {view !== 'dashboard' && view !== 'kb' && view !== 'defects' && view !== 'assistant' && view !== 'versions' && <Inspector />}
+                    {view !== 'dashboard' && view !== 'kb' && view !== 'defects' && view !== 'versions' && <Inspector />}
                 </div>
             ) : (
                 <div className="empty">

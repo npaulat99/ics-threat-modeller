@@ -266,9 +266,6 @@ JSON file under `.assets/knowledge-base/imported/<your-catalogue-name>/*.json` w
 - **Plausibility checker** — reference integrity, STRIDE-per-element/interface coverage,
   residual ≤ initial, mitigated-needs-implemented-control, preventive-control-must-not-cut-impact,
   attacker-proximity vs. exposure, and the requirement chain.
-- **Assistant** — drop specifications into `projects/<id>/documents/`; the app proposes applicable
-  threats from the shared knowledge base by transparent keyword matching (rule-based, human
-  reviewed — the seam where future AI agents plug in).
 - **Knowledge base** — browse the department-shared **Bug Bar** and any pulled/hand-added catalogues
   of reusable threats/countermeasures (see [Knowledge base](#knowledge-base) above).
 - **Cross-links, CRA intended purpose & foreseeable use, git integration, dark mode** — threats ↔ countermeasures

@@ -74,7 +74,6 @@ export default function StepNav() {
 
             <div className="grouplabel">Views</div>
             <NavItem vkey="dashboard" view={view} setView={setView} num="▦" label="Dashboard" sub="IEC 62443-4-1 overview" />
-            <NavItem vkey="assistant" view={view} setView={setView} num="✨" label="Assistant" sub="Docs · KB suggestions" />
             <NavItem vkey="defects" view={view} setView={setView} num="🐞" label="Defect register" sub="Lifecycle DM / SUM">
                 {(counts.defects ?? 0) > 0 ? <span className="count">{counts.defects}</span> : null}
             </NavItem>

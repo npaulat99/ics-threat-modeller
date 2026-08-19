@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore, uid } from '../../state/store';
-import { Field, Chips, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, RiskPill, Jump, HelpButton, confirmDelete, IdInput } from '../common';
+import { Field, TagSelect, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, RiskPill, Jump, HelpButton, confirmDelete, IdInput } from '../common';
 import { band } from '../../lib/risk';
 import RiskCalculator from './RiskCalculator';
 import ThreatCmImportExport from '../ThreatCmImportExport';
@@ -27,8 +27,9 @@ export default function CountermeasuresPanel() {
     // A countermeasure is "selected" (chosen to be implemented) unless explicitly unchecked. Older
     // projects without the flag are treated as selected, so nothing disappears from the overview.
     const isSelected = (c: Countermeasure) => c.selected !== false;
-    const selectedCms = cms.filter(isSelected);
-    const candidateCms = cms.filter((c) => !isSelected(c));
+    const byId = (a: Countermeasure, b: Countermeasure) => a.id.localeCompare(b.id, undefined, { numeric: true });
+    const selectedCms = cms.filter(isSelected).sort(byId);
+    const candidateCms = cms.filter((c) => !isSelected(c)).sort(byId);
 
     // "Compare & choose" (brainstorming) mode: pick a threat, see every candidate control side by side.
     const [mode, setMode] = useState<'selected' | 'compare'>('selected');
@@ -141,7 +142,7 @@ export default function CountermeasuresPanel() {
                 </div>
 
                 <Field label="Addresses threats" hint={!addrThreatIds.length ? 'A countermeasure must address at least one threat.' : undefined}>
-                    <Chips options={threatOpts} value={addrThreatIds} onChange={toggleThreat} empty="Define threats in step 05 first." />
+                    <TagSelect options={threatOpts} value={addrThreatIds} onChange={toggleThreat} empty="Define threats in step 05 first." />
                 </Field>
 
                 {(c.addresses || []).length > 0 && (
@@ -167,7 +168,7 @@ export default function CountermeasuresPanel() {
                             return (
                                 <div key={a.threat} className="itemcard residual-card" style={{ marginBottom: 8 }}>
                                     <div className="inline" style={{ marginBottom: 8, alignItems: 'center' }}>
-                                        <Jump view="threats" id={a.threat} />
+                                        <Jump view="threats" id={a.threat} title={t ? `${t.id} · ${t.title}` : undefined} />
                                         <span className="grow muted" style={{ flex: 1, minWidth: 180 }}>
                                             {t?.title || 'unknown threat'}
                                         </span>
@@ -188,7 +189,7 @@ export default function CountermeasuresPanel() {
                                             </select>
                                         </Field>
                                         <Field label="Residual interfaces / vectors">
-                                            <Chips options={ifaceOpts} value={residualIfaces} onChange={(v) => updAddr(a.threat, { interfaceRefs: v, interfaceRef: v[0] || undefined })} empty="No interfaces defined in step 03 yet." />
+                                            <TagSelect options={ifaceOpts} value={residualIfaces} onChange={(v) => updAddr(a.threat, { interfaceRefs: v, interfaceRef: v[0] || undefined })} empty="No interfaces defined in step 03 yet." />
                                             <input className="inp" style={{ marginTop: 6 }} value={a.interfaceLabel ?? t?.interfaceLabel ?? ''} placeholder="Optional custom vector" onChange={(e) => updAddr(a.threat, { interfaceLabel: e.target.value || undefined })} />
                                         </Field>
                                     </div>
@@ -207,8 +208,6 @@ export default function CountermeasuresPanel() {
                                             upd={(patch) => updAddr(a.threat, patch)}
                                             likelihoodField="residualLikelihood"
                                             impactField="residualImpact"
-                                            summary="Open Bug Bar, likelihood factors and CVSS tools for the residual assessment"
-                                            defaultOpen={true}
                                         />
                                     </div>
                                     {(t?.likelihoodRationale || t?.impactRationale || t?.interfaceLabel || t?.interfaceRefs?.length || t?.interfaceRef) && (
@@ -227,7 +226,7 @@ export default function CountermeasuresPanel() {
 
                 <div className="grid3">
                     <Field label="Affected components">
-                        <Chips options={compOpts} value={c.components || []} onChange={(v) => upd({ components: v })} />
+                        <TagSelect options={compOpts} value={c.components || []} onChange={(v) => upd({ components: v })} empty="Define components in step 03 first." />
                     </Field>
                     <Field label="IEC 62443 reference (optional)">
                         <input value={c.iec62443Ref || ''} onChange={(e) => upd({ iec62443Ref: e.target.value })} placeholder="CR 1.2 / FR1" />
@@ -322,7 +321,7 @@ export default function CountermeasuresPanel() {
     // residual risk, negative effects and an "implement" checkbox, so alternatives can be weighed.
     const renderCompare = () => {
         const t = threatById.get(compareThreatId);
-        const forThreat = t ? cms.filter((c) => (c.addresses || []).some((a) => a.threat === t.id)) : [];
+        const forThreat = t ? cms.filter((c) => (c.addresses || []).some((a) => a.threat === t.id)).sort(byId) : [];
         const initial = t ? (t.likelihood || 0) * (t.impact || 0) : 0;
         const negOf = (c: Countermeasure) => (c.negativeEffects || []).join('\n');
         const setNeg = (cmId: string, text: string) => {
@@ -422,7 +421,7 @@ export default function CountermeasuresPanel() {
                                 <div className="itemcard collapsed" key={c.id}>
                                     <div className="head">
                                         <span className="summary-id">{c.id}</span>
-                                        <span className="summary-title">{c.title}</span>
+                                        <span className="summary-title" title={c.title}>{c.title}</span>
                                         <span className="tag">{c.type || 'preventive'}</span>
                                         <label className="inline" style={{ gap: 5 }} title="Choose to implement">
                                             <input type="checkbox" checked={isSelected(c)} onChange={(e) => toggleSelected(c, e.target.checked)} />
@@ -433,7 +432,7 @@ export default function CountermeasuresPanel() {
                                     </div>
                                     <div className="summary-links">
                                         <span className="lbl">Addresses:</span>
-                                        {(c.addresses || []).length ? (c.addresses || []).map((a) => <Jump key={a.threat} view="threats" id={a.threat} />) : <span className="hint">none</span>}
+                                        {(c.addresses || []).length ? (c.addresses || []).map((a) => <Jump key={a.threat} view="threats" id={a.threat} title={threatById.get(a.threat) ? `${a.threat} · ${threatById.get(a.threat)!.title}` : undefined} />) : <span className="hint">none</span>}
                                     </div>
                                 </div>
                             ))}
@@ -509,7 +508,7 @@ export default function CountermeasuresPanel() {
                                 <div id={`f-countermeasures-${c.id}`} className={'itemcard collapsed' + (focusId === c.id ? ' focused' : '')} key={c.id} style={!addr.length ? { borderColor: '#f0c9a8' } : undefined}>
                                     <div className="head">
                                         <span className="summary-id">{c.id}</span>
-                                        <span className="summary-title">{c.title}</span>
+                                        <span className="summary-title" title={c.title}>{c.title}</span>
                                         <span className="tag">{c.type || 'preventive'}</span>
                                         <span className="tag statuspill">{c.status || 'proposed'}</span>
                                         <button className="btn sm" onClick={() => setEditingId(c.id)}>
@@ -521,7 +520,7 @@ export default function CountermeasuresPanel() {
                                     </div>
                                     <div className="summary-links">
                                         <span className="lbl">Addresses:</span>
-                                        {addr.length ? addr.map((a) => <Jump key={a.threat} view="threats" id={a.threat} />) : <span className="hint">none</span>}
+                                        {addr.length ? addr.map((a) => <Jump key={a.threat} view="threats" id={a.threat} title={threatById.get(a.threat) ? `${a.threat} · ${threatById.get(a.threat)!.title}` : undefined} />) : <span className="hint">none</span>}
                                     </div>
                                     {(c.negativeEffects || []).filter(Boolean).length > 0 && (
                                         <div className="summary-links">

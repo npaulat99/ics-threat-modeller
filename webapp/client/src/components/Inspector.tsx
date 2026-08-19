@@ -3,10 +3,19 @@ import { useStore, uid } from '../state/store';
 import { validate, openIssues } from '../lib/validate';
 import { riskOf, descendantComponentIds } from '../lib/risk';
 import RiskMatrix from './RiskMatrix';
-import { RiskPill, Chips, IdInput } from './common';
+import { RiskPill, TagSelect, IdInput } from './common';
 import type { DfdNodeType, UseCaseArrow, UseCaseEntityKind } from '../types';
 
-const HANDLE_OPTS = ['t', 'r', 'b', 'l', 'tl', 'tr', 'br', 'bl'];
+const HANDLE_OPTS = [
+    ['t', 'top'],
+    ['tr', 'top-right'],
+    ['r', 'right'],
+    ['br', 'bottom-right'],
+    ['b', 'bottom'],
+    ['bl', 'bottom-left'],
+    ['l', 'left'],
+    ['tl', 'top-left'],
+] as const;
 
 const HELP: Record<string, string> = {
     project: 'Keep the boundary to one sentence. Choose the smallest modelling depth (blackbox → graybox → whitebox) that still answers your question.',
@@ -91,7 +100,7 @@ function NodeInspector() {
             {isTb ? (
                 <div className="field">
                     <label>Members (a trust boundary must contain at least one)</label>
-                    <Chips
+                    <TagSelect
                         options={siblings.map((s) => ({ value: s.id, label: s.label }))}
                         value={node.members || []}
                         onChange={(v) => updNode({ members: v })}
@@ -226,13 +235,6 @@ function EdgeInspector() {
             ...dfd.nodes.filter((n) => n.type === 'trust-boundary').map((n) => n.id),
         ]),
     );
-    const handleLabel = (id?: string | null) => {
-        if (!id) return '';
-        const p = id.slice(2);
-        if (id.startsWith('s-')) return `source:${p}`;
-        if (id.startsWith('t-')) return `target:${p}`;
-        return id;
-    };
     return (
         <div className="block">
             <h2>Selected data flow</h2>
@@ -258,9 +260,9 @@ function EdgeInspector() {
                 <label>Junction point on source object</label>
                 <select className="inp" value={flow.sourceHandle || ''} onChange={(e) => upd({ sourceHandle: e.target.value || null })}>
                     <option value="">Auto (closest)</option>
-                    {HANDLE_OPTS.map((h) => (
-                        <option key={h} value={`s-${h}`}>
-                            {handleLabel(`s-${h}`)}
+                    {HANDLE_OPTS.map(([handle, label]) => (
+                        <option key={handle} value={`s-${handle}`}>
+                            {label}
                         </option>
                     ))}
                 </select>
@@ -269,9 +271,9 @@ function EdgeInspector() {
                 <label>Junction point on target object</label>
                 <select className="inp" value={flow.targetHandle || ''} onChange={(e) => upd({ targetHandle: e.target.value || null })}>
                     <option value="">Auto (closest)</option>
-                    {HANDLE_OPTS.map((h) => (
-                        <option key={h} value={`t-${h}`}>
-                            {handleLabel(`t-${h}`)}
+                    {HANDLE_OPTS.map(([handle, label]) => (
+                        <option key={handle} value={`t-${handle}`}>
+                            {label}
                         </option>
                     ))}
                 </select>
@@ -519,7 +521,7 @@ function UcGroupInspector() {
             </div>
             <div className="field">
                 <label>Members</label>
-                <Chips
+                <TagSelect
                     options={diagram.entities.map((e) => ({ value: e.id, label: e.name || e.id }))}
                     value={group.members || []}
                     onChange={(v) => upd({ members: v })}

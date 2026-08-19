@@ -1,6 +1,6 @@
+import { useEffect, useState } from 'react';
 import { useStore, uid } from '../../state/store';
-import { Field, Chips, STRIDE, sortStride, RiskPill, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, Jump, HelpButton, confirmDelete, IdInput } from '../common';
-import { ID_PATTERN } from '../../lib/ids';
+import { Field, Chips, TagSelect, cx, STRIDE, sortStride, RiskPill, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, Jump, HelpButton, confirmDelete, IdInput } from '../common';
 import { riskOf } from '../../lib/risk';
 import { adId } from '../../lib/attackTree';
 import RiskCalculator from './RiskCalculator';
@@ -13,12 +13,17 @@ export default function ThreatsPanel() {
     const kb = useStore((s) => s.kb);
     const save = useStore((s) => s.save);
     const setView = useStore((s) => s.setView);
+    const [sortBy, setSortBy] = useState<'id' | 'name' | 'initial' | 'residual'>('id');
 
     const threats = data.threats.threats || [];
     const cms = data.countermeasures.countermeasures || [];
     const focusId = useFocus('threats');
     const { editingId, setEditingId } = useEditMode(focusId);
+    const [editTab, setEditTab] = useState<'classification' | 'details' | 'risk'>('classification');
+    useEffect(() => setEditTab('classification'), [editingId]);
     const cmsFor = (tid: string) => cms.filter((c) => (c.addresses || []).some((a) => a.threat === tid));
+    const requirements = data.requirements?.requirements || [];
+    const requirementOpts = requirements.map((r) => ({ value: r.id, label: r.id, title: r.text }));
     const compOpts = (data.system.components || []).map((c) => ({ value: c.id, label: `${c.name}` }));
     const assetOpts = (data.system.assets || []).map((a) => ({ value: a.id, label: a.name }));
     const attackers = data.assumptions.attacker || [];
@@ -29,8 +34,7 @@ export default function ThreatsPanel() {
         ...(data.assumptions.operational || []).map((x) => ({ id: x.id, text: x.text || '', source: 'Operational' })),
         ...(attackers || []).map((x) => ({ id: x.id, text: x.text || x.name || '', source: 'Attacker' })),
     ];
-    const assumptionById = new Map(assumptionRows.map((x) => [x.id, x]));
-    const assumptionOpts = assumptionRows.map((x) => ({ value: x.id, label: `${x.id} · ${x.source}${x.text ? ` · ${x.text.slice(0, 64)}` : ''}` }));
+    const assumptionOpts = assumptionRows.map((x) => ({ value: x.id, label: `${x.id} · ${x.source}`, title: x.text || undefined }));
 
     const trees = data.attackTrees?.trees || [];
     const treeThreatRefs = (tree: any) => [...new Set([...(tree.threatRefs || []), ...(tree.threatRef ? [tree.threatRef] : [])])];
@@ -44,6 +48,17 @@ export default function ThreatsPanel() {
     };
 
     const setThreats = (list: Threat[]) => save('threats', { threats: list });
+    const setThreatRequirements = (threatId: string, requirementIds: string[]) => {
+        const selected = new Set(requirementIds);
+        save('requirements', {
+            requirements: requirements.map((requirement) => {
+                const links = new Set(requirement.derivedFromThreat || []);
+                if (selected.has(requirement.id)) links.add(threatId);
+                else links.delete(threatId);
+                return { ...requirement, derivedFromThreat: [...links] };
+            }),
+        });
+    };
     const add = () => {
         const id = uid('T', threats.map((t) => t.id));
         setThreats([...threats, { id, title: 'New threat', stride: ['T'], components: [], likelihood: 3, impact: 3, status: 'open' }]);
@@ -74,7 +89,7 @@ export default function ThreatsPanel() {
         const upd = (patch: any) => setThreats(threats.map((x) => (x.id === t.id ? { ...x, ...patch } : x)));
         const orphan = !(t.components || []).length;
         const ifaceOpts = (data.system.interfaces || []).map((itf) => ({ value: itf.id, label: `${itf.name}${itf.protocol ? ` (${itf.protocol})` : ''}` }));
-        const transferReqs = (data.requirements?.requirements || []).filter((r) => (r.derivedFromThreat || []).includes(t.id));
+        const linkedRequirementIds = requirements.filter((r) => (r.derivedFromThreat || []).includes(t.id)).map((r) => r.id);
         const interfaceRefs = t.interfaceRefs?.length ? t.interfaceRefs : t.interfaceRef && t.interfaceRef !== 'custom' ? [t.interfaceRef] : [];
         const setInterfaces = (next: string[]) => upd({ interfaceRefs: next, interfaceRef: next[0] || undefined });
         const splitByInterface = () => {
@@ -125,96 +140,109 @@ export default function ThreatsPanel() {
                         </Field>
                     </div>
                 </div>
-                <div className="grid2">
-                    <Field label="Classification">
-                        <select value={t.classification || ''} onChange={(e) => upd({ classification: e.target.value || undefined })}>
-                            <option value="">— none —</option>
-                            <option value="product-vulnerability">product-vulnerability</option>
-                            <option value="protocol-limitation">protocol-limitation</option>
-                            <option value="deployment-risk">deployment-risk</option>
-                            <option value="shared-responsibility">shared-responsibility</option>
-                        </select>
-                    </Field>
-                    <Field label="Responsibility">
-                        <select value={t.responsibility || ''} onChange={(e) => upd({ responsibility: e.target.value || undefined })}>
-                            <option value="">— none —</option>
-                            <option value="manufacturer">manufacturer</option>
-                            <option value="integrator-operator">integrator-operator</option>
-                            <option value="shared">shared</option>
-                        </select>
-                    </Field>
-                </div>
-                <Field label="Classification rationale">
-                    <textarea value={t.classificationRationale || ''} onChange={(e) => upd({ classificationRationale: e.target.value || undefined })} />
-                </Field>
-                {(t.classification === 'protocol-limitation' || t.classification === 'deployment-risk' || t.classification === 'shared-responsibility') && (
-                    <Field
-                        label="Deployment constraints"
-                        hint="Compensating controls required outside this component (segmentation, physical protection, gateway architecture, monitoring) for the residual risk to be acceptable in an actual deployment."
-                    >
-                        <textarea value={t.deploymentConstraints || ''} onChange={(e) => upd({ deploymentConstraints: e.target.value || undefined })} />
-                    </Field>
-                )}
 
                 <Field label="Affected components" hint={orphan ? 'A threat must affect at least one component.' : undefined}>
-                    <Chips options={compOpts} value={t.components || []} onChange={(v) => upd({ components: v })} empty="Define components in step 03 first." />
+                    <TagSelect options={compOpts} value={t.components || []} onChange={(v) => upd({ components: v })} empty="Define components in step 03 first." />
                 </Field>
-                <details className="calc">
-                    <summary>More details — assets, attacker, interface, assumptions</summary>
-                    <div className="grid3">
-                        <Field label="Affected assets">
-                            <Chips options={assetOpts} value={t.assets || []} onChange={(v) => upd({ assets: v })} empty="No assets yet." />
-                        </Field>
-                        <Field label="Attacker profile" hint="Used to ground likelihood.">
-                            <select value={t.attackerRef || ''} onChange={(e) => upd({ attackerRef: e.target.value })}>
-                                <option value="">— none —</option>
-                                {attackers.map((a) => (
-                                    <option key={a.id} value={a.id}>
-                                        {a.name} (cap {a.capability}, {a.access})
-                                    </option>
-                                ))}
-                            </select>
-                        </Field>
-                        <Field label="Affected interfaces / vectors" hint="Split by interface if the risk differs.">
-                            <Chips options={ifaceOpts} value={interfaceRefs} onChange={setInterfaces} empty="No interfaces defined in step 03 yet." />
-                            <input
-                                className="inp"
-                                style={{ marginTop: 6 }}
-                                placeholder="Optional custom vector, e.g. over USB service port"
-                                value={t.interfaceLabel || ''}
-                                onChange={(e) => upd({ interfaceLabel: e.target.value || undefined })}
-                            />
-                            {interfaceRefs.length > 1 && !t.interfaceLabel && (
-                                <button type="button" className="btn sm" style={{ marginTop: 6 }} onClick={splitByInterface}>
-                                    Split into one threat per interface
-                                </button>
+                <div className="subtabs">
+                    <div className="tabs sub">
+                        <button type="button" className={cx('tab', editTab === 'classification' && 'active')} onClick={() => setEditTab('classification')}>
+                            Classification
+                        </button>
+                        <button type="button" className={cx('tab', editTab === 'details' && 'active')} onClick={() => setEditTab('details')}>
+                            Assets, attacker &amp; interface
+                        </button>
+                        <button type="button" className={cx('tab', editTab === 'risk' && 'active')} onClick={() => setEditTab('risk')}>
+                            Risk rating
+                        </button>
+                    </div>
+                    {editTab === 'classification' && (
+                        <div className="calc">
+                            <div className="grid2">
+                                <Field label="Classification">
+                                    <select value={t.classification || ''} onChange={(e) => upd({ classification: e.target.value || undefined })}>
+                                        <option value="">— none —</option>
+                                        <option value="product-vulnerability">product-vulnerability</option>
+                                        <option value="protocol-limitation">protocol-limitation</option>
+                                        <option value="deployment-risk">deployment-risk</option>
+                                        <option value="shared-responsibility">shared-responsibility</option>
+                                    </select>
+                                </Field>
+                                <Field label="Responsibility">
+                                    <select value={t.responsibility || ''} onChange={(e) => upd({ responsibility: e.target.value || undefined })}>
+                                        <option value="">— none —</option>
+                                        <option value="manufacturer">manufacturer</option>
+                                        <option value="integrator-operator">integrator-operator</option>
+                                        <option value="shared">shared</option>
+                                    </select>
+                                </Field>
+                            </div>
+                            <Field label="Classification rationale">
+                                <textarea value={t.classificationRationale || ''} onChange={(e) => upd({ classificationRationale: e.target.value || undefined })} />
+                            </Field>
+                            {(t.classification === 'protocol-limitation' || t.classification === 'deployment-risk' || t.classification === 'shared-responsibility') && (
+                                <Field
+                                    label="Deployment constraints"
+                                    hint="Compensating controls required outside this component (segmentation, physical protection, gateway architecture, monitoring) for the residual risk to be acceptable in an actual deployment."
+                                >
+                                    <textarea value={t.deploymentConstraints || ''} onChange={(e) => upd({ deploymentConstraints: e.target.value || undefined })} />
+                                </Field>
                             )}
-                        </Field>
-                    </div>
-                    <div className="grid2">
-                        <Field label="Likelihood rationale">
-                            <textarea value={t.likelihoodRationale || ''} onChange={(e) => upd({ likelihoodRationale: e.target.value })} />
-                        </Field>
-                        <Field label="Impact rationale">
-                            <textarea value={t.impactRationale || ''} onChange={(e) => upd({ impactRationale: e.target.value })} />
-                        </Field>
-                    </div>
-                    <Field label="Supporting assumptions" hint="Cite assumptions that justify feasibility or the chosen risk rating.">
-                        <Chips options={assumptionOpts} value={t.assumptionRefs || []} onChange={(v) => upd({ assumptionRefs: v })} empty="No assumptions defined in step 02 yet." />
-                        {(t.assumptionRefs || []).length ? (
-                            <ul style={{ margin: '8px 0 0 18px' }}>
-                                {(t.assumptionRefs || []).map((aid) => {
-                                    const ref = assumptionById.get(aid);
-                                    const validId = ID_PATTERN.test(aid);
-                                    if (!validId) return <li key={aid}><b>{aid}</b> · invalid ID format</li>;
-                                    if (!ref) return <li key={aid}><b>{aid}</b> · assumption not found</li>;
-                                    return <li key={aid}><b>{aid}</b> ({ref.source}) · {ref.text || 'No detail text'}</li>;
-                                })}
-                            </ul>
-                        ) : null}
-                    </Field>
-                </details>
-                <RiskCalculator t={t} upd={upd} />
+                        </div>
+                    )}
+                    {editTab === 'details' && (
+                        <div className="calc">
+                            <div className="grid3">
+                                <Field label="Affected assets">
+                                    <TagSelect options={assetOpts} value={t.assets || []} onChange={(v) => upd({ assets: v })} empty="No assets yet." />
+                                </Field>
+                                <Field label="Attacker profile" hint="Grounds the likelihood rating.">
+                                    <select value={t.attackerRef || ''} onChange={(e) => upd({ attackerRef: e.target.value })}>
+                                        <option value="">— none —</option>
+                                        {attackers.map((a) => (
+                                            <option key={a.id} value={a.id}>
+                                                {a.name} (cap {a.capability}, {a.access})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </Field>
+                                <Field label="Affected interfaces / vectors" hint="Split by interface if the risk differs.">
+                                    <TagSelect options={ifaceOpts} value={interfaceRefs} onChange={setInterfaces} empty="No interfaces defined in step 03 yet." />
+                                    <input
+                                        className="inp"
+                                        style={{ marginTop: 6 }}
+                                        placeholder="Optional custom vector, e.g. over USB service port"
+                                        value={t.interfaceLabel || ''}
+                                        onChange={(e) => upd({ interfaceLabel: e.target.value || undefined })}
+                                    />
+                                    {interfaceRefs.length > 1 && !t.interfaceLabel && (
+                                        <button type="button" className="btn sm" style={{ marginTop: 6 }} onClick={splitByInterface}>
+                                            Split into one threat per interface
+                                        </button>
+                                    )}
+                                </Field>
+                            </div>
+                            <div className="grid2">
+                                <Field label="Likelihood rationale">
+                                    <textarea value={t.likelihoodRationale || ''} onChange={(e) => upd({ likelihoodRationale: e.target.value })} />
+                                </Field>
+                                <Field label="Impact rationale">
+                                    <textarea value={t.impactRationale || ''} onChange={(e) => upd({ impactRationale: e.target.value })} />
+                                </Field>
+                            </div>
+                            <Field label="Supporting assumptions" hint="Assumptions that justify feasibility or the chosen risk rating.">
+                                <TagSelect options={assumptionOpts} value={t.assumptionRefs || []} onChange={(v) => upd({ assumptionRefs: v })} empty="No assumptions defined in step 02 yet." />
+                            </Field>
+                        </div>
+                    )}
+                    {editTab === 'risk' && <RiskCalculator t={t} upd={upd} />}
+                </div>
+                <Field
+                    label={t.status === 'transferred' ? 'Risk transfer requirements' : 'Linked requirements / rationale'}
+                    hint="Link requirements that mitigate this threat or justify why its residual risk is accepted or transferred."
+                >
+                    <TagSelect options={requirementOpts} value={linkedRequirementIds} onChange={(v) => setThreatRequirements(t.id, v)} empty="Define requirements in step 05 first." />
+                </Field>
                 {t.status === 'accepted' && (
                     <div className="grid3" style={{ marginTop: 8 }}>
                         <Field label="Accepted by" hint="Residual-risk sign-off owner.">
@@ -228,26 +256,13 @@ export default function ThreatsPanel() {
                         </Field>
                     </div>
                 )}
-                {t.status === 'transferred' && (
-                    <Field label="Risk transfer requirement" hint="Link a requirement in step 05 that documents how this transfer is described in the user guide.">
-                        {transferReqs.length ? (
-                            <div className="summary-links">
-                                {transferReqs.map((r) => (
-                                    <Jump key={r.id} view="requirements" id={r.id} label={`${r.id} · ${r.text}`} />
-                                ))}
-                            </div>
-                        ) : (
-                            <span className="hint">none linked</span>
-                        )}
-                    </Field>
-                )}
                 <div className="inline" style={{ marginTop: 8, flexWrap: 'wrap', gap: 6 }}>
                     <button className="btn sm" onClick={() => makeTree(t)}>
                         {treeFor(t.id) ? 'Open attack tree →' : '+ Attack tree for this threat'}
                     </button>
                     <span className="hint" style={{ marginLeft: 8 }}>Mitigated by:</span>
                     {cmsFor(t.id).length ? (
-                        cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} label={`${c.id} · ${c.title}`.slice(0, 26)} />)
+                        cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} label={`${c.id} · ${c.title}`.slice(0, 26)} title={`${c.id} · ${c.title}`} />)
                     ) : (
                         <span className="hint">none</span>
                     )}
@@ -303,17 +318,32 @@ export default function ThreatsPanel() {
                             </select>
                         ) : null}
                         <ThreatCmImportExport />
+                        <label className="inline" style={{ gap: 6 }}>
+                            <span className="hint">Sort by</span>
+                            <select className="inp sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+                                <option value="id">ID</option>
+                                <option value="name">Name</option>
+                                <option value="initial">Original risk</option>
+                                <option value="residual">Residual risk</option>
+                            </select>
+                        </label>
                     </div>
 
                     <div className="list">
-                        {threats.map((t) => {
+                        {[...threats].sort((a, b) => {
+                            if (sortBy === 'id') return a.id.localeCompare(b.id, undefined, { numeric: true });
+                            if (sortBy === 'name') return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+                            const aRisk = riskOf(a, cms, scheme);
+                            const bRisk = riskOf(b, cms, scheme);
+                            return sortBy === 'initial' ? bRisk.initial - aRisk.initial : bRisk.residual - aRisk.residual;
+                        }).map((t) => {
                             const r = riskOf(t, cms, scheme);
                             const orphan = !(t.components || []).length;
                             return (
                                 <div id={`f-threats-${t.id}`} className={'itemcard collapsed' + (focusId === t.id ? ' focused' : '')} key={t.id} style={orphan ? { borderColor: '#f0c9a8' } : undefined}>
                                     <div className="head">
                                         <span className="summary-id">{t.id}</span>
-                                        <span className="summary-title">{t.title}</span>
+                                        <span className="summary-title" title={t.title}>{t.title}</span>
                                         <RiskPill score={r.initial} band={r.initialBand} title="Initial risk" />
                                         <span className="muted">→</span>
                                         <RiskPill score={r.residual} band={r.residualBand} title="Residual risk" />
@@ -331,12 +361,12 @@ export default function ThreatsPanel() {
                                         {t.responsibility ? <span className="tag">Resp: {t.responsibility}</span> : null}
                                         {(t.assumptionRefs || []).length ? <span className="tag">Assumptions: {t.assumptionRefs.join(', ')}</span> : null}
                                         <span className="lbl">Mitigated by:</span>
-                                        {cmsFor(t.id).length ? cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} />) : <span className="hint">none</span>}
+                                        {cmsFor(t.id).length ? cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} title={`${c.id} · ${c.title}`} />) : <span className="hint">none</span>}
                                         {(t.assets || []).length ? (
                                             <>
                                                 <span className="lbl">Assets:</span>
                                                 {(t.assets || []).map((aid) => (
-                                                    <Jump key={aid} view="system" id={aid} />
+                                                    <Jump key={aid} view="system" id={aid} title={assetOpts.find((a) => a.value === aid) ? `${aid} · ${assetOpts.find((a) => a.value === aid)!.label}` : undefined} />
                                                 ))}
                                             </>
                                         ) : null}

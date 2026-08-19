@@ -131,6 +131,72 @@ export function Chips({
     );
 }
 
+/**
+ * Multi-select for option lists that can grow large (components, assets, threats, requirements,
+ * interfaces, …). Selected items show as removable tags; unselected options stay tucked away in
+ * a dropdown instead of being rendered as a wall of chips.
+ */
+export function TagSelect({
+    options,
+    value,
+    onChange,
+    empty,
+    addLabel = '+ Add…',
+    label,
+}: {
+    options: { value: string; label: string; title?: string }[];
+    value: string[];
+    onChange: (next: string[]) => void;
+    empty?: string;
+    addLabel?: string;
+    label?: string;
+}) {
+    const selected = value || [];
+    const optOf = (v: string) => options.find((o) => o.value === v);
+    const labelOf = (v: string) => optOf(v)?.label || v;
+    const available = options.filter((o) => !selected.includes(o.value));
+    if (!options.length) return <span className="hint">{empty || 'Nothing to select from yet.'}</span>;
+    return (
+        <div className="tagselect" role="group" aria-label={label || 'multi-select'}>
+            <div className="tagselect-tags">
+                {selected.length ? (
+                    selected.map((v) => (
+                        <span className="chip on" key={v} title={optOf(v)?.title}>
+                            {labelOf(v)}
+                            <button
+                                type="button"
+                                className="chipx"
+                                aria-label={`Remove ${labelOf(v)}`}
+                                onClick={() => onChange(selected.filter((x) => x !== v))}
+                            >
+                                ✕
+                            </button>
+                        </span>
+                    ))
+                ) : (
+                    <span className="hint">{empty || 'None selected.'}</span>
+                )}
+            </div>
+            {available.length > 0 && (
+                <select
+                    className="inp tagselect-add"
+                    value=""
+                    onChange={(e) => {
+                        if (e.target.value) onChange([...selected, e.target.value]);
+                    }}
+                >
+                    <option value="">{addLabel}</option>
+                    {available.map((o) => (
+                        <option key={o.value} value={o.value} title={o.title}>
+                            {o.label}
+                        </option>
+                    ))}
+                </select>
+            )}
+        </div>
+    );
+}
+
 /** Read-only display of the currently-selected options (labels) as static chips. Used by the
  *  collapsed list view so a card shows only its own links, not the full selectable universe. */
 export function SelectedChips({ options, value, empty }: { options: { value: string; label: string }[]; value?: string[]; empty?: string }) {
@@ -337,14 +403,14 @@ export function EditBackBar({ label, onBack }: { label: string; onBack: () => vo
 }
 
 /** A clickable chip that jumps to a linked item in another view (traceability). */
-export function Jump({ view, id, label }: { view: string; id: string; label?: string }) {
+export function Jump({ view, id, label, title }: { view: string; id: string; label?: string; title?: string }) {
     const goto = useStore((s) => s.goto);
     return (
         <span
             className="jump"
             role="button"
             tabIndex={0}
-            title={`Open ${id}`}
+            title={title || `Open ${id}`}
             onClick={(e) => {
                 e.stopPropagation();
                 goto(view, id);

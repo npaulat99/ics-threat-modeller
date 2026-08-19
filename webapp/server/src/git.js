@@ -13,8 +13,8 @@ import { STEP_FILES } from './artifacts.js';
 const localGitRoot = join(webappRoot, '.local', 'git-workspaces');
 const localGitConfigPath = join(localGitRoot, 'workspaces.json');
 const PROTECTED_BRANCH = /^(main|master|develop|development|dev|trunk|release)$/i;
-const STEP_DIRS = [...new Set(Object.values(STEP_FILES).map((p) => p.split('/')[0])), 'documents'];
-const PROJECT_DATA_DIR = /^(\d{2}-|documents$)/;
+const STEP_DIRS = [...new Set(Object.values(STEP_FILES).map((p) => p.split('/')[0]))];
+const PROJECT_DATA_DIR = /^\d{2}-/;
 
 function run(args, cwd) {
     return new Promise((resolve) => {
@@ -166,7 +166,7 @@ async function syncProjectIntoWorkspace(projectId, workspace) {
 
     // Replace every managed TRA data folder so additions, edits and deletions in the
     // webapp are reflected in git. Numbered methodology folders cover current and
-    // future steps (01-..., 10-...), and documents/ carries assessor-provided files.
+    // future steps (01-..., 10-...).
     const targetEntries = await fs.readdir(target, { withFileTypes: true }).catch(() => []);
     for (const entry of targetEntries) {
         if (PROJECT_DATA_DIR.test(entry.name)) await fs.rm(join(target, entry.name), { recursive: true, force: true }).catch(() => { });

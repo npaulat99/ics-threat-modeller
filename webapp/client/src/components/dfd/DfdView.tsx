@@ -25,45 +25,80 @@ import { riskOf } from '../../lib/risk';
 import { deriveVisibleInterfaceIds, flowBelongsToLayerContext, isParentChildNodeFlow, resolveTargetNodeId } from './layerVisibility.js';
 import { cx, confirmDelete } from '../common';
 import type { Dfd, DfdNode, DfdNodeType } from '../../types';
-import { routeAround, roundedPath, labelPtOnPolyline } from '@shared/dfdEngine.js';
+import { routeAround, roundedPath } from '@shared/dfdEngine.js';
+
+function pointOnPolyline(points: number[][], fraction: number) {
+    const lengths = points.slice(1).map((point, index) => Math.hypot(point[0] - points[index][0], point[1] - points[index][1]));
+    let remaining = lengths.reduce((sum, length) => sum + length, 0) * fraction;
+    for (let index = 0; index < lengths.length; index++) {
+        if (remaining <= lengths[index]) {
+            const ratio = lengths[index] ? remaining / lengths[index] : 0;
+            const from = points[index];
+            const to = points[index + 1];
+            const dx = to[0] - from[0];
+            const dy = to[1] - from[1];
+            const length = lengths[index] || 1;
+            return { x: from[0] + dx * ratio, y: from[1] + dy * ratio, nx: -dy / length, ny: dx / length };
+        }
+        remaining -= lengths[index];
+    }
+    const from = points[points.length - 2];
+    const to = points[points.length - 1];
+    const length = Math.hypot(to[0] - from[0], to[1] - from[1]) || 1;
+    return { x: to[0], y: to[1], nx: -(to[1] - from[1]) / length, ny: (to[0] - from[0]) / length };
+}
+
+function edgeGeometry(sourceX: number, sourceY: number, targetX: number, targetY: number, obstacles: any[], offset: number) {
+    const route = routeAround(sourceX, sourceY, targetX, targetY, obstacles, 16);
+    const directDist = Math.hypot(targetX - sourceX, targetY - sourceY) || 1;
+    let polyLen = 0;
+    for (let index = 1; index < route.length; index++) polyLen += Math.hypot(route[index][0] - route[index - 1][0], route[index][1] - route[index - 1][1]);
+    if (route.length > 2 && polyLen <= 2.4 * directDist) {
+        return { path: roundedPath(route, 14), pointAt: (fraction: number) => pointOnPolyline(route, fraction) };
+    }
+    const dx = targetX - sourceX;
+    const dy = targetY - sourceY;
+    const length = Math.hypot(dx, dy) || 1;
+    const controlX = (sourceX + targetX) / 2 + (-dy / length) * offset;
+    const controlY = (sourceY + targetY) / 2 + (dx / length) * offset;
+    return {
+        path: `M ${sourceX},${sourceY} Q ${controlX},${controlY} ${targetX},${targetY}`,
+        pointAt: (fraction: number) => {
+            const inverse = 1 - fraction;
+            const x = inverse * inverse * sourceX + 2 * inverse * fraction * controlX + fraction * fraction * targetX;
+            const y = inverse * inverse * sourceY + 2 * inverse * fraction * controlY + fraction * fraction * targetY;
+            const tangentX = 2 * inverse * (controlX - sourceX) + 2 * fraction * (targetX - controlX);
+            const tangentY = 2 * inverse * (controlY - sourceY) + 2 * fraction * (targetY - controlY);
+            const tangentLength = Math.hypot(tangentX, tangentY) || 1;
+            return { x, y, nx: -tangentY / tangentLength, ny: tangentX / tangentLength };
+        },
+    };
+}
 
 // Data-flow edge. It routes around foreground entities so it never hides behind them; when the
 // straight line is already clear it keeps a gentle curve (offset) so bidirectional pairs separate.
 function OffsetEdge({ id, sourceX, sourceY, targetX, targetY, markerEnd, data }: any) {
     const obstacles = data?.obstacles || [];
-    const route = routeAround(sourceX, sourceY, targetX, targetY, obstacles, 16);
-    const directDist = Math.hypot(targetX - sourceX, targetY - sourceY) || 1;
-    let polyLen = 0;
-    for (let i = 1; i < route.length; i++) polyLen += Math.hypot(route[i][0] - route[i - 1][0], route[i][1] - route[i - 1][1]);
-    let path: string;
-    let midX: number;
-    let midY: number;
-    if (route.length > 2 && polyLen <= 2.4 * directDist) {
-        path = roundedPath(route, 14);
-        [midX, midY] = labelPtOnPolyline(route);
-    } else {
-        const off = data?.offset || 0;
-        const dx = targetX - sourceX;
-        const dy = targetY - sourceY;
-        const len = Math.hypot(dx, dy) || 1;
-        const nx = -dy / len;
-        const ny = dx / len;
-        // Control point for the bezier arc (positive off = right of direction = consistent curvature).
-        const cX = (sourceX + targetX) / 2 + nx * off;
-        const cY = (sourceY + targetY) / 2 + ny * off;
-        path = `M ${sourceX},${sourceY} Q ${cX},${cY} ${targetX},${targetY}`;
-        // Label at t=2/3 on the quadratic bezier: 1/3 from the target end, away from the arrowhead.
-        midX = (1 / 9) * sourceX + (4 / 9) * cX + (4 / 9) * targetX;
-        midY = (1 / 9) * sourceY + (4 / 9) * cY + (4 / 9) * targetY;
-    }
+    const geometry = edgeGeometry(sourceX, sourceY, targetX, targetY, obstacles, data?.offset || 0);
+    const labelPosition = data?.labelPosition || geometry.pointAt(0.55);
+    const labelAnchor = data?.labelAnchor || labelPosition;
     return (
         <>
-            <BaseEdge id={id} path={path} markerEnd={markerEnd} interactionWidth={28} />
+            <BaseEdge id={id} path={geometry.path} markerEnd={markerEnd} interactionWidth={28} />
             {data?.label ? (
                 <EdgeLabelRenderer>
+                    {Math.hypot(labelPosition.x - labelAnchor.x, labelPosition.y - labelAnchor.y) > 4 ? (
+                        <svg
+                            className="edgelabel-leader"
+                            style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', pointerEvents: 'none' }}
+                            aria-hidden="true"
+                        >
+                            <line x1={labelAnchor.x} y1={labelAnchor.y} x2={labelPosition.x} y2={labelPosition.y} />
+                        </svg>
+                    ) : null}
                     <div
                         className="edgelabel"
-                        style={{ position: 'absolute', transform: `translate(-50%, -50%) translate(${midX}px, ${midY}px)`, pointerEvents: 'all' }}
+                        style={{ position: 'absolute', transform: `translate(-50%, -50%) translate(${labelPosition.x}px, ${labelPosition.y}px)`, pointerEvents: 'all' }}
                         onClick={(e) => {
                             e.stopPropagation();
                             data.onSelect?.();
@@ -122,6 +157,17 @@ function bboxOf(items: { x: number; y: number; w: number; h: number }[]) {
 }
 
 type Box = { x: number; y: number; w: number; h: number };
+const HANDLE_RING = ['t', 'tr', 'r', 'br', 'b', 'bl', 'l', 'tl'] as const;
+function handlePoint(box: Box, handle: string, ellipse = false) {
+    const key = handle.replace(/^[st]-/, '');
+    const corner = ellipse ? 0.146 : 0;
+    const positions: Record<string, [number, number]> = {
+        t: [0.5, 0], tr: [1 - corner, corner], r: [1, 0.5], br: [1 - corner, 1 - corner],
+        b: [0.5, 1], bl: [corner, 1 - corner], l: [0, 0.5], tl: [corner, corner],
+    };
+    const [x, y] = positions[key] || positions.r;
+    return { x: box.x + box.w * x, y: box.y + box.h * y };
+}
 /** Which side (t/r/b/l) of `from` faces `to` — used to auto-route a flow to the nearest handles. */
 function sideToward(from: Box, to: Box): 'l' | 'r' | 't' | 'b' {
     const dx = to.x + to.w / 2 - (from.x + from.w / 2);
@@ -567,8 +613,8 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
         // normal). Bidirectional pairs each receive the same positive offset value; the reversed
         // direction vector on the return flow causes it to bow the other way, creating an eye shape.
         // Same-direction multiple flows spread outward around the base curve.
-        const CURVE = 20; // baseline rightward curve (single flow or bidirectional pair)
-        const LANE_STEP = 28; // extra step per same-direction flow within a pair
+        const CURVE = 28; // wider, but still eye-shaped, bidirectional pairs
+        const LANE_STEP = 32; // extra step per same-direction flow within a pair
         const offsetOf = (f: (typeof flows)[number]) => {
             const sameDir = flows.filter((x) => x.from === f.from && x.to === f.to);
             sameDir.sort((a, b) => (a.id < b.id ? -1 : 1));
@@ -576,13 +622,103 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             const n = sameDir.length;
             return CURVE + (i - (n - 1) / 2) * LANE_STEP;
         };
-        flows.forEach((f) => {
-            const sId = rfId(f.from);
-            const tId = rfId(f.to);
-            const sBox = boxes[sId];
-            const tBox = boxes[tId];
-            const sh = f.sourceHandle || `s-${sBox && tBox ? sideToward(sBox, tBox) : 'r'}`;
-            const th = f.targetHandle || `t-${sBox && tBox ? sideToward(tBox, sBox) : 'l'}`;
+        const handleUse = new Map<string, number>();
+        const shapeById = new Map(realNodes.map((node) => [node.id, node.type === 'process' || node.type === 'multiprocess']));
+        const reserveHandle = (nodeId: string, role: 's' | 't', handle: string) => {
+            const key = handle.replace(/^[st]-/, '');
+            const usageKey = `${nodeId}:${role}:${key}`;
+            handleUse.set(usageKey, (handleUse.get(usageKey) || 0) + 1);
+            return `${role}-${key}`;
+        };
+        const allocateHandle = (nodeId: string, role: 's' | 't', from: Box, toward: Box) => {
+            const closest = sideToward(from, toward);
+            const closestIndex = HANDLE_RING.indexOf(closest);
+            const allowed = [closest, HANDLE_RING[(closestIndex + 7) % 8], HANDLE_RING[(closestIndex + 1) % 8]];
+            const candidates = [...allowed];
+            candidates.sort((a, b) => {
+                const useDiff = (handleUse.get(`${nodeId}:${role}:${a}`) || 0) - (handleUse.get(`${nodeId}:${role}:${b}`) || 0);
+                if (useDiff) return useDiff;
+                const targetX = toward.x + toward.w / 2;
+                const targetY = toward.y + toward.h / 2;
+                const pointA = handlePoint(from, a, shapeById.get(nodeId));
+                const pointB = handlePoint(from, b, shapeById.get(nodeId));
+                const cardinalTolerance = (key: string) => key.length === 1 ? 18 : 0;
+                return Math.hypot(pointA.x - targetX, pointA.y - targetY) - cardinalTolerance(a) - (Math.hypot(pointB.x - targetX, pointB.y - targetY) - cardinalTolerance(b));
+            });
+            const selected = candidates.find((key) => (handleUse.get(`${nodeId}:${role}:${key}`) || 0) === 0) || candidates[0];
+            const usageKey = `${nodeId}:${role}:${selected}`;
+            handleUse.set(usageKey, (handleUse.get(usageKey) || 0) + 1);
+            return `${role}-${selected}`;
+        };
+        const pairKey = (from: string, to: string) => from < to ? `${from}\u0001${to}` : `${to}\u0001${from}`;
+        const pairHandles = new Map<string, { from: string; to: string; sourceKey: string; targetKey: string }>();
+        const assigned = [...flows].sort((a, b) => pairKey(a.from, a.to).localeCompare(pairKey(b.from, b.to)) || a.id.localeCompare(b.id)).map((flow) => {
+            const sourceId = rfId(flow.from);
+            const targetId = rfId(flow.to);
+            const sourceBox = boxes[sourceId];
+            const targetBox = boxes[targetId];
+            const key = pairKey(sourceId, targetId);
+            const paired = pairHandles.get(key);
+            let sourceHandle: string;
+            let targetHandle: string;
+            let bidirectional = false;
+            const reversePaired = paired && paired.from === targetId && paired.to === sourceId;
+            if (flow.sourceHandle) sourceHandle = reserveHandle(sourceId, 's', flow.sourceHandle);
+            else if (reversePaired) sourceHandle = reserveHandle(sourceId, 's', paired.targetKey);
+            else sourceHandle = sourceBox && targetBox ? allocateHandle(sourceId, 's', sourceBox, targetBox) : 's-r';
+            if (flow.targetHandle) targetHandle = reserveHandle(targetId, 't', flow.targetHandle);
+            else if (reversePaired) targetHandle = reserveHandle(targetId, 't', paired.sourceKey);
+            else targetHandle = sourceBox && targetBox ? allocateHandle(targetId, 't', targetBox, sourceBox) : 't-l';
+            if (reversePaired) {
+                bidirectional = true;
+            }
+            if (!paired) pairHandles.set(key, { from: sourceId, to: targetId, sourceKey: sourceHandle.slice(2), targetKey: targetHandle.slice(2) });
+            if (!bidirectional) bidirectional = flows.some((candidate) => candidate.from === flow.to && candidate.to === flow.from);
+            return { flow, sourceId, targetId, sourceBox, targetBox, sourceHandle, targetHandle, bidirectional };
+        });
+        const placedLabels: Box[] = [];
+        const overlapArea = (a: Box, b: Box) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+        const labelSize = (text: string) => {
+            const lines = [''];
+            for (const word of text.trim().split(/\s+/).filter(Boolean)) {
+                const current = lines[lines.length - 1];
+                if (current && `${current} ${word}`.length <= 34) lines[lines.length - 1] = `${current} ${word}`;
+                else if (word.length <= 34) lines.push(word);
+                else {
+                    for (let index = 0; index < word.length; index += 34) lines.push(word.slice(index, index + 34));
+                }
+            }
+            const contentLines = lines.filter(Boolean);
+            const maxLength = Math.max(1, ...contentLines.map((line) => line.length));
+            return { w: Math.min(220, Math.max(54, maxLength * 6.1 + 16)), h: Math.max(1, contentLines.length) * 14 + 4 };
+        };
+        const labelPositionFor = (entry: (typeof assigned)[number], offset: number, obstacles: any[]) => {
+            if (!entry.sourceBox || !entry.targetBox) return undefined;
+            const source = handlePoint(entry.sourceBox, entry.sourceHandle, shapeById.get(entry.sourceId));
+            const target = handlePoint(entry.targetBox, entry.targetHandle, shapeById.get(entry.targetId));
+            const geometry = edgeGeometry(source.x, source.y, target.x, target.y, obstacles, offset);
+            const size = labelSize(entry.flow.label || '');
+            const preferredFraction = entry.bidirectional ? 0.36 : 0.5;
+            let best: { x: number; y: number; score: number; box: Box; anchor: { x: number; y: number } } | undefined;
+            for (const fraction of entry.bidirectional ? [0.36, 0.28, 0.44, 0.55, 0.2] : [0.5, 0.35, 0.65, 0.2, 0.8]) {
+                const point = geometry.pointAt(fraction);
+                for (const normalOffset of [0, 16, -16, 32, -32, 48, -48]) {
+                    const x = point.x + point.nx * normalOffset;
+                    const y = point.y + point.ny * normalOffset;
+                    const box = { x: x - size.w / 2, y: y - size.h / 2, ...size };
+                    const overlap = [...boxList, ...placedLabels].reduce((sum, obstacle) => sum + overlapArea(box, obstacle), 0);
+                    const score = overlap * 1000 + Math.abs(fraction - preferredFraction) * 140 + Math.abs(normalOffset);
+                    if (!best || score < best.score) best = { x, y, score, box, anchor: { x: point.x, y: point.y } };
+                }
+            }
+            if (best) placedLabels.push(best.box);
+            return best ? { position: { x: best.x, y: best.y }, anchor: best.anchor } : undefined;
+        };
+        assigned.forEach((entry) => {
+            const { flow: f, sourceId: sId, targetId: tId, sourceHandle: sh, targetHandle: th } = entry;
+            const obstacles = obstaclesFor(sId, tId);
+            const offset = offsetOf(f);
+            const labelPlacement = labelPositionFor(entry, offset, obstacles);
             out.push({
                 id: f.id,
                 source: sId,
@@ -591,7 +727,14 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
                 targetHandle: th,
                 type: 'offset',
                 reconnectable: true,
-                data: { offset: offsetOf(f), label: f.label, obstacles: obstaclesFor(sId, tId), onSelect: () => selectEdge(f.id) },
+                data: {
+                    offset,
+                    label: f.label,
+                    labelPosition: labelPlacement?.position,
+                    labelAnchor: labelPlacement?.anchor,
+                    obstacles,
+                    onSelect: () => selectEdge(f.id),
+                },
                 markerEnd: { type: MarkerType.ArrowClosed },
                 className: cx(isEdgeSelected(f.id) && 'edge-sel'),
             });

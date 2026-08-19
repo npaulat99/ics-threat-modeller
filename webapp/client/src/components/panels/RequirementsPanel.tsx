@@ -1,7 +1,7 @@
 // Security requirements (methodology step 05) — the traceable bridge threat -> risk ->
 // requirement -> control that IEC 62443-4-1 (SR) and the CRA expect.
 import { useStore, uid } from '../../state/store';
-import { Field, Chips, useFocus, useEditMode, EditBackBar, Jump, HelpButton, confirmDelete, IdInput } from '../common';
+import { Field, TagSelect, useFocus, useEditMode, EditBackBar, Jump, HelpButton, confirmDelete, IdInput } from '../common';
 import type { Requirement } from '../../types';
 
 export default function RequirementsPanel() {
@@ -20,6 +20,8 @@ export default function RequirementsPanel() {
     };
     const threatOpts = threats.map((t) => ({ value: t.id, label: `${t.id} · ${t.title}` }));
     const cmOpts = cms.map((c) => ({ value: c.id, label: `${c.id} · ${c.title}` }));
+    const threatById = new Map(threats.map((t) => [t.id, t]));
+    const cmById = new Map(cms.map((c) => [c.id, c]));
     const editing = reqs.find((r) => r.id === editingId) || null;
 
     return (
@@ -62,10 +64,10 @@ export default function RequirementsPanel() {
                                     </Field>
                                 </div>
                                 <Field label="Derived from threats">
-                                    <Chips options={threatOpts} value={r.derivedFromThreat || []} onChange={(v) => upd({ derivedFromThreat: v })} empty="No threats yet." />
+                                    <TagSelect options={threatOpts} value={r.derivedFromThreat || []} onChange={(v) => upd({ derivedFromThreat: v })} empty="No threats yet." />
                                 </Field>
                                 <Field label="Satisfied by countermeasures">
-                                    <Chips options={cmOpts} value={r.satisfiedByCM || []} onChange={(v) => upd({ satisfiedByCM: v, fromCountermeasure: v.length ? true : r.fromCountermeasure })} empty="No countermeasures yet." />
+                                    <TagSelect options={cmOpts} value={r.satisfiedByCM || []} onChange={(v) => upd({ satisfiedByCM: v, fromCountermeasure: v.length ? true : r.fromCountermeasure })} empty="No countermeasures yet." />
                                 </Field>
                                 <label className="inline" style={{ gap: 7, alignItems: 'flex-start', marginTop: 4 }}>
                                     <input type="checkbox" checked={!!r.fromCountermeasure || (r.satisfiedByCM || []).length > 0} disabled={(r.satisfiedByCM || []).length > 0} onChange={(e) => upd({ fromCountermeasure: e.target.checked })} style={{ marginTop: 3 }} />
@@ -86,11 +88,11 @@ export default function RequirementsPanel() {
                     </div>
                     {reqs.length ? (
                         <div className="list">
-                            {reqs.map((r) => (
+                            {[...reqs].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })).map((r) => (
                                 <div id={`f-requirements-${r.id}`} className={'itemcard collapsed' + (focusId === r.id ? ' focused' : '')} key={r.id}>
                                     <div className="head">
                                         <span className="summary-id">{r.id}</span>
-                                        <span className="summary-title">{r.text || '(untitled requirement)'}</span>
+                                        <span className="summary-title" title={r.text || undefined}>{r.text || '(untitled requirement)'}</span>
                                         {r.fromCountermeasure || (r.satisfiedByCM || []).length ? (
                                             <span className="tag" title="Realises a countermeasure that reduces a threat's risk">is CM</span>
                                         ) : !(r.derivedFromThreat || []).length ? (
@@ -105,9 +107,9 @@ export default function RequirementsPanel() {
                                     </div>
                                     <div className="summary-links">
                                         <span className="lbl">From threats:</span>
-                                        {(r.derivedFromThreat || []).length ? r.derivedFromThreat!.map((tid) => <Jump key={tid} view="threats" id={tid} />) : <span className="hint">none</span>}
+                                        {(r.derivedFromThreat || []).length ? r.derivedFromThreat!.map((tid) => <Jump key={tid} view="threats" id={tid} title={threatById.get(tid) ? `${tid} · ${threatById.get(tid)!.title}` : undefined} />) : <span className="hint">none</span>}
                                         <span className="lbl">Satisfied by:</span>
-                                        {(r.satisfiedByCM || []).length ? r.satisfiedByCM!.map((cid) => <Jump key={cid} view="countermeasures" id={cid} />) : <span className="hint">none</span>}
+                                        {(r.satisfiedByCM || []).length ? r.satisfiedByCM!.map((cid) => <Jump key={cid} view="countermeasures" id={cid} title={cmById.get(cid) ? `${cid} · ${cmById.get(cid)!.title}` : undefined} />) : <span className="hint">none</span>}
                                     </div>
                                 </div>
                             ))}

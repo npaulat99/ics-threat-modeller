@@ -40,9 +40,11 @@ export default function DashboardPanel() {
     const protocolLimitations = threats.filter((t) => t.classification === 'protocol-limitation').length;
     const deploymentRisks = threats.filter((t) => t.classification === 'deployment-risk').length;
     const sharedResponsibility = threats.filter((t) => t.classification === 'shared-responsibility').length;
+    const threatById = new Map(threats.map((t) => [t.id, t]));
+    const cmById = new Map(cms.map((c) => [c.id, c]));
 
     return (
-        <div className="panel" style={{ maxWidth: 1140 }}>
+        <div className="panel">
             <div className="panelhead">
                 <h1>Compliance dashboard</h1>
                 <HelpButton title="IEC 62443-4-1 / CRA overview">
@@ -148,7 +150,7 @@ export default function DashboardPanel() {
                         {assets.map((a) => (
                             <tr key={a.id}>
                                 <td className="mono">
-                                    <Jump view="system" id={a.id} />
+                                    <Jump view="system" id={a.id} title={`${a.id} · ${a.name}`} />
                                 </td>
                                 <td>{a.name}</td>
                                 <td>{a.storage || '—'}</td>
@@ -180,7 +182,7 @@ export default function DashboardPanel() {
                             return (
                                 <tr key={t.id}>
                                     <td className="mono">
-                                        <Jump view="threats" id={t.id} />
+                                        <Jump view="threats" id={t.id} title={`${t.id} · ${t.title}`} />
                                     </td>
                                     <td>{t.title}</td>
                                     <td className="mono">{sortStride(t.stride).join('')}</td>
@@ -223,12 +225,12 @@ export default function DashboardPanel() {
                             return (
                                 <tr key={c.id} style={needsTicket ? { background: 'rgba(239,108,0,0.08)' } : undefined}>
                                     <td className="mono">
-                                        <Jump view="countermeasures" id={c.id} />
+                                        <Jump view="countermeasures" id={c.id} title={`${c.id} · ${c.title}`} />
                                     </td>
                                     <td>{c.title}</td>
                                     <td className="mono">
                                         {(c.addresses || []).map((a) => (
-                                            <Jump key={a.threat} view="threats" id={a.threat} />
+                                            <Jump key={a.threat} view="threats" id={a.threat} title={threatById.get(a.threat) ? `${a.threat} · ${threatById.get(a.threat)!.title}` : undefined} />
                                         ))}
                                     </td>
                                     <td style={{ textTransform: 'capitalize' }}>{c.status}</td>
@@ -289,12 +291,12 @@ export default function DashboardPanel() {
                                 </td>
                                 <td className="mono">
                                     {(r.derivedFromThreat || []).map((th) => (
-                                        <Jump key={th} view="threats" id={th} />
+                                        <Jump key={th} view="threats" id={th} title={threatById.get(th) ? `${th} · ${threatById.get(th)!.title}` : undefined} />
                                     ))}
                                 </td>
                                 <td className="mono">
                                     {(r.satisfiedByCM || []).map((cm) => (
-                                        <Jump key={cm} view="countermeasures" id={cm} />
+                                        <Jump key={cm} view="countermeasures" id={cm} title={cmById.get(cm) ? `${cm} · ${cmById.get(cm)!.title}` : undefined} />
                                     ))}
                                 </td>
                             </tr>

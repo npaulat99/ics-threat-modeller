@@ -13,7 +13,7 @@ import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import chokidar from 'chokidar';
 import { promises as fs } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join } from 'node:path';
 import os from 'node:os';
 import { PORT, projectsDir, clientDist, fieldLibraryPath, bugBarPath, riskSchemePath, knowledgeBaseDir } from './paths.js';
 import {
@@ -208,90 +208,6 @@ app.get('/api/projects/:id/export/sbom.spdx.json', async (req, res) => {
     const { files } = await buildReport(req.params.id);
     if (!files['sbom.spdx.json']) return res.status(404).json({ error: 'SPDX SBOM not generated for this project (check the SBOM settings on the Project page).' });
     res.type('application/json').set('Content-Disposition', `attachment; filename="${req.params.id}-sbom.spdx.json"`).send(files['sbom.spdx.json']);
-});
-
-// ---- AI/assistive workflow seam (rule-based, human-reviewed) ---------------
-// Users drop specifications / manuals into projects/<id>/documents/. The suggestion endpoint
-// matches the shared knowledge-base library against the project model + document text and
-// proposes threats/countermeasures for the engineer to accept (never auto-applied).
-async function readDocuments(id) {
-    const dir = join(projectsDir, id, 'documents');
-    try {
-        const entries = await fs.readdir(dir, { withFileTypes: true });
-        const names = [];
-        const texts = [];
-        for (const e of entries) {
-            if (!e.isFile()) continue;
-            names.push(e.name);
-            if (/\.(md|txt|json|csv|log)$/i.test(e.name)) {
-                try {
-                    texts.push(await fs.readFile(join(dir, e.name), 'utf8'));
-                } catch {
-                    /* skip unreadable */
-                }
-            }
-        }
-        return { names, text: texts.join('\n') };
-    } catch {
-        return { names: [], text: '' };
-    }
-}
-
-app.get('/api/projects/:id/documents', async (req, res) => {
-    const dir = join(projectsDir, req.params.id, 'documents');
-    try {
-        const entries = await fs.readdir(dir, { withFileTypes: true });
-        const out = [];
-        for (const e of entries) {
-            if (!e.isFile()) continue;
-            const st = await fs.stat(join(dir, e.name));
-            out.push({ name: e.name, size: st.size });
-        }
-        res.json(out);
-    } catch {
-        res.json([]);
-    }
-});
-
-app.get('/api/projects/:id/documents/:name', async (req, res) => {
-    try {
-        res.type('text/plain').send(await fs.readFile(join(projectsDir, req.params.id, 'documents', basename(req.params.name)), 'utf8'));
-    } catch {
-        res.status(404).send('');
-    }
-});
-
-app.post('/api/projects/:id/suggest', async (req, res) => {
-    let kb;
-    try {
-        kb = JSON.parse(await fs.readFile(fieldLibraryPath, 'utf8'));
-    } catch {
-        kb = { threats: [], countermeasures: [] };
-    }
-    const proj = await readProject(req.params.id);
-    const docs = await readDocuments(req.params.id);
-    const corpus = [
-        ...(proj.system.components || []).flatMap((c) => [c.name, c.kind, c.provenance]),
-        ...(proj.system.interfaces || []).flatMap((i) => [i.name, i.protocol, i.exposure, i.category]),
-        ...(proj.system.assets || []).flatMap((a) => [a.name, a.type]),
-        docs.text,
-    ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-    const tok = (s) => (String(s).toLowerCase().match(/[a-z0-9]+/g) || []).filter((w) => w.length > 3);
-    const score = (e) => {
-        const words = new Set([...tok(e.title), ...(e.appliesTo || []).flatMap(tok)]);
-        let n = 0;
-        for (const w of words) if (corpus.includes(w)) n++;
-        return n;
-    };
-    const existing = new Set((proj.threats.threats || []).map((t) => (t.title || '').toLowerCase()));
-    const threats = (kb.threats || [])
-        .map((t) => ({ key: t.key, title: t.title, stride: t.stride || [], typicalImpact: t.typicalImpact, appliesTo: t.appliesTo || [], score: score(t) }))
-        .filter((t) => t.score > 0 && !existing.has(t.title.toLowerCase()))
-        .sort((a, b) => b.score - a.score);
-    res.json({ threats, countermeasures: kb.countermeasures || [], documents: docs.names });
 });
 
 // ---- Static client (production build) -------------------------------------

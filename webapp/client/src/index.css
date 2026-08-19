@@ -29,6 +29,7 @@
     --topbar-h: 52px;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
+    color-scheme: light;
 }
 
 [data-theme='dark'] {
@@ -53,6 +54,7 @@
     --exp-adjacent: #c79bff;
     --exp-remote: #ffb061;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
 }
 
 .react-flow {
@@ -98,7 +100,7 @@ textarea {
 .layout {
     flex: 1;
     display: grid;
-    grid-template-columns: 248px 1fr 340px;
+    grid-template-columns: clamp(200px, 15vw, 264px) minmax(0, 1fr) clamp(280px, 20vw, 380px);
     min-height: 0;
 }
 
@@ -362,8 +364,9 @@ textarea {
 
 /* ---- Panels / cards ------------------------------------------------------ */
 .panel {
-    padding: 22px 26px 40px;
-    max-width: 940px;
+    padding: 22px clamp(16px, 3vw, 48px) 40px;
+    max-width: 1400px;
+    width: 100%;
     margin: 0 auto;
 }
 
@@ -452,6 +455,12 @@ textarea {
 .inp:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-weak);
+}
+
+.sort-select {
+    width: auto;
+    color: var(--text);
+    background-color: var(--surface);
 }
 
 textarea {
@@ -618,6 +627,24 @@ textarea {
     opacity: 1;
 }
 
+/* tag select (searchless dropdown-add + removable tags), for large option lists */
+.tagselect {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tagselect-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tagselect-add {
+    max-width: 340px;
+    color: var(--text-dim);
+}
+
 .version-history-list {
     display: grid;
     gap: 10px;
@@ -686,6 +713,7 @@ textarea {
 
 /* ---- Risk matrix --------------------------------------------------------- */
 .matrix {
+    position: relative;
     display: grid;
     grid-template-columns: 22px repeat(5, 1fr);
     grid-auto-rows: 30px;
@@ -701,6 +729,42 @@ textarea {
     font-size: 11px;
     font-weight: 600;
     position: relative;
+}
+
+.matrix-boundaries {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: 22px repeat(5, 1fr);
+    grid-template-rows: repeat(6, 30px);
+    gap: 3px;
+    pointer-events: none;
+    z-index: 3;
+}
+
+.matrix-boundaries span {
+    position: relative;
+}
+
+.matrix-boundaries .boundary-top::before,
+.matrix-boundaries .boundary-right::after {
+    content: '';
+    position: absolute;
+    background: var(--text);
+}
+
+.matrix-boundaries .boundary-top::before {
+    top: -2px;
+    left: -1px;
+    right: -1px;
+    height: 4px;
+}
+
+.matrix-boundaries .boundary-right::after {
+    top: -1px;
+    right: -2px;
+    bottom: -1px;
+    width: 4px;
 }
 
 .matrix .axis {
@@ -733,6 +797,13 @@ textarea {
     font-size: 11px;
     color: var(--text-faint);
     margin: 6px 0;
+}
+
+.matrix-threshold-key {
+    width: 14px;
+    height: 4px;
+    background: var(--text);
+    display: inline-block;
 }
 
 /* ---- DFD canvas ---------------------------------------------------------- */
@@ -1014,15 +1085,47 @@ textarea {
     border-radius: 6px;
     padding: 1px 6px;
     line-height: 1.4;
-    max-width: 160px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    width: max-content;
+    max-width: 220px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
     cursor: pointer;
 }
 
 .edgelabel:hover {
     border-color: var(--accent);
+}
+
+.edgelabel-leader line {
+    stroke: var(--edge);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    opacity: 0.8;
+}
+
+.matrix-preview {
+    width: min(360px, 100%);
+    padding: 16px;
+}
+
+.matrix-preview-item {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+    align-items: baseline;
+    padding: 7px 5px;
+    border: 0;
+    border-top: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.matrix-preview-item:hover,
+.matrix-preview-item:focus-visible {
+    background: var(--surface-2);
 }
 
 /* ---- Empty state --------------------------------------------------------- */
@@ -1381,15 +1484,7 @@ button.linkbtn {
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
-    padding: 4px 10px 10px;
-}
-
-.calc>summary {
-    cursor: pointer;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--text-dim);
-    padding: 7px 2px;
+    padding: 12px 10px;
 }
 
 .calcgrid {
@@ -1975,6 +2070,20 @@ button.linkbtn {
     margin-left: 5px;
 }
 
+/* Secondary in-card tabs (e.g. threat editor's "details" / "risk rating" sections) */
+.subtabs {
+    margin-top: 12px;
+}
+
+.tabs.sub {
+    margin: 0 0 12px;
+}
+
+.tabs.sub .tab {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
 .itemcard textarea.grow {
     width: 100%;
     min-height: 44px;
@@ -1982,7 +2091,7 @@ button.linkbtn {
 
 /* ---- Dashboard / KB / tables / modal (session 3) ------------------------- */
 .layout.wide {
-    grid-template-columns: 248px 1fr;
+    grid-template-columns: clamp(200px, 15vw, 264px) minmax(0, 1fr);
 }
 
 .dashgrid {

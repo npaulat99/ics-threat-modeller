@@ -140,16 +140,6 @@ export default function TopBar() {
                         >
                             Tutorial overview
                         </button>
-                        <button
-                            className="helpmenu-item"
-                            role="menuitem"
-                            onClick={() => {
-                                setHelpOpen(false);
-                                setView('assistant');
-                            }}
-                        >
-                            Documentation &amp; assistant
-                        </button>
                     </div>
                 )}
             </div>
