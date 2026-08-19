@@ -1,8 +1,8 @@
-// Browse the shared knowledge base: Bug Bar, risk scheme, the OT threat/countermeasure
-// library, and any catalogues pulled from git. Read-only — the security unit owns the KB.
+// Browse the shared knowledge base: Bug Bar, and any catalogues pulled from git / dropped on disk.
+// Read-only — the security unit owns the KB.
 import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
-import { Field, HelpButton, confirmDelete, sortStride } from '../common';
+import { Field, HelpButton, confirmDelete } from '../common';
 import BugBarTable from '../BugBarTable';
 import ImportedCatalogue from '../ImportedCatalogue';
 
@@ -14,7 +14,7 @@ export default function KbPanel() {
     const setRepo = (patch: any) => p && save('project', { ...p, repo: { ...(p.repo || {}), ...patch } });
 
     const [kb, setKb] = useState<any>(null);
-    const [tab, setTab] = useState<'bugbar' | 'library' | 'scheme' | 'imported'>('bugbar');
+    const [tab, setTab] = useState<'bugbar' | 'imported'>('bugbar');
     const [pullMsg, setPullMsg] = useState('');
     const [busy, setBusy] = useState(false);
     const loadFull = () =>
@@ -55,8 +55,6 @@ export default function KbPanel() {
         setBusy(false);
     };
 
-    const lib = kb?.library || {};
-    const scheme = kb?.riskScheme || {};
     const imported = kb?.imported || [];
 
     return (
@@ -71,18 +69,11 @@ export default function KbPanel() {
                     </ul>
                 </HelpButton>
             </div>
-            <p className="lead">Browse the shared threat, countermeasure, and risk references.</p>
+            <p className="lead">Browse the shared Bug Bar and imported catalogues.</p>
 
             <div className="tabs">
                 <button className={'tab' + (tab === 'bugbar' ? ' active' : '')} onClick={() => setTab('bugbar')}>
                     Bug Bar
-                </button>
-                <button className={'tab' + (tab === 'library' ? ' active' : '')} onClick={() => setTab('library')}>
-                    Threat / CM library
-                    <span className="badge">{(lib.threats?.length || 0) + (lib.countermeasures?.length || 0)}</span>
-                </button>
-                <button className={'tab' + (tab === 'scheme' ? ' active' : '')} onClick={() => setTab('scheme')}>
-                    Risk scheme
                 </button>
                 <button className={'tab' + (tab === 'imported' ? ' active' : '')} onClick={() => setTab('imported')}>
                     Imported
@@ -93,72 +84,6 @@ export default function KbPanel() {
             {tab === 'bugbar' && (
                 <div className="card">
                     <BugBarTable />
-                </div>
-            )}
-
-            {tab === 'library' && (
-                <>
-                    <div className="card">
-                        <h3>Threats</h3>
-                        <table className="tbl">
-                            <thead>
-                                <tr>
-                                    <th>Key</th>
-                                    <th>Title</th>
-                                    <th>STRIDE</th>
-                                    <th>Applies to</th>
-                                    <th>Typ. impact</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(lib.threats || []).map((t: any) => (
-                                    <tr key={t.key}>
-                                        <td className="mono">{t.key}</td>
-                                        <td>{t.title}</td>
-                                        <td className="mono">{sortStride(t.stride).join('')}</td>
-                                        <td className="mono">{(t.appliesTo || []).join(', ')}</td>
-                                        <td>{t.typicalImpact ?? '—'}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="card">
-                        <h3>Countermeasures</h3>
-                        <table className="tbl">
-                            <thead>
-                                <tr>
-                                    <th>Key</th>
-                                    <th>Title</th>
-                                    <th>For</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(lib.countermeasures || []).map((c: any) => (
-                                    <tr key={c.key}>
-                                        <td className="mono">{c.key}</td>
-                                        <td>{c.title}</td>
-                                        <td className="mono">{(c.for || []).join(', ')}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </>
-            )}
-
-            {tab === 'scheme' && (
-                <div className="card">
-                    <h3>Likelihood &amp; impact bands</h3>
-                    <p className="hint">{scheme.description}</p>
-                    <div className="inline" style={{ flexWrap: 'wrap', gap: 8 }}>
-                        {(scheme.matrix?.bands || []).map((b: any) => (
-                            <span key={b.name} className="pill" style={{ background: b.color }}>
-                                {b.name} ({b.min}–{b.max})
-                            </span>
-                        ))}
-                    </div>
-                    <pre className="kbjson">{JSON.stringify(scheme.likelihood?.factorScale || scheme.likelihood || {}, null, 2)}</pre>
                 </div>
             )}
 

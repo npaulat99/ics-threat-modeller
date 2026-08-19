@@ -189,6 +189,59 @@ One JSON file per step under `projects/<id>/`, matching the `tra/` methodology a
 capability, exploitability, control maturity), with CVSS as an optional exploitability signal.
 The canonical scheme is `.assets/knowledge-base/risk-scheme.json`.
 
+## Knowledge base
+
+The **Knowledge base** view (left nav) has two tabs:
+
+- **Bug Bar** — the department's C/I/A/Safety impact rubric (`.assets/knowledge-base/bug-bar.json`),
+  used by the risk calculator.
+- **Imported** — threat/countermeasure catalogues dropped into
+  `.assets/knowledge-base/imported/<name>/*.json`, either pulled from a git URL (the "Pull a
+  catalogue" box on this tab) or a plain folder you copy in yourself. Each catalogue is browsable
+  here and can be de-imported again from the same tab.
+
+### Adding your own threats and countermeasures
+
+To make a set of common, reusable threats/countermeasures show up in the **Imported** tab (and
+become available via "+ Add from knowledge base…" in the Threats/Countermeasures steps), add a
+JSON file under `.assets/knowledge-base/imported/<your-catalogue-name>/*.json` with this shape:
+
+```json
+{
+  "name": "My common OT threats",
+  "version": "1.0",
+  "threats": [
+    {
+      "key": "my-threat-1",
+      "title": "Short, human-readable title",
+      "stride": ["S", "T"],
+      "appliesTo": ["component:processor"],
+      "typicalImpact": 3,
+      "description": "What the threat is and why it typically applies."
+    }
+  ],
+  "countermeasures": [
+    {
+      "key": "my-cm-1",
+      "title": "Short, human-readable title",
+      "for": ["my-threat-1"],
+      "maturity": "foundational"
+    }
+  ]
+}
+```
+
+- `threats[].key` / `countermeasures[].key` must be unique across every imported catalogue —
+  duplicates are silently skipped (first one wins).
+- `stride` uses the single-letter STRIDE codes (`S T R I D E`); `appliesTo` is a free-text tag list
+  (e.g. `component:...`, `interface:...`) shown as-is, not validated against the project.
+- Optional fields (`emb3dId`, `cwe`, `category`, `tier` for threats; `iec62443`, `emb3dId`,
+  `maturity` for countermeasures) are shown in each row's "Details" expander when present.
+- Multiple `.json` files in the same folder are merged into one catalogue entry in the UI.
+- This is a **catalogue** import (abstract, reusable definitions). To round-trip fully-rated project
+  threats/countermeasures (with likelihood, impact, rationale, status, etc.) between projects, use
+  the **Export…**/**Import…** buttons on the Threats/Countermeasures steps instead.
+
 ## Compliance & collaboration
 
 - **Traceability matrix & exports** — the report renders the full **asset → threat → risk →
@@ -216,8 +269,8 @@ The canonical scheme is `.assets/knowledge-base/risk-scheme.json`.
 - **Assistant** — drop specifications into `projects/<id>/documents/`; the app proposes applicable
   threats from the shared knowledge base by transparent keyword matching (rule-based, human
   reviewed — the seam where future AI agents plug in).
-- **Knowledge base** — browse the department-shared **Bug Bar**, reusable threats/countermeasures/
-  **assets/risk-ratings/templates**, and the risk scheme; git-tracked and pull-only.
+- **Knowledge base** — browse the department-shared **Bug Bar** and any pulled/hand-added catalogues
+  of reusable threats/countermeasures (see [Knowledge base](#knowledge-base) above).
 - **Cross-links, CRA intended purpose & foreseeable use, git integration, dark mode** — threats ↔ countermeasures
   ↔ requirements ↔ assets are click-navigable; the Project panel captures the intended purpose and
   reasonably foreseeable use (both in the report); the shared KB is pulled read-only and a project commits
