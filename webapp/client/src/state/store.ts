@@ -379,7 +379,7 @@ interface Store {
     kb: any | null;
     bugBar: any | null;
     theme: 'light' | 'dark';
-    activeView: ViewKey | 'dashboard' | 'kb' | 'assistant';
+    activeView: ViewKey | 'dashboard' | 'kb';
     dfdPath: string[];
     selectedNodeId: string | null;
     selectedEdgeId: string | null;
@@ -403,7 +403,7 @@ interface Store {
     closeTutorial(): void;
     openTutorial(): void;
     openTutorialPrompt(): void;
-    setView(v: ViewKey | 'dashboard' | 'kb' | 'assistant'): void;
+    setView(v: ViewKey | 'dashboard' | 'kb'): void;
     goto(view: string, id?: string): void;
     setTheme(t: 'light' | 'dark'): void;
     setDfdPath(path: string[]): void;
