@@ -81,11 +81,21 @@ function OffsetEdge({ id, sourceX, sourceY, targetX, targetY, markerEnd, data }:
     const obstacles = data?.obstacles || [];
     const geometry = edgeGeometry(sourceX, sourceY, targetX, targetY, obstacles, data?.offset || 0);
     const labelPosition = data?.labelPosition || geometry.pointAt(0.55);
+    const labelAnchor = data?.labelAnchor || labelPosition;
     return (
         <>
             <BaseEdge id={id} path={geometry.path} markerEnd={markerEnd} interactionWidth={28} />
             {data?.label ? (
                 <EdgeLabelRenderer>
+                    {Math.hypot(labelPosition.x - labelAnchor.x, labelPosition.y - labelAnchor.y) > 4 ? (
+                        <svg
+                            className="edgelabel-leader"
+                            style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', pointerEvents: 'none' }}
+                            aria-hidden="true"
+                        >
+                            <line x1={labelAnchor.x} y1={labelAnchor.y} x2={labelPosition.x} y2={labelPosition.y} />
+                        </svg>
+                    ) : null}
                     <div
                         className="edgelabel"
                         style={{ position: 'absolute', transform: `translate(-50%, -50%) translate(${labelPosition.x}px, ${labelPosition.y}px)`, pointerEvents: 'all' }}
@@ -627,21 +637,37 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
                 const targetY = toward.y + toward.h / 2;
                 const pointA = handlePoint(from, a, shapeById.get(nodeId));
                 const pointB = handlePoint(from, b, shapeById.get(nodeId));
-                return Math.hypot(pointA.x - targetX, pointA.y - targetY) - Math.hypot(pointB.x - targetX, pointB.y - targetY);
+                const cardinalTolerance = (key: string) => key.length === 1 ? 18 : 0;
+                return Math.hypot(pointA.x - targetX, pointA.y - targetY) - cardinalTolerance(a) - (Math.hypot(pointB.x - targetX, pointB.y - targetY) - cardinalTolerance(b));
             });
             const selected = candidates.find((key) => (handleUse.get(`${nodeId}:${role}:${key}`) || 0) === 0) || candidates[0];
             const usageKey = `${nodeId}:${role}:${selected}`;
             handleUse.set(usageKey, (handleUse.get(usageKey) || 0) + 1);
             return `${role}-${selected}`;
         };
-        const assigned = flows.map((flow) => {
+        const pairKey = (from: string, to: string) => from < to ? `${from}\u0001${to}` : `${to}\u0001${from}`;
+        const pairHandles = new Map<string, { from: string; to: string; sourceKey: string; targetKey: string }>();
+        const assigned = [...flows].sort((a, b) => pairKey(a.from, a.to).localeCompare(pairKey(b.from, b.to)) || a.id.localeCompare(b.id)).map((flow) => {
             const sourceId = rfId(flow.from);
             const targetId = rfId(flow.to);
             const sourceBox = boxes[sourceId];
             const targetBox = boxes[targetId];
-            const sourceHandle = sourceBox && targetBox ? allocateHandle(sourceId, 's', flow.sourceHandle, sourceBox, targetBox) : flow.sourceHandle || 's-r';
-            const targetHandle = sourceBox && targetBox ? allocateHandle(targetId, 't', flow.targetHandle, targetBox, sourceBox) : flow.targetHandle || 't-l';
-            return { flow, sourceId, targetId, sourceBox, targetBox, sourceHandle, targetHandle };
+            const key = pairKey(sourceId, targetId);
+            const paired = pairHandles.get(key);
+            let sourceHandle: string;
+            let targetHandle: string;
+            let bidirectional = false;
+            if (paired && paired.from === targetId && paired.to === sourceId) {
+                sourceHandle = `s-${paired.targetKey}`;
+                targetHandle = `t-${paired.sourceKey}`;
+                bidirectional = true;
+            } else {
+                sourceHandle = sourceBox && targetBox ? allocateHandle(sourceId, 's', flow.sourceHandle, sourceBox, targetBox) : flow.sourceHandle || 's-r';
+                targetHandle = sourceBox && targetBox ? allocateHandle(targetId, 't', flow.targetHandle, targetBox, sourceBox) : flow.targetHandle || 't-l';
+                if (!paired) pairHandles.set(key, { from: sourceId, to: targetId, sourceKey: sourceHandle.slice(2), targetKey: targetHandle.slice(2) });
+            }
+            if (!bidirectional) bidirectional = flows.some((candidate) => candidate.from === flow.to && candidate.to === flow.from);
+            return { flow, sourceId, targetId, sourceBox, targetBox, sourceHandle, targetHandle, bidirectional };
         });
         const placedLabels: Box[] = [];
         const overlapArea = (a: Box, b: Box) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
@@ -665,25 +691,27 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             const target = handlePoint(entry.targetBox, entry.targetHandle, shapeById.get(entry.targetId));
             const geometry = edgeGeometry(source.x, source.y, target.x, target.y, obstacles, offset);
             const size = labelSize(entry.flow.label || '');
-            let best: { x: number; y: number; score: number; box: Box } | undefined;
-            for (const fraction of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+            const preferredFraction = entry.bidirectional ? 0.36 : 0.5;
+            let best: { x: number; y: number; score: number; box: Box; anchor: { x: number; y: number } } | undefined;
+            for (const fraction of entry.bidirectional ? [0.36, 0.28, 0.44, 0.55, 0.2] : [0.5, 0.35, 0.65, 0.2, 0.8]) {
                 const point = geometry.pointAt(fraction);
                 for (const normalOffset of [0, 16, -16, 32, -32, 48, -48]) {
                     const x = point.x + point.nx * normalOffset;
                     const y = point.y + point.ny * normalOffset;
                     const box = { x: x - size.w / 2, y: y - size.h / 2, ...size };
                     const overlap = [...boxList, ...placedLabels].reduce((sum, obstacle) => sum + overlapArea(box, obstacle), 0);
-                    const score = overlap * 1000 + Math.abs(fraction - 0.5) * 120 + Math.abs(normalOffset);
-                    if (!best || score < best.score) best = { x, y, score, box };
+                    const score = overlap * 1000 + Math.abs(fraction - preferredFraction) * 140 + Math.abs(normalOffset);
+                    if (!best || score < best.score) best = { x, y, score, box, anchor: { x: point.x, y: point.y } };
                 }
             }
             if (best) placedLabels.push(best.box);
-            return best ? { x: best.x, y: best.y } : undefined;
+            return best ? { position: { x: best.x, y: best.y }, anchor: best.anchor } : undefined;
         };
         assigned.forEach((entry) => {
             const { flow: f, sourceId: sId, targetId: tId, sourceHandle: sh, targetHandle: th } = entry;
             const obstacles = obstaclesFor(sId, tId);
             const offset = offsetOf(f);
+            const labelPlacement = labelPositionFor(entry, offset, obstacles);
             out.push({
                 id: f.id,
                 source: sId,
@@ -695,7 +723,8 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
                 data: {
                     offset,
                     label: f.label,
-                    labelPosition: labelPositionFor(entry, offset, obstacles),
+                    labelPosition: labelPlacement?.position,
+                    labelAnchor: labelPlacement?.anchor,
                     obstacles,
                     onSelect: () => selectEdge(f.id),
                 },

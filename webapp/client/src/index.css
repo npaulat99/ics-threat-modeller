@@ -1034,6 +1034,13 @@ textarea {
     border-color: var(--accent);
 }
 
+.edgelabel-leader line {
+    stroke: var(--edge);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    opacity: 0.8;
+}
+
 .matrix-preview {
     width: min(360px, 100%);
     padding: 16px;
