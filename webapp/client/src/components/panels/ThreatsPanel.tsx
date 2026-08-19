@@ -4,6 +4,7 @@ import { ID_PATTERN } from '../../lib/ids';
 import { riskOf } from '../../lib/risk';
 import { adId } from '../../lib/attackTree';
 import RiskCalculator from './RiskCalculator';
+import ThreatCmImportExport from '../ThreatCmImportExport';
 import type { Threat } from '../../types';
 
 export default function ThreatsPanel() {
@@ -301,6 +302,7 @@ export default function ThreatsPanel() {
                                 ))}
                             </select>
                         ) : null}
+                        <ThreatCmImportExport />
                     </div>
 
                     <div className="list">

@@ -1156,6 +1156,27 @@ button.linkbtn {
     background: var(--surface-2);
 }
 
+.checklist {
+    max-height: 320px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 6px;
+}
+
+.checkrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 2px;
+    font-size: 13px;
+}
+
+.checkrow input {
+    flex: none;
+}
+
 /* ---- Project depth note --------------------------------------------------- */
 .depthnote {
     margin: 2px 0 12px;
