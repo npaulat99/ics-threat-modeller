@@ -3,6 +3,7 @@ import { useStore, uid } from '../../state/store';
 import { Field, Chips, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, RiskPill, Jump, HelpButton, confirmDelete, IdInput } from '../common';
 import { band } from '../../lib/risk';
 import RiskCalculator from './RiskCalculator';
+import ThreatCmImportExport from '../ThreatCmImportExport';
 import type { Countermeasure, Requirement } from '../../types';
 
 export default function CountermeasuresPanel() {
@@ -498,6 +499,7 @@ export default function CountermeasuresPanel() {
                                 {candidateCms.length} candidate{candidateCms.length > 1 ? 's' : ''} not implemented
                             </button>
                         )}
+                        <ThreatCmImportExport />
                     </div>
 
                     <div className="list">

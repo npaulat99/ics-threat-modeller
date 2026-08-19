@@ -248,6 +248,24 @@ export async function pullKnowledgeBase(url) {
     return { ...res, dest: `imported/${name}`, action: exists ? 'pull' : 'clone' };
 }
 
+/** De-import (delete) a previously pulled/placed catalogue folder under knowledge-base/imported/<name>. */
+export async function removeImportedCatalogue(name) {
+    if (typeof name !== 'string' || !/^[\w.-]+$/.test(name) || name === '.' || name === '..') {
+        return { ok: false, stderr: 'Invalid catalogue name.' };
+    }
+    const importedDir = join(knowledgeBaseDir, 'imported');
+    const dest = join(importedDir, name);
+    // Guard against path traversal even though the regex above already forbids "..".
+    if (!dest.startsWith(importedDir + '/')) return { ok: false, stderr: 'Invalid catalogue path.' };
+    try {
+        await fs.access(dest);
+    } catch {
+        return { ok: false, stderr: 'Catalogue not found.' };
+    }
+    await fs.rm(dest, { recursive: true, force: true });
+    return { ok: true };
+}
+
 export async function getProjectWorkspace(id) {
     const map = await loadWorkspaceMap();
     const workspace = map[id] || null;

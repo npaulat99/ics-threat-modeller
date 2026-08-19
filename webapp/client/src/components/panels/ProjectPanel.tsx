@@ -100,7 +100,6 @@ export default function ProjectPanel() {
     const save = useStore((s) => s.save);
     const setView = useStore((s) => s.setView);
     const activeId = useStore((s) => s.activeId);
-    const refreshKb = useStore((s) => s.refreshKb);
     const p = data.project;
     const set = (patch: any) => save('project', { ...p, ...patch });
     const setDevice = (patch: any) => set({ device: { ...(p.device || {}), ...patch } });
@@ -167,15 +166,6 @@ export default function ProjectPanel() {
             cancelled = true;
         };
     }, [activeId]);
-
-    const pullKb = async () => {
-        setGit('Pulling knowledge base…');
-        const r = await fetch('/api/kb/git/pull', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: p.repo?.kbUrl }) })
-            .then((x) => x.json())
-            .catch(() => ({ ok: false, stderr: 'request failed' }));
-        if (r.ok) await refreshKb();
-        setGit(r.ok ? `Knowledge base ${r.action === 'clone' ? 'cloned' : 'pulled'} → ${r.dest}. Reusable threats/countermeasures are now importable.` : `Pull failed: ${r.stderr || 'error'}`);
-    };
 
     const flushProjectData = async () => {
         if (!activeId || !data) return false;
@@ -526,23 +516,6 @@ export default function ProjectPanel() {
                     )}
                 </details>
                 {git && <p className="hint" style={{ marginTop: 4 }}>{git}</p>}
-            </div>
-
-            <div className="card">
-                <h3>Knowledge base</h3>
-                <div className="row">
-                    <Field label="Knowledge base URL">
-                        <input value={p.repo?.kbUrl || ''} onChange={(e) => setRepo({ kbUrl: e.target.value })} placeholder="https://github.com/org/tra-knowledge-base.git" />
-                    </Field>
-                    <div className="field">
-                        <label>Actions</label>
-                        <div className="inline">
-                            <button className="btn sm" onClick={pullKb} disabled={!p.repo?.kbUrl}>
-                                ↓ Pull knowledge base
-                            </button>
-                        </div>
-                    </div>
-                </div>
             </div>
 
         </div>
