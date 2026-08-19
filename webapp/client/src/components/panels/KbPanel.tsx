@@ -1,18 +1,59 @@
 // Browse the shared knowledge base: Bug Bar, risk scheme, the OT threat/countermeasure
 // library, and any catalogues pulled from git. Read-only — the security unit owns the KB.
 import { useEffect, useState } from 'react';
-import { HelpButton, sortStride } from '../common';
+import { useStore } from '../../state/store';
+import { Field, HelpButton, confirmDelete, sortStride } from '../common';
 import BugBarTable from '../BugBarTable';
+import ImportedCatalogue from '../ImportedCatalogue';
 
 export default function KbPanel() {
+    const data = useStore((s) => s.data);
+    const save = useStore((s) => s.save);
+    const refreshKb = useStore((s) => s.refreshKb);
+    const p = data?.project;
+    const setRepo = (patch: any) => p && save('project', { ...p, repo: { ...(p.repo || {}), ...patch } });
+
     const [kb, setKb] = useState<any>(null);
     const [tab, setTab] = useState<'bugbar' | 'library' | 'scheme' | 'imported'>('bugbar');
-    useEffect(() => {
+    const [pullMsg, setPullMsg] = useState('');
+    const [busy, setBusy] = useState(false);
+    const loadFull = () =>
         fetch('/api/kb/full')
             .then((r) => r.json())
             .then(setKb)
             .catch(() => setKb({}));
+    useEffect(() => {
+        loadFull();
     }, []);
+
+    const pullKb = async () => {
+        setBusy(true);
+        setPullMsg('Pulling knowledge base…');
+        const r = await fetch('/api/kb/git/pull', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: p?.repo?.kbUrl }) })
+            .then((x) => x.json())
+            .catch(() => ({ ok: false, stderr: 'request failed' }));
+        if (r.ok) {
+            await refreshKb();
+            await loadFull();
+        }
+        setPullMsg(r.ok ? `Knowledge base ${r.action === 'clone' ? 'cloned' : 'pulled'} → ${r.dest}. Reusable threats/countermeasures are now importable.` : `Pull failed: ${r.stderr || 'error'}`);
+        setBusy(false);
+    };
+
+    const deleteCatalogue = async (name: string) => {
+        if (!confirmDelete(`imported catalogue "${name}"`)) return;
+        setBusy(true);
+        setPullMsg(`Removing ${name}…`);
+        const r = await fetch(`/api/kb/imported/${encodeURIComponent(name)}`, { method: 'DELETE' })
+            .then((x) => x.json())
+            .catch(() => ({ ok: false, stderr: 'request failed' }));
+        if (r.ok) {
+            await refreshKb();
+            await loadFull();
+        }
+        setPullMsg(r.ok ? `Removed ${name}.` : `Remove failed: ${r.stderr || 'error'}`);
+        setBusy(false);
+    };
 
     const lib = kb?.library || {};
     const scheme = kb?.riskScheme || {};
@@ -25,7 +66,7 @@ export default function KbPanel() {
                 <HelpButton title="Knowledge base">
                     <ul>
                         <li>Shared reference data owned by the security team.</li>
-                        <li>Add the KB git URL and pull it from <b>Project → Repository</b>.</li>
+                        <li>Pull a catalogue by git URL, or de-import one, from the <b>Imported</b> tab.</li>
                         <li>Reusable threats/countermeasures can be imported into a project from the Threats / Countermeasures steps.</li>
                     </ul>
                 </HelpButton>
@@ -121,22 +162,38 @@ export default function KbPanel() {
                 </div>
             )}
 
-            {tab === 'imported' &&
-                (imported.length ? (
-                    imported.map((cat: any) => (
-                        <div className="card" key={cat.name}>
-                            <h3>{cat.name}</h3>
-                            {Object.keys(cat.files || {}).map((f) => (
-                                <details key={f}>
-                                    <summary>{f}</summary>
-                                    <pre className="kbjson">{JSON.stringify(cat.files[f], null, 2)}</pre>
-                                </details>
-                            ))}
+            {tab === 'imported' && (
+                <>
+                    <div className="card">
+                        <h3>Pull a catalogue</h3>
+                        <div className="row">
+                            <Field label="Knowledge base URL">
+                                <input
+                                    value={p?.repo?.kbUrl || ''}
+                                    onChange={(e) => setRepo({ kbUrl: e.target.value })}
+                                    placeholder="https://github.com/org/tra-knowledge-base.git"
+                                    disabled={!p}
+                                />
+                            </Field>
+                            <div className="field">
+                                <label>Actions</label>
+                                <div className="inline">
+                                    <button className="btn sm" onClick={pullKb} disabled={busy || !p?.repo?.kbUrl}>
+                                        ↓ Pull knowledge base
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    ))
-                ) : (
-                    <p className="hint">No imported catalogues.</p>
-                ))}
+                        {!p && <p className="hint">Open a project to pull a catalogue (the URL is stored per project).</p>}
+                        {pullMsg && <p className="hint">{pullMsg}</p>}
+                    </div>
+                    {imported.length ? (
+                        imported.map((cat: any) => <ImportedCatalogue key={cat.name} name={cat.name} files={cat.files || {}} onDelete={deleteCatalogue} busy={busy} />)
+                    ) : (
+                        <p className="hint">No imported catalogues.</p>
+                    )}
+                </>
+            )}
         </div>
     );
 }

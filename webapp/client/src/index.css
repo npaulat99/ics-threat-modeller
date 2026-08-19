@@ -1142,6 +1142,20 @@ a.linkbtn {
     text-decoration: none;
 }
 
+button.linkbtn {
+    background: none;
+    border: none;
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0;
+}
+
+.rowdetail td {
+    background: var(--surface-2);
+}
+
 /* ---- Project depth note --------------------------------------------------- */
 .depthnote {
     margin: 2px 0 12px;

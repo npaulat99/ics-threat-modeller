@@ -32,7 +32,7 @@ import {
 import { loadScheme } from './risk.js';
 import { validate } from './validate.js';
 import { generateReport, buildReport } from './report.js';
-import { pullKnowledgeBase, commitProject, gitStatus, getProjectWorkspace, prepareProjectWorkspace, verifyProjectWorkspace } from './git.js';
+import { pullKnowledgeBase, commitProject, gitStatus, getProjectWorkspace, prepareProjectWorkspace, verifyProjectWorkspace, removeImportedCatalogue } from './git.js';
 
 const app = express();
 app.use(express.json({ limit: '8mb' }));
@@ -120,6 +120,7 @@ app.get('/api/kb/full', async (_req, res) => {
 });
 
 app.post('/api/kb/git/pull', async (req, res) => res.json(await pullKnowledgeBase(req.body?.url)));
+app.delete('/api/kb/imported/:name', async (req, res) => res.json(await removeImportedCatalogue(req.params.name)));
 app.get('/api/projects/:id/git/workspace', async (req, res) => res.json(await getProjectWorkspace(req.params.id)));
 app.post('/api/projects/:id/git/workspace', async (req, res) => res.json(await prepareProjectWorkspace(req.params.id, req.body || {})));
 app.post('/api/projects/:id/git/workspace/verify', async (req, res) => res.json(await verifyProjectWorkspace(req.params.id)));
