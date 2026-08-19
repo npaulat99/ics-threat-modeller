@@ -20,6 +20,8 @@ export default function RequirementsPanel() {
     };
     const threatOpts = threats.map((t) => ({ value: t.id, label: `${t.id} · ${t.title}` }));
     const cmOpts = cms.map((c) => ({ value: c.id, label: `${c.id} · ${c.title}` }));
+    const threatById = new Map(threats.map((t) => [t.id, t]));
+    const cmById = new Map(cms.map((c) => [c.id, c]));
     const editing = reqs.find((r) => r.id === editingId) || null;
 
     return (
@@ -105,9 +107,9 @@ export default function RequirementsPanel() {
                                     </div>
                                     <div className="summary-links">
                                         <span className="lbl">From threats:</span>
-                                        {(r.derivedFromThreat || []).length ? r.derivedFromThreat!.map((tid) => <Jump key={tid} view="threats" id={tid} />) : <span className="hint">none</span>}
+                                        {(r.derivedFromThreat || []).length ? r.derivedFromThreat!.map((tid) => <Jump key={tid} view="threats" id={tid} title={threatById.get(tid) ? `${tid} · ${threatById.get(tid)!.title}` : undefined} />) : <span className="hint">none</span>}
                                         <span className="lbl">Satisfied by:</span>
-                                        {(r.satisfiedByCM || []).length ? r.satisfiedByCM!.map((cid) => <Jump key={cid} view="countermeasures" id={cid} />) : <span className="hint">none</span>}
+                                        {(r.satisfiedByCM || []).length ? r.satisfiedByCM!.map((cid) => <Jump key={cid} view="countermeasures" id={cid} title={cmById.get(cid) ? `${cid} · ${cmById.get(cid)!.title}` : undefined} />) : <span className="hint">none</span>}
                                     </div>
                                 </div>
                             ))}

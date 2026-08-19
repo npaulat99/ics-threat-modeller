@@ -168,7 +168,7 @@ export default function CountermeasuresPanel() {
                             return (
                                 <div key={a.threat} className="itemcard residual-card" style={{ marginBottom: 8 }}>
                                     <div className="inline" style={{ marginBottom: 8, alignItems: 'center' }}>
-                                        <Jump view="threats" id={a.threat} />
+                                        <Jump view="threats" id={a.threat} title={t ? `${t.id} · ${t.title}` : undefined} />
                                         <span className="grow muted" style={{ flex: 1, minWidth: 180 }}>
                                             {t?.title || 'unknown threat'}
                                         </span>
@@ -432,7 +432,7 @@ export default function CountermeasuresPanel() {
                                     </div>
                                     <div className="summary-links">
                                         <span className="lbl">Addresses:</span>
-                                        {(c.addresses || []).length ? (c.addresses || []).map((a) => <Jump key={a.threat} view="threats" id={a.threat} />) : <span className="hint">none</span>}
+                                        {(c.addresses || []).length ? (c.addresses || []).map((a) => <Jump key={a.threat} view="threats" id={a.threat} title={threatById.get(a.threat) ? `${a.threat} · ${threatById.get(a.threat)!.title}` : undefined} />) : <span className="hint">none</span>}
                                     </div>
                                 </div>
                             ))}
@@ -520,7 +520,7 @@ export default function CountermeasuresPanel() {
                                     </div>
                                     <div className="summary-links">
                                         <span className="lbl">Addresses:</span>
-                                        {addr.length ? addr.map((a) => <Jump key={a.threat} view="threats" id={a.threat} />) : <span className="hint">none</span>}
+                                        {addr.length ? addr.map((a) => <Jump key={a.threat} view="threats" id={a.threat} title={threatById.get(a.threat) ? `${a.threat} · ${threatById.get(a.threat)!.title}` : undefined} />) : <span className="hint">none</span>}
                                     </div>
                                     {(c.negativeEffects || []).filter(Boolean).length > 0 && (
                                         <div className="summary-links">

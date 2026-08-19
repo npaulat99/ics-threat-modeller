@@ -262,7 +262,7 @@ export default function ThreatsPanel() {
                     </button>
                     <span className="hint" style={{ marginLeft: 8 }}>Mitigated by:</span>
                     {cmsFor(t.id).length ? (
-                        cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} label={`${c.id} · ${c.title}`.slice(0, 26)} />)
+                        cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} label={`${c.id} · ${c.title}`.slice(0, 26)} title={`${c.id} · ${c.title}`} />)
                     ) : (
                         <span className="hint">none</span>
                     )}
@@ -361,7 +361,7 @@ export default function ThreatsPanel() {
                                         {t.responsibility ? <span className="tag">Resp: {t.responsibility}</span> : null}
                                         {(t.assumptionRefs || []).length ? <span className="tag">Assumptions: {t.assumptionRefs.join(', ')}</span> : null}
                                         <span className="lbl">Mitigated by:</span>
-                                        {cmsFor(t.id).length ? cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} />) : <span className="hint">none</span>}
+                                        {cmsFor(t.id).length ? cmsFor(t.id).map((c) => <Jump key={c.id} view="countermeasures" id={c.id} title={`${c.id} · ${c.title}`} />) : <span className="hint">none</span>}
                                         {(t.assets || []).length ? (
                                             <>
                                                 <span className="lbl">Assets:</span>

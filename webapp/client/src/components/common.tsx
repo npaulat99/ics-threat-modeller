@@ -403,14 +403,14 @@ export function EditBackBar({ label, onBack }: { label: string; onBack: () => vo
 }
 
 /** A clickable chip that jumps to a linked item in another view (traceability). */
-export function Jump({ view, id, label }: { view: string; id: string; label?: string }) {
+export function Jump({ view, id, label, title }: { view: string; id: string; label?: string; title?: string }) {
     const goto = useStore((s) => s.goto);
     return (
         <span
             className="jump"
             role="button"
             tabIndex={0}
-            title={`Open ${id}`}
+            title={title || `Open ${id}`}
             onClick={(e) => {
                 e.stopPropagation();
                 goto(view, id);

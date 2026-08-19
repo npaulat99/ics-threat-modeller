@@ -80,7 +80,7 @@ export default function DefectsPanel() {
                                     <ComboInput value={d.component} onChange={(v) => upd(d.id, { component: v || undefined })} options={comps} placeholder="component…" />
                                     {d.component && (
                                         <div style={{ marginTop: 4 }}>
-                                            <Jump view="system" id={d.component} />
+                                            <Jump view="system" id={d.component} title={comps.find((c) => c.value === d.component)?.label} />
                                         </div>
                                     )}
                                 </Field>
@@ -102,7 +102,7 @@ export default function DefectsPanel() {
                                     <ComboInput value={d.threatRef} onChange={(v) => upd(d.id, { threatRef: v || undefined })} options={threatOpts} placeholder="threat…" />
                                     {d.threatRef && (
                                         <div style={{ marginTop: 4 }}>
-                                            <Jump view="threats" id={d.threatRef} />
+                                            <Jump view="threats" id={d.threatRef} title={threatOpts.find((t) => t.value === d.threatRef)?.label} />
                                         </div>
                                     )}
                                 </Field>

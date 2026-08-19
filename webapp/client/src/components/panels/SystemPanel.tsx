@@ -369,7 +369,7 @@ export default function SystemPanel() {
                                             <div className="inline" style={{ flexWrap: 'wrap', gap: 6 }}>
                                                 <span className="hint">Threats:</span>
                                                 {threatsForAsset(c.id).map((t) => (
-                                                    <Jump key={t.id} view="threats" id={t.id} />
+                                                    <Jump key={t.id} view="threats" id={t.id} title={`${t.id} · ${t.title}`} />
                                                 ))}
                                             </div>
                                         )}
@@ -413,7 +413,7 @@ export default function SystemPanel() {
                                                     <>
                                                         <span className="lbl">Threats:</span>
                                                         {threatsForAsset(c.id).map((t) => (
-                                                            <Jump key={t.id} view="threats" id={t.id} />
+                                                            <Jump key={t.id} view="threats" id={t.id} title={`${t.id} · ${t.title}`} />
                                                         ))}
                                                     </>
                                                 ) : null}
