@@ -13,7 +13,7 @@ export default function ThreatsPanel() {
     const kb = useStore((s) => s.kb);
     const save = useStore((s) => s.save);
     const setView = useStore((s) => s.setView);
-    const [sortBy, setSortBy] = useState<'name' | 'initial' | 'residual'>('name');
+    const [sortBy, setSortBy] = useState<'id' | 'name' | 'initial' | 'residual'>('id');
 
     const threats = data.threats.threats || [];
     const cms = data.countermeasures.countermeasures || [];
@@ -321,6 +321,7 @@ export default function ThreatsPanel() {
                         <label className="inline" style={{ gap: 6 }}>
                             <span className="hint">Sort by</span>
                             <select className="inp sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+                                <option value="id">ID</option>
                                 <option value="name">Name</option>
                                 <option value="initial">Original risk</option>
                                 <option value="residual">Residual risk</option>
@@ -330,6 +331,7 @@ export default function ThreatsPanel() {
 
                     <div className="list">
                         {[...threats].sort((a, b) => {
+                            if (sortBy === 'id') return a.id.localeCompare(b.id, undefined, { numeric: true });
                             if (sortBy === 'name') return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
                             const aRisk = riskOf(a, cms, scheme);
                             const bRisk = riskOf(b, cms, scheme);

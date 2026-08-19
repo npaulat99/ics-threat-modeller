@@ -50,7 +50,7 @@ export default function AssumptionsPanel() {
             </div>
             {!(a.attacker || []).length && <p className="hint">At least one attacker profile is required.</p>}
             <div className="list">
-                {(a.attacker || []).map((p, i) => {
+                {(a.attacker || []).map((p, i) => ({ p, i })).sort((a, b) => a.p.id.localeCompare(b.p.id, undefined, { numeric: true })).map(({ p, i }) => {
                     const upd = (patch: any) => setAttacker(a.attacker.map((x, j) => (j === i ? { ...x, ...patch } : x)));
                     return (
                         <div className="itemcard" key={i}>
@@ -103,7 +103,7 @@ export default function AssumptionsPanel() {
                 {cat.help}
             </p>
             <div className="list">
-                {(a[cat.key] || []).map((item, i) => {
+                {(a[cat.key] || []).map((item, i) => ({ item, i })).sort((a, b) => a.item.id.localeCompare(b.item.id, undefined, { numeric: true })).map(({ item, i }) => {
                     const list = a[cat.key];
                     const upd = (patch: any) => setList(cat.key, list.map((x, j) => (j === i ? { ...x, ...patch } : x)));
                     return (

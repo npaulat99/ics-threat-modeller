@@ -27,8 +27,9 @@ export default function CountermeasuresPanel() {
     // A countermeasure is "selected" (chosen to be implemented) unless explicitly unchecked. Older
     // projects without the flag are treated as selected, so nothing disappears from the overview.
     const isSelected = (c: Countermeasure) => c.selected !== false;
-    const selectedCms = cms.filter(isSelected);
-    const candidateCms = cms.filter((c) => !isSelected(c));
+    const byId = (a: Countermeasure, b: Countermeasure) => a.id.localeCompare(b.id, undefined, { numeric: true });
+    const selectedCms = cms.filter(isSelected).sort(byId);
+    const candidateCms = cms.filter((c) => !isSelected(c)).sort(byId);
 
     // "Compare & choose" (brainstorming) mode: pick a threat, see every candidate control side by side.
     const [mode, setMode] = useState<'selected' | 'compare'>('selected');
@@ -320,7 +321,7 @@ export default function CountermeasuresPanel() {
     // residual risk, negative effects and an "implement" checkbox, so alternatives can be weighed.
     const renderCompare = () => {
         const t = threatById.get(compareThreatId);
-        const forThreat = t ? cms.filter((c) => (c.addresses || []).some((a) => a.threat === t.id)) : [];
+        const forThreat = t ? cms.filter((c) => (c.addresses || []).some((a) => a.threat === t.id)).sort(byId) : [];
         const initial = t ? (t.likelihood || 0) * (t.impact || 0) : 0;
         const negOf = (c: Countermeasure) => (c.negativeEffects || []).join('\n');
         const setNeg = (cmId: string, text: string) => {

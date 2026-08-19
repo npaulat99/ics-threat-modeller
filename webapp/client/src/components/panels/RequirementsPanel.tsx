@@ -86,7 +86,7 @@ export default function RequirementsPanel() {
                     </div>
                     {reqs.length ? (
                         <div className="list">
-                            {reqs.map((r) => (
+                            {[...reqs].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })).map((r) => (
                                 <div id={`f-requirements-${r.id}`} className={'itemcard collapsed' + (focusId === r.id ? ' focused' : '')} key={r.id}>
                                     <div className="head">
                                         <span className="summary-id">{r.id}</span>
