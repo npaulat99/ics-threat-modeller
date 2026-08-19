@@ -3,6 +3,7 @@
 Usage: python tools/generate_report.py <project-dir>"""
 import html as html_lib
 import json, os, sys
+import textwrap
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
@@ -42,6 +43,15 @@ except Exception:
     dfd = {"nodes": [], "flows": []}
 
 def dfd_svg(dfd, layer=1):
+    def svg_label(value, x, center_y, width=18):
+        lines = textwrap.wrap(str(value or ""), width=width, break_long_words=True, break_on_hyphens=False) or [""]
+        first_y = center_y - ((len(lines) - 1) * 11 / 2)
+        spans = "".join(
+            f"<tspan x='{x}' dy='{'0' if index == 0 else '11'}'>{html_lib.escape(line)}</tspan>"
+            for index, line in enumerate(lines)
+        )
+        return f"<text x='{x}' y='{first_y}' text-anchor='middle' font-size='11'>{spans}</text>"
+
     ROW = {"external-entity": 0, "process": 1, "multiprocess": 1, "store": 2}
     nodes = [n for n in dfd["nodes"] if n.get("layer") == layer and n["type"] != "trust-boundary"]
     col = {0: 0, 1: 0, 2: 0}
@@ -53,7 +63,7 @@ def dfd_svg(dfd, layer=1):
         shape = (f"<ellipse cx='{x+60}' cy='{y+25}' rx='60' ry='25' fill='#fff' stroke='#333'/>" if n["type"] in ("process", "multiprocess")
                  else f"<rect x='{x}' y='{y}' width='120' height='50' fill='none' stroke='#333' stroke-width='1' style='border-top:0'/>" if n["type"] == "store"
                  else f"<rect x='{x}' y='{y}' width='120' height='50' fill='#fff' stroke='#333'/>")
-        out.append(shape + f"<text x='{x+60}' y='{y+28}' text-anchor='middle' font-size='11'>{n['label'][:18]}</text>")
+        out.append(shape + svg_label(n.get("label", ""), x + 60, y + 28))
     for f in dfd["flows"]:
         if f["from"] in pos and f["to"] in pos:
             x1, y1 = pos[f["from"]]; x2, y2 = pos[f["to"]]

@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { useStore } from '../state/store';
 import { riskOf, band, bandsOf, descendantComponentIds } from '../lib/risk';
 
@@ -6,12 +6,13 @@ import { riskOf, band, bandsOf, descendantComponentIds } from '../lib/risk';
  * 5×5 residual-risk heat map. Optionally filtered to a single component (when a DFD node
  * is selected) — including all of that component's sub-components, so a parent node rolls
  * up the risk of everything it contains. Clicking a cell that holds threats jumps to the
- * first of those threats.
+ * matching threat directly, or opens a chooser when several threats share the cell.
  */
 export default function RiskMatrix({ componentRef }: { componentRef?: string }) {
     const data = useStore((s) => s.data)!;
     const scheme = useStore((s) => s.scheme);
     const goto = useStore((s) => s.goto);
+    const [previewIds, setPreviewIds] = useState<string[]>([]);
     let threats = data.threats.threats || [];
     const cms = data.countermeasures.countermeasures || [];
     let rolledUp = false;
@@ -30,6 +31,10 @@ export default function RiskMatrix({ componentRef }: { componentRef?: string }) 
 
     const impacts = [5, 4, 3, 2, 1];
     const likes = [1, 2, 3, 4, 5];
+    const openCell = (ids: string[]) => {
+        if (ids.length === 1) goto('threats', ids[0]);
+        else if (ids.length > 1) setPreviewIds(ids);
+    };
 
     return (
         <div>
@@ -53,11 +58,11 @@ export default function RiskMatrix({ componentRef }: { componentRef?: string }) 
                                     aria-label={n ? `Likelihood ${L} by impact ${I}, ${b.name}, ${n} threat(s): ${ids.join(', ')}. Activate to open.` : undefined}
                                     style={{ background: b.color, opacity: n ? 1 : 0.42, cursor: n ? 'pointer' : 'default' }}
                                     title={n ? `L${L} × I${I} = ${score} (${b.name}) — ${ids.join(', ')} · click to open` : `L${L} × I${I} = ${score} (${b.name})`}
-                                    onClick={() => n && goto('threats', ids[0])}
+                                    onClick={() => openCell(ids)}
                                     onKeyDown={(e) => {
                                         if (n && (e.key === 'Enter' || e.key === ' ')) {
                                             e.preventDefault();
-                                            goto('threats', ids[0]);
+                                            openCell(ids);
                                         }
                                     }}
                                 >
@@ -90,6 +95,25 @@ export default function RiskMatrix({ componentRef }: { componentRef?: string }) 
                     </span>
                 ))}
             </div>
+            {previewIds.length > 1 ? (
+                <div className="modal-overlay" onClick={() => setPreviewIds([])}>
+                    <div className="modal matrix-preview" role="dialog" aria-modal="true" aria-label="Threats at selected residual risk" onClick={(event) => event.stopPropagation()}>
+                        <div className="modalhead">
+                            <strong>Threats at this residual risk</strong>
+                            <button className="btn sm" type="button" aria-label="Close threat preview" onClick={() => setPreviewIds([])}>✕</button>
+                        </div>
+                        {previewIds.map((id) => {
+                            const threat = threats.find((item) => item.id === id);
+                            return (
+                                <button key={id} className="matrix-preview-item" type="button" onClick={() => goto('threats', id)}>
+                                    <span className="summary-id">{id}</span>
+                                    <span>{threat?.title || 'Unknown threat'}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }

@@ -29,6 +29,7 @@
     --topbar-h: 52px;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
+    color-scheme: light;
 }
 
 [data-theme='dark'] {
@@ -53,6 +54,7 @@
     --exp-adjacent: #c79bff;
     --exp-remote: #ffb061;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
 }
 
 .react-flow {
@@ -452,6 +454,12 @@ textarea {
 .inp:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-weak);
+}
+
+.sort-select {
+    width: auto;
+    color: var(--text);
+    background-color: var(--surface);
 }
 
 textarea {
@@ -1014,15 +1022,40 @@ textarea {
     border-radius: 6px;
     padding: 1px 6px;
     line-height: 1.4;
-    max-width: 160px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    width: max-content;
+    max-width: 220px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
     cursor: pointer;
 }
 
 .edgelabel:hover {
     border-color: var(--accent);
+}
+
+.matrix-preview {
+    width: min(360px, 100%);
+    padding: 16px;
+}
+
+.matrix-preview-item {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+    align-items: baseline;
+    padding: 7px 5px;
+    border: 0;
+    border-top: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.matrix-preview-item:hover,
+.matrix-preview-item:focus-visible {
+    background: var(--surface-2);
 }
 
 /* ---- Empty state --------------------------------------------------------- */

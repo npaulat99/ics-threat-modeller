@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useStore, uid } from '../../state/store';
 import { Field, Chips, STRIDE, sortStride, RiskPill, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, Jump, HelpButton, confirmDelete, IdInput } from '../common';
 import { ID_PATTERN } from '../../lib/ids';
@@ -13,12 +14,15 @@ export default function ThreatsPanel() {
     const kb = useStore((s) => s.kb);
     const save = useStore((s) => s.save);
     const setView = useStore((s) => s.setView);
+    const [sortBy, setSortBy] = useState<'name' | 'initial' | 'residual'>('name');
 
     const threats = data.threats.threats || [];
     const cms = data.countermeasures.countermeasures || [];
     const focusId = useFocus('threats');
     const { editingId, setEditingId } = useEditMode(focusId);
     const cmsFor = (tid: string) => cms.filter((c) => (c.addresses || []).some((a) => a.threat === tid));
+    const requirements = data.requirements?.requirements || [];
+    const requirementOpts = requirements.map((r) => ({ value: r.id, label: `${r.id} · ${r.text}` }));
     const compOpts = (data.system.components || []).map((c) => ({ value: c.id, label: `${c.name}` }));
     const assetOpts = (data.system.assets || []).map((a) => ({ value: a.id, label: a.name }));
     const attackers = data.assumptions.attacker || [];
@@ -44,6 +48,17 @@ export default function ThreatsPanel() {
     };
 
     const setThreats = (list: Threat[]) => save('threats', { threats: list });
+    const setThreatRequirements = (threatId: string, requirementIds: string[]) => {
+        const selected = new Set(requirementIds);
+        save('requirements', {
+            requirements: requirements.map((requirement) => {
+                const links = new Set(requirement.derivedFromThreat || []);
+                if (selected.has(requirement.id)) links.add(threatId);
+                else links.delete(threatId);
+                return { ...requirement, derivedFromThreat: [...links] };
+            }),
+        });
+    };
     const add = () => {
         const id = uid('T', threats.map((t) => t.id));
         setThreats([...threats, { id, title: 'New threat', stride: ['T'], components: [], likelihood: 3, impact: 3, status: 'open' }]);
@@ -74,7 +89,7 @@ export default function ThreatsPanel() {
         const upd = (patch: any) => setThreats(threats.map((x) => (x.id === t.id ? { ...x, ...patch } : x)));
         const orphan = !(t.components || []).length;
         const ifaceOpts = (data.system.interfaces || []).map((itf) => ({ value: itf.id, label: `${itf.name}${itf.protocol ? ` (${itf.protocol})` : ''}` }));
-        const transferReqs = (data.requirements?.requirements || []).filter((r) => (r.derivedFromThreat || []).includes(t.id));
+        const linkedRequirementIds = requirements.filter((r) => (r.derivedFromThreat || []).includes(t.id)).map((r) => r.id);
         const interfaceRefs = t.interfaceRefs?.length ? t.interfaceRefs : t.interfaceRef && t.interfaceRef !== 'custom' ? [t.interfaceRef] : [];
         const setInterfaces = (next: string[]) => upd({ interfaceRefs: next, interfaceRef: next[0] || undefined });
         const splitByInterface = () => {
@@ -215,6 +230,12 @@ export default function ThreatsPanel() {
                     </Field>
                 </details>
                 <RiskCalculator t={t} upd={upd} />
+                <Field
+                    label={t.status === 'transferred' ? 'Risk transfer requirements' : 'Linked requirements / rationale'}
+                    hint="Link requirements that mitigate this threat or justify why its residual risk is accepted or transferred."
+                >
+                    <Chips options={requirementOpts} value={linkedRequirementIds} onChange={(v) => setThreatRequirements(t.id, v)} empty="Define requirements in step 05 first." />
+                </Field>
                 {t.status === 'accepted' && (
                     <div className="grid3" style={{ marginTop: 8 }}>
                         <Field label="Accepted by" hint="Residual-risk sign-off owner.">
@@ -227,19 +248,6 @@ export default function ThreatsPanel() {
                             <input type="date" value={t.reviewDate || ''} onChange={(e) => upd({ reviewDate: e.target.value })} />
                         </Field>
                     </div>
-                )}
-                {t.status === 'transferred' && (
-                    <Field label="Risk transfer requirement" hint="Link a requirement in step 05 that documents how this transfer is described in the user guide.">
-                        {transferReqs.length ? (
-                            <div className="summary-links">
-                                {transferReqs.map((r) => (
-                                    <Jump key={r.id} view="requirements" id={r.id} label={`${r.id} · ${r.text}`} />
-                                ))}
-                            </div>
-                        ) : (
-                            <span className="hint">none linked</span>
-                        )}
-                    </Field>
                 )}
                 <div className="inline" style={{ marginTop: 8, flexWrap: 'wrap', gap: 6 }}>
                     <button className="btn sm" onClick={() => makeTree(t)}>
@@ -303,10 +311,23 @@ export default function ThreatsPanel() {
                             </select>
                         ) : null}
                         <ThreatCmImportExport />
+                        <label className="inline" style={{ gap: 6 }}>
+                            <span className="hint">Sort by</span>
+                            <select className="inp sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+                                <option value="name">Name</option>
+                                <option value="initial">Original risk</option>
+                                <option value="residual">Residual risk</option>
+                            </select>
+                        </label>
                     </div>
 
                     <div className="list">
-                        {threats.map((t) => {
+                        {[...threats].sort((a, b) => {
+                            if (sortBy === 'name') return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+                            const aRisk = riskOf(a, cms, scheme);
+                            const bRisk = riskOf(b, cms, scheme);
+                            return sortBy === 'initial' ? bRisk.initial - aRisk.initial : bRisk.residual - aRisk.residual;
+                        }).map((t) => {
                             const r = riskOf(t, cms, scheme);
                             const orphan = !(t.components || []).length;
                             return (

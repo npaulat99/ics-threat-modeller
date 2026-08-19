@@ -56,6 +56,7 @@ function OffsetEdge({ id, sourceX, sourceY, targetX, targetY, markerEnd, data }:
         midX = (1 / 9) * sourceX + (4 / 9) * cX + (4 / 9) * targetX;
         midY = (1 / 9) * sourceY + (4 / 9) * cY + (4 / 9) * targetY;
     }
+    midY += data?.labelOffset || 0;
     return (
         <>
             <BaseEdge id={id} path={path} markerEnd={markerEnd} interactionWidth={28} />
@@ -576,6 +577,13 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
             const n = sameDir.length;
             return CURVE + (i - (n - 1) / 2) * LANE_STEP;
         };
+        const labelOffsetOf = (f: (typeof flows)[number]) => {
+            const related = flows
+                .filter((candidate) => candidate.from === f.from || candidate.from === f.to || candidate.to === f.from || candidate.to === f.to)
+                .sort((a, b) => a.id.localeCompare(b.id));
+            const centered = (related.indexOf(f) - (related.length - 1) / 2) * 18;
+            return Math.max(-36, Math.min(36, centered));
+        };
         flows.forEach((f) => {
             const sId = rfId(f.from);
             const tId = rfId(f.to);
@@ -591,7 +599,13 @@ function Canvas({ connMode, setConnMode, overview, setOverview }: { connMode: bo
                 targetHandle: th,
                 type: 'offset',
                 reconnectable: true,
-                data: { offset: offsetOf(f), label: f.label, obstacles: obstaclesFor(sId, tId), onSelect: () => selectEdge(f.id) },
+                data: {
+                    offset: offsetOf(f),
+                    label: f.label,
+                    labelOffset: labelOffsetOf(f),
+                    obstacles: obstaclesFor(sId, tId),
+                    onSelect: () => selectEdge(f.id),
+                },
                 markerEnd: { type: MarkerType.ArrowClosed },
                 className: cx(isEdgeSelected(f.id) && 'edge-sel'),
             });

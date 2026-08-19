@@ -25,6 +25,26 @@ const sortStride = (letters) => [...(letters || [])].sort((a, b) => {
 });
 const SZ = { 'external-entity': [150, 60], process: [120, 80], multiprocess: [120, 80], store: [140, 60] };
 
+function wrapSvgText(value, maxChars) {
+    const words = String(value || '').trim().split(/\s+/).filter(Boolean).flatMap((word) => {
+        const parts = [];
+        for (let i = 0; i < word.length; i += maxChars) parts.push(word.slice(i, i + maxChars));
+        return parts;
+    });
+    const lines = [];
+    for (const word of words) {
+        const current = lines[lines.length - 1];
+        if (current && `${current} ${word}`.length <= maxChars) lines[lines.length - 1] = `${current} ${word}`;
+        else lines.push(word);
+    }
+    return lines.length ? lines : [''];
+}
+
+function svgTextLines(lines, x, centerY, lineHeight, attrs = '') {
+    const firstY = centerY - ((lines.length - 1) * lineHeight) / 2;
+    return `<text x='${x}' y='${firstY}' ${attrs}>${lines.map((line, index) => `<tspan x='${x}' dy='${index ? lineHeight : 0}'>${esc(line)}</tspan>`).join('')}</text>`;
+}
+
 // --- DFD geometry helpers (mirror the client's edge routing so the report matches the editor) ---
 function bboxOfBoxes(items) {
     return {
@@ -45,7 +65,8 @@ function layerSvg(dfd, parentId, system = {}) {
     const tbs = (dfd.nodes || []).filter((n) => (n.parent ?? null) === parentId && n.type === 'trust-boundary');
     const box = (n) => {
         const [w, h] = SZ[n.type] || [130, 70];
-        return { x: n.x || 0, y: n.y || 0, w, h };
+        const labelLines = wrapSvgText(n.label, 22);
+        return { x: n.x || 0, y: n.y || 0, w, h: Math.max(h, labelLines.length * 12 + 18), labelLines };
     };
     const bxs = new Map(nodes.map((n) => [n.id, box(n)]));
 
@@ -62,7 +83,8 @@ function layerSvg(dfd, parentId, system = {}) {
     };
     const ifaces = (system.interfaces || []).filter((itf) => !itf.hidden);
     const CHIP_W = 150;
-    const CHIP_H = 34;
+    const interfaceLabelLines = new Map(ifaces.map((itf) => [itf.id, wrapSvgText(itf.name, 24)]));
+    const CHIP_H = Math.max(34, ...[...interfaceLabelLines.values()].map((lines) => 20 + lines.length * 11));
     const GAP = 20;
     const CHIP_MEMBER_GAP = 74; // vertical breathing room between the chip row and the members
     const TB_PAD = 26;
@@ -196,7 +218,7 @@ function layerSvg(dfd, parentId, system = {}) {
                 `<rect x='${x}' y='${y}' width='${b.w}' height='${b.h}' fill='#fff' stroke='none'/>` +
                 `<line x1='${x}' y1='${y}' x2='${x + b.w}' y2='${y}' stroke='#333'/><line x1='${x}' y1='${y + b.h}' x2='${x + b.w}' y2='${y + b.h}' stroke='#333'/>`;
         else shape = `<rect x='${x}' y='${y}' width='${b.w}' height='${b.h}' fill='#fff' stroke='#333'/>`;
-        out.push(shape + `<text x='${x + b.w / 2}' y='${y + b.h / 2 + 4}' text-anchor='middle' font-size='10'>${esc((n.label || '').slice(0, 22))}</text>`);
+        out.push(shape + svgTextLines(b.labelLines, x + b.w / 2, y + b.h / 2 + 3, 12, "text-anchor='middle' font-size='10'"));
     }
     for (const itf of ifaces) {
         const b = chipBox.get(itf.id);
@@ -206,15 +228,26 @@ function layerSvg(dfd, parentId, system = {}) {
         out.push(
             `<rect x='${x}' y='${y}' width='${b.w}' height='${b.h}' rx='7' fill='#fff' stroke='#0f9d8f' stroke-width='1.3'/>` +
             `<text x='${x + 8}' y='${y + 14}' font-size='9' font-weight='700' fill='#0f9d8f'>${esc(itf.tag || itf.protocol || 'interface')}</text>` +
-            `<text x='${x + 8}' y='${y + 26}' font-size='9.5'>${esc((itf.name || '').slice(0, 22))}</text>`,
+            svgTextLines(interfaceLabelLines.get(itf.id), x + 8, y + 25 + ((interfaceLabelLines.get(itf.id).length - 1) * 11) / 2, 11, "font-size='9.5'"),
         );
     }
     // Flow labels on top so a shape never hides them.
+    const placedLabelBoxes = [];
     for (const l of labels) {
-        const w = Math.min(150, 6.2 * l.text.length + 10);
+        const lines = wrapSvgText(l.text, 28);
+        const w = Math.max(42, Math.min(180, Math.max(...lines.map((line) => line.length)) * 5.4 + 12));
+        const h = lines.length * 11 + 6;
+        let y = l.y;
+        let attempt = 0;
+        const overlaps = (box) => placedLabelBoxes.some((placed) => box.x < placed.x + placed.w && box.x + box.w > placed.x && box.y < placed.y + placed.h && box.y + box.h > placed.y);
+        while (overlaps({ x: l.x - w / 2, y: y - h / 2, w, h }) && attempt < 20) {
+            attempt += 1;
+            y = l.y + Math.ceil(attempt / 2) * (h + 4) * (attempt % 2 ? 1 : -1);
+        }
+        placedLabelBoxes.push({ x: l.x - w / 2, y: y - h / 2, w, h });
         out.push(
-            `<rect x='${l.x - w / 2}' y='${l.y - 8}' width='${w}' height='14' rx='3' fill='#ffffff' fill-opacity='0.9' stroke='#e2e5ea'/>` +
-            `<text x='${l.x}' y='${l.y + 2}' text-anchor='middle' font-size='9' fill='#1d2430'>${esc(l.text.slice(0, 24))}</text>`,
+            `<rect x='${l.x - w / 2}' y='${y - h / 2}' width='${w}' height='${h}' rx='3' fill='#ffffff' fill-opacity='0.9' stroke='#e2e5ea'/>` +
+            svgTextLines(lines, l.x, y + 3, 11, "text-anchor='middle' font-size='9' fill='#1d2430'"),
         );
     }
     return `<svg width='${Math.min(W, 900)}' height='${Math.min(H, 620)}' viewBox='0 0 ${W} ${H}' xmlns='http://www.w3.org/2000/svg'><defs><marker id='a' markerWidth='8' markerHeight='8' refX='7' refY='3' orient='auto'><path d='M0,0L7,3L0,6' fill='#6b7688'/></marker></defs>${out.join('')}</svg>`;
@@ -702,10 +735,19 @@ export async function buildReport(id) {
     const strideSection = strideCov.length
         ? `<h2>STRIDE-per-element coverage</h2><p>✓ = at least one threat of that category on the element; · = candidate gap.</p><table><tr><th>Element</th><th>S</th><th>T</th><th>R</th><th>I</th><th>D</th><th>E</th></tr>${strideRows}</table>`
         : '';
+    const componentsById = new Map((system.components || []).map((component) => [component.id, component]));
+    const componentsByTag = new Map((system.components || []).filter((component) => component.tag).map((component) => [component.tag, component]));
+    const dfdNodesById = new Map((dfd.nodes || []).map((node) => [node.id, node]));
+    const boundaryMemberName = (memberId) => {
+        const node = dfdNodesById.get(memberId);
+        const component = componentsById.get(memberId) || componentsById.get(node?.componentRef) || componentsByTag.get(memberId);
+        return component?.name || node?.label || memberId;
+    };
     const tbRows = (system.trustBoundaries || [])
         .map((b) => {
             const crossing = (dfd.flows || []).filter((f) => f.crossesBoundary === b.id).map((f) => f.id);
-            return `<tr><td><b>${esc(b.id)}</b> ${esc(b.name)}</td><td>${esc((b.members || []).join(', '))}</td><td>${esc(crossing.join(', ')) || '—'}</td></tr>`;
+            const members = (b.members || []).map(boundaryMemberName);
+            return `<tr><td><b>${esc(b.id)}</b> ${esc(b.name)}</td><td>${esc(members.join(', '))}</td><td>${esc(crossing.join(', ')) || '—'}</td></tr>`;
         })
         .join('');
     const tbSection = (system.trustBoundaries || []).length
