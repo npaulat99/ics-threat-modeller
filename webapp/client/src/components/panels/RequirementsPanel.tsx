@@ -92,7 +92,7 @@ export default function RequirementsPanel() {
                                 <div id={`f-requirements-${r.id}`} className={'itemcard collapsed' + (focusId === r.id ? ' focused' : '')} key={r.id}>
                                     <div className="head">
                                         <span className="summary-id">{r.id}</span>
-                                        <span className="summary-title">{r.text || '(untitled requirement)'}</span>
+                                        <span className="summary-title" title={r.text || undefined}>{r.text || '(untitled requirement)'}</span>
                                         {r.fromCountermeasure || (r.satisfiedByCM || []).length ? (
                                             <span className="tag" title="Realises a countermeasure that reduces a threat's risk">is CM</span>
                                         ) : !(r.derivedFromThreat || []).length ? (

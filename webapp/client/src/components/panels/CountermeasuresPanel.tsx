@@ -421,7 +421,7 @@ export default function CountermeasuresPanel() {
                                 <div className="itemcard collapsed" key={c.id}>
                                     <div className="head">
                                         <span className="summary-id">{c.id}</span>
-                                        <span className="summary-title">{c.title}</span>
+                                        <span className="summary-title" title={c.title}>{c.title}</span>
                                         <span className="tag">{c.type || 'preventive'}</span>
                                         <label className="inline" style={{ gap: 5 }} title="Choose to implement">
                                             <input type="checkbox" checked={isSelected(c)} onChange={(e) => toggleSelected(c, e.target.checked)} />
@@ -508,7 +508,7 @@ export default function CountermeasuresPanel() {
                                 <div id={`f-countermeasures-${c.id}`} className={'itemcard collapsed' + (focusId === c.id ? ' focused' : '')} key={c.id} style={!addr.length ? { borderColor: '#f0c9a8' } : undefined}>
                                     <div className="head">
                                         <span className="summary-id">{c.id}</span>
-                                        <span className="summary-title">{c.title}</span>
+                                        <span className="summary-title" title={c.title}>{c.title}</span>
                                         <span className="tag">{c.type || 'preventive'}</span>
                                         <span className="tag statuspill">{c.status || 'proposed'}</span>
                                         <button className="btn sm" onClick={() => setEditingId(c.id)}>

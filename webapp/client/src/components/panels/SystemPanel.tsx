@@ -287,7 +287,7 @@ export default function SystemPanel() {
                                     <div className="itemcard collapsed" key={c.id}>
                                         <div className="head">
                                             <span className="summary-id">{c.id}</span>
-                                            <span className="summary-title">{c.name}</span>
+                                            <span className="summary-title" title={c.name}>{c.name}</span>
                                             <button className="btn sm" onClick={() => openStrideBoundary(c.id)} title="Edit the STRIDE strengths/weaknesses analysis for this boundary">
                                                 STRIDE
                                             </button>
@@ -394,7 +394,7 @@ export default function SystemPanel() {
                                         <div id={`f-system-${c.id}`} className={'itemcard collapsed' + (focusId === c.id ? ' focused' : '')} key={c.id}>
                                             <div className="head">
                                                 <span className="summary-id">{c.id}</span>
-                                                <span className="summary-title">{c.name}</span>
+                                                <span className="summary-title" title={c.name}>{c.name}</span>
                                                 <span className="tag">{c.type || 'function'}</span>
                                                 <span className="tag" title="Confidentiality / Integrity / Availability / Safety">
                                                     C{o.confidentiality ?? 0}/I{o.integrity ?? 0}/A{o.availability ?? 0}/S{o.safety ?? 0}

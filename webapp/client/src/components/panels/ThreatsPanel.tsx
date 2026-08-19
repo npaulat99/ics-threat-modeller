@@ -343,7 +343,7 @@ export default function ThreatsPanel() {
                                 <div id={`f-threats-${t.id}`} className={'itemcard collapsed' + (focusId === t.id ? ' focused' : '')} key={t.id} style={orphan ? { borderColor: '#f0c9a8' } : undefined}>
                                     <div className="head">
                                         <span className="summary-id">{t.id}</span>
-                                        <span className="summary-title">{t.title}</span>
+                                        <span className="summary-title" title={t.title}>{t.title}</span>
                                         <RiskPill score={r.initial} band={r.initialBand} title="Initial risk" />
                                         <span className="muted">→</span>
                                         <RiskPill score={r.residual} band={r.residualBand} title="Residual risk" />
