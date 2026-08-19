@@ -713,6 +713,7 @@ textarea {
 
 /* ---- Risk matrix --------------------------------------------------------- */
 .matrix {
+    position: relative;
     display: grid;
     grid-template-columns: 22px repeat(5, 1fr);
     grid-auto-rows: 30px;
@@ -728,6 +729,42 @@ textarea {
     font-size: 11px;
     font-weight: 600;
     position: relative;
+}
+
+.matrix-boundaries {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: 22px repeat(5, 1fr);
+    grid-template-rows: repeat(6, 30px);
+    gap: 3px;
+    pointer-events: none;
+    z-index: 3;
+}
+
+.matrix-boundaries span {
+    position: relative;
+}
+
+.matrix-boundaries .boundary-top::before,
+.matrix-boundaries .boundary-right::after {
+    content: '';
+    position: absolute;
+    background: var(--text);
+}
+
+.matrix-boundaries .boundary-top::before {
+    top: -2px;
+    left: -1px;
+    right: -1px;
+    height: 4px;
+}
+
+.matrix-boundaries .boundary-right::after {
+    top: -1px;
+    right: -2px;
+    bottom: -1px;
+    width: 4px;
 }
 
 .matrix .axis {
@@ -760,6 +797,13 @@ textarea {
     font-size: 11px;
     color: var(--text-faint);
     margin: 6px 0;
+}
+
+.matrix-threshold-key {
+    width: 14px;
+    height: 4px;
+    background: var(--text);
+    display: inline-block;
 }
 
 /* ---- DFD canvas ---------------------------------------------------------- */

@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react';
 import { useStore } from '../state/store';
 import { riskOf, band, bandsOf, descendantComponentIds } from '../lib/risk';
+import { DEFAULT_ACCEPTABLE_RISK } from '../types';
 
 /**
  * 5×5 residual-risk heat map. Optionally filtered to a single component (when a DFD node
@@ -31,6 +32,15 @@ export default function RiskMatrix({ componentRef }: { componentRef?: string }) 
 
     const impacts = [5, 4, 3, 2, 1];
     const likes = [1, 2, 3, 4, 5];
+    const acceptableRisk = typeof data.project.acceptableRisk === 'number' ? data.project.acceptableRisk : DEFAULT_ACCEPTABLE_RISK;
+    const isAcceptable = (likelihood: number, impact: number) => likelihood * impact <= acceptableRisk;
+    const boundaryClass = (likelihood: number, impact: number) => {
+        const acceptable = isAcceptable(likelihood, impact);
+        const classes: string[] = [];
+        if (impact < 5 && acceptable !== isAcceptable(likelihood, impact + 1)) classes.push('boundary-top');
+        if (likelihood < 5 && acceptable !== isAcceptable(likelihood + 1, impact)) classes.push('boundary-right');
+        return classes.join(' ');
+    };
     const openCell = (ids: string[]) => {
         if (ids.length === 1) goto('threats', ids[0]);
         else if (ids.length > 1) setPreviewIds(ids);
@@ -51,7 +61,7 @@ export default function RiskMatrix({ componentRef }: { componentRef?: string }) 
                             const n = ids.length;
                             return (
                                 <div
-                                    className={'cell' + (n ? ' hit' : '')}
+                                    className={'cell ' + boundaryClass(L, I) + (n ? ' hit' : '')}
                                     key={`${L}-${I}`}
                                     role={n ? 'button' : undefined}
                                     tabIndex={n ? 0 : undefined}
@@ -74,6 +84,21 @@ export default function RiskMatrix({ componentRef }: { componentRef?: string }) 
                         })}
                     </Fragment>
                 ))}
+                <div className="matrix-boundaries" aria-hidden="true">
+                    {impacts.map((I, rowIndex) =>
+                        likes.map((L) => {
+                            const boundary = boundaryClass(L, I);
+                            if (!boundary) return null;
+                            return (
+                                <span
+                                    key={`${L}-${I}`}
+                                    className={boundary}
+                                    style={{ gridColumn: L + 1, gridRow: rowIndex + 1 }}
+                                />
+                            );
+                        }),
+                    )}
+                </div>
                 <div className="cell axis" />
                 {likes.map((L) => (
                     <div className="cell axis" key={`l-${L}`}>
@@ -94,6 +119,10 @@ export default function RiskMatrix({ componentRef }: { componentRef?: string }) 
                         <span className="hint">{b.name}</span>
                     </span>
                 ))}
+                <span className="inline" style={{ gap: 4 }}>
+                    <span className="matrix-threshold-key" aria-hidden="true" />
+                    <span className="hint">acceptable risk: {acceptableRisk}</span>
+                </span>
             </div>
             {previewIds.length > 1 ? (
                 <div className="modal-overlay" onClick={() => setPreviewIds([])}>
