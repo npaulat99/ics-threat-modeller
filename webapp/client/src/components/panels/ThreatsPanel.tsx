@@ -366,7 +366,7 @@ export default function ThreatsPanel() {
                                             <>
                                                 <span className="lbl">Assets:</span>
                                                 {(t.assets || []).map((aid) => (
-                                                    <Jump key={aid} view="system" id={aid} />
+                                                    <Jump key={aid} view="system" id={aid} title={assetOpts.find((a) => a.value === aid) ? `${aid} · ${assetOpts.find((a) => a.value === aid)!.label}` : undefined} />
                                                 ))}
                                             </>
                                         ) : null}
