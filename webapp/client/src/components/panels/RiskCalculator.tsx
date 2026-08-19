@@ -70,15 +70,11 @@ export default function RiskCalculator({
     upd,
     likelihoodField = 'likelihood',
     impactField = 'impact',
-    summary = 'Guided rating - Bug Bar impact + attacker-grounded likelihood (optional)',
-    defaultOpen = false,
 }: {
     t: GuidedRiskModel;
     upd: (patch: any) => void;
     likelihoodField?: 'likelihood' | 'residualLikelihood';
     impactField?: 'impact' | 'residualImpact';
-    summary?: string;
-    defaultOpen?: boolean;
 }) {
     const likelihood = Number((t as any)[likelihoodField] ?? 0);
     const impact = Number((t as any)[impactField] ?? 0);
@@ -136,9 +132,7 @@ export default function RiskCalculator({
 
     return (
         <>
-            <details className="calc" open={defaultOpen}>
-                <summary>{summary}</summary>
-
+            <div className="calc">
                 <div className="calcgrid">
                     <div>
                         <div className="calchead">
@@ -253,7 +247,7 @@ export default function RiskCalculator({
                     </label>
                     {t.ratedAt && <span className="hint">last rated {t.ratedAt}</span>}
                 </div>
-            </details>
+            </div>
             {bbOpen && (
                 <div className="modal-overlay" onClick={() => setBbOpen(false)}>
                     <div className="modal" role="dialog" aria-modal="true" aria-label="Bug Bar impact rating reference" onClick={(e) => e.stopPropagation()}>

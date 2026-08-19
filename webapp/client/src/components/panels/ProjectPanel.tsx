@@ -310,7 +310,6 @@ export default function ProjectPanel() {
                 <div className="row">
                     <Field
                         label="Modelling depth"
-                        hint="Defines how far inside the device you model."
                     >
                         <select value={p.scope?.mode || 'graybox'} onChange={(e) => setScope({ mode: e.target.value })}>
                             <option value="blackbox">Black-box — external interfaces only</option>
@@ -318,7 +317,7 @@ export default function ProjectPanel() {
                             <option value="whitebox">White-box — full internals</option>
                         </select>
                     </Field>
-                    <Field label="Target Security Level" hint="IEC 62443-4-2 SL-T, for example SL2.">
+                    <Field label="Target Security Level">
                         <input value={p.slTarget || ''} onChange={(e) => set({ slTarget: e.target.value })} placeholder="SL2" />
                     </Field>
                     <Field label="Status">

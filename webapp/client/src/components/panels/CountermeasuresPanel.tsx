@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore, uid } from '../../state/store';
-import { Field, Chips, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, RiskPill, Jump, HelpButton, confirmDelete, IdInput } from '../common';
+import { Field, TagSelect, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, RiskPill, Jump, HelpButton, confirmDelete, IdInput } from '../common';
 import { band } from '../../lib/risk';
 import RiskCalculator from './RiskCalculator';
 import ThreatCmImportExport from '../ThreatCmImportExport';
@@ -141,7 +141,7 @@ export default function CountermeasuresPanel() {
                 </div>
 
                 <Field label="Addresses threats" hint={!addrThreatIds.length ? 'A countermeasure must address at least one threat.' : undefined}>
-                    <Chips options={threatOpts} value={addrThreatIds} onChange={toggleThreat} empty="Define threats in step 05 first." />
+                    <TagSelect options={threatOpts} value={addrThreatIds} onChange={toggleThreat} empty="Define threats in step 05 first." />
                 </Field>
 
                 {(c.addresses || []).length > 0 && (
@@ -188,7 +188,7 @@ export default function CountermeasuresPanel() {
                                             </select>
                                         </Field>
                                         <Field label="Residual interfaces / vectors">
-                                            <Chips options={ifaceOpts} value={residualIfaces} onChange={(v) => updAddr(a.threat, { interfaceRefs: v, interfaceRef: v[0] || undefined })} empty="No interfaces defined in step 03 yet." />
+                                            <TagSelect options={ifaceOpts} value={residualIfaces} onChange={(v) => updAddr(a.threat, { interfaceRefs: v, interfaceRef: v[0] || undefined })} empty="No interfaces defined in step 03 yet." />
                                             <input className="inp" style={{ marginTop: 6 }} value={a.interfaceLabel ?? t?.interfaceLabel ?? ''} placeholder="Optional custom vector" onChange={(e) => updAddr(a.threat, { interfaceLabel: e.target.value || undefined })} />
                                         </Field>
                                     </div>
@@ -207,8 +207,6 @@ export default function CountermeasuresPanel() {
                                             upd={(patch) => updAddr(a.threat, patch)}
                                             likelihoodField="residualLikelihood"
                                             impactField="residualImpact"
-                                            summary="Open Bug Bar, likelihood factors and CVSS tools for the residual assessment"
-                                            defaultOpen={true}
                                         />
                                     </div>
                                     {(t?.likelihoodRationale || t?.impactRationale || t?.interfaceLabel || t?.interfaceRefs?.length || t?.interfaceRef) && (
@@ -227,7 +225,7 @@ export default function CountermeasuresPanel() {
 
                 <div className="grid3">
                     <Field label="Affected components">
-                        <Chips options={compOpts} value={c.components || []} onChange={(v) => upd({ components: v })} />
+                        <TagSelect options={compOpts} value={c.components || []} onChange={(v) => upd({ components: v })} empty="Define components in step 03 first." />
                     </Field>
                     <Field label="IEC 62443 reference (optional)">
                         <input value={c.iec62443Ref || ''} onChange={(e) => upd({ iec62443Ref: e.target.value })} placeholder="CR 1.2 / FR1" />

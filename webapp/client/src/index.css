@@ -627,6 +627,24 @@ textarea {
     opacity: 1;
 }
 
+/* tag select (searchless dropdown-add + removable tags), for large option lists */
+.tagselect {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tagselect-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tagselect-add {
+    max-width: 340px;
+    color: var(--text-dim);
+}
+
 .version-history-list {
     display: grid;
     gap: 10px;
@@ -1422,15 +1440,7 @@ button.linkbtn {
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
-    padding: 4px 10px 10px;
-}
-
-.calc>summary {
-    cursor: pointer;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--text-dim);
-    padding: 7px 2px;
+    padding: 12px 10px;
 }
 
 .calcgrid {
@@ -2014,6 +2024,20 @@ button.linkbtn {
     border-radius: 10px;
     padding: 0 6px;
     margin-left: 5px;
+}
+
+/* Secondary in-card tabs (e.g. threat editor's "details" / "risk rating" sections) */
+.subtabs {
+    margin-top: 12px;
+}
+
+.tabs.sub {
+    margin: 0 0 12px;
+}
+
+.tabs.sub .tab {
+    padding: 6px 12px;
+    font-size: 13px;
 }
 
 .itemcard textarea.grow {

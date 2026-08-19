@@ -4,7 +4,7 @@
 // Two interchangeable views: an indented list and a graphical (node-and-gate) diagram.
 import { useState } from 'react';
 import { useStore, uid } from '../../state/store';
-import { Chips, Field, HelpButton, confirmDelete, IdInput } from '../common';
+import { TagSelect, Field, HelpButton, confirmDelete, IdInput } from '../common';
 import { evaluate, COST_FACTORS, updateNode, addChild, removeNode, moveChild, adId, KIND_LABEL, likelihoodFromProb, newNode, GATES, ADD_KINDS, ACCESS_OPTS, SKILL_OPTS, accessLabel, skillLabel } from '../../lib/attackTree';
 import AttackTreeDiagram from './AttackTreeDiagram';
 import type { AdGate, AdKind, AdNode, AttackTree } from '../../types';
@@ -174,7 +174,7 @@ function TreeCard({ tree, view }: { tree: AttackTree; view: 'list' | 'diagram' }
             </div>
 
             <Field label="Linked threats">
-                <Chips
+                <TagSelect
                     options={threats.map((t) => ({ value: t.id, label: `${t.id} · ${t.title}` }))}
                     value={linkedThreatIds}
                     onChange={setThreatLinks}

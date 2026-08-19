@@ -1,7 +1,7 @@
 // Security requirements (methodology step 05) — the traceable bridge threat -> risk ->
 // requirement -> control that IEC 62443-4-1 (SR) and the CRA expect.
 import { useStore, uid } from '../../state/store';
-import { Field, Chips, useFocus, useEditMode, EditBackBar, Jump, HelpButton, confirmDelete, IdInput } from '../common';
+import { Field, TagSelect, useFocus, useEditMode, EditBackBar, Jump, HelpButton, confirmDelete, IdInput } from '../common';
 import type { Requirement } from '../../types';
 
 export default function RequirementsPanel() {
@@ -62,10 +62,10 @@ export default function RequirementsPanel() {
                                     </Field>
                                 </div>
                                 <Field label="Derived from threats">
-                                    <Chips options={threatOpts} value={r.derivedFromThreat || []} onChange={(v) => upd({ derivedFromThreat: v })} empty="No threats yet." />
+                                    <TagSelect options={threatOpts} value={r.derivedFromThreat || []} onChange={(v) => upd({ derivedFromThreat: v })} empty="No threats yet." />
                                 </Field>
                                 <Field label="Satisfied by countermeasures">
-                                    <Chips options={cmOpts} value={r.satisfiedByCM || []} onChange={(v) => upd({ satisfiedByCM: v, fromCountermeasure: v.length ? true : r.fromCountermeasure })} empty="No countermeasures yet." />
+                                    <TagSelect options={cmOpts} value={r.satisfiedByCM || []} onChange={(v) => upd({ satisfiedByCM: v, fromCountermeasure: v.length ? true : r.fromCountermeasure })} empty="No countermeasures yet." />
                                 </Field>
                                 <label className="inline" style={{ gap: 7, alignItems: 'flex-start', marginTop: 4 }}>
                                     <input type="checkbox" checked={!!r.fromCountermeasure || (r.satisfiedByCM || []).length > 0} disabled={(r.satisfiedByCM || []).length > 0} onChange={(e) => upd({ fromCountermeasure: e.target.checked })} style={{ marginTop: 3 }} />

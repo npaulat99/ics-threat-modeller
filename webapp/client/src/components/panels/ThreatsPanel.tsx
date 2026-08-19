@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore, uid } from '../../state/store';
-import { Field, Chips, STRIDE, sortStride, RiskPill, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, Jump, HelpButton, confirmDelete, IdInput } from '../common';
+import { Field, Chips, TagSelect, cx, STRIDE, sortStride, RiskPill, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, Jump, HelpButton, confirmDelete, IdInput } from '../common';
 import { ID_PATTERN } from '../../lib/ids';
 import { riskOf } from '../../lib/risk';
 import { adId } from '../../lib/attackTree';
@@ -20,6 +20,8 @@ export default function ThreatsPanel() {
     const cms = data.countermeasures.countermeasures || [];
     const focusId = useFocus('threats');
     const { editingId, setEditingId } = useEditMode(focusId);
+    const [editTab, setEditTab] = useState<'details' | 'risk'>('details');
+    useEffect(() => setEditTab('details'), [editingId]);
     const cmsFor = (tid: string) => cms.filter((c) => (c.addresses || []).some((a) => a.threat === tid));
     const requirements = data.requirements?.requirements || [];
     const requirementOpts = requirements.map((r) => ({ value: r.id, label: `${r.id} · ${r.text}` }));
@@ -172,69 +174,81 @@ export default function ThreatsPanel() {
                 )}
 
                 <Field label="Affected components" hint={orphan ? 'A threat must affect at least one component.' : undefined}>
-                    <Chips options={compOpts} value={t.components || []} onChange={(v) => upd({ components: v })} empty="Define components in step 03 first." />
+                    <TagSelect options={compOpts} value={t.components || []} onChange={(v) => upd({ components: v })} empty="Define components in step 03 first." />
                 </Field>
-                <details className="calc">
-                    <summary>More details — assets, attacker, interface, assumptions</summary>
-                    <div className="grid3">
-                        <Field label="Affected assets">
-                            <Chips options={assetOpts} value={t.assets || []} onChange={(v) => upd({ assets: v })} empty="No assets yet." />
-                        </Field>
-                        <Field label="Attacker profile" hint="Used to ground likelihood.">
-                            <select value={t.attackerRef || ''} onChange={(e) => upd({ attackerRef: e.target.value })}>
-                                <option value="">— none —</option>
-                                {attackers.map((a) => (
-                                    <option key={a.id} value={a.id}>
-                                        {a.name} (cap {a.capability}, {a.access})
-                                    </option>
-                                ))}
-                            </select>
-                        </Field>
-                        <Field label="Affected interfaces / vectors" hint="Split by interface if the risk differs.">
-                            <Chips options={ifaceOpts} value={interfaceRefs} onChange={setInterfaces} empty="No interfaces defined in step 03 yet." />
-                            <input
-                                className="inp"
-                                style={{ marginTop: 6 }}
-                                placeholder="Optional custom vector, e.g. over USB service port"
-                                value={t.interfaceLabel || ''}
-                                onChange={(e) => upd({ interfaceLabel: e.target.value || undefined })}
-                            />
-                            {interfaceRefs.length > 1 && !t.interfaceLabel && (
-                                <button type="button" className="btn sm" style={{ marginTop: 6 }} onClick={splitByInterface}>
-                                    Split into one threat per interface
-                                </button>
-                            )}
-                        </Field>
+                <div className="subtabs">
+                    <div className="tabs sub">
+                        <button type="button" className={cx('tab', editTab === 'details' && 'active')} onClick={() => setEditTab('details')}>
+                            Assets, attacker &amp; interface
+                        </button>
+                        <button type="button" className={cx('tab', editTab === 'risk' && 'active')} onClick={() => setEditTab('risk')}>
+                            Risk rating
+                        </button>
                     </div>
-                    <div className="grid2">
-                        <Field label="Likelihood rationale">
-                            <textarea value={t.likelihoodRationale || ''} onChange={(e) => upd({ likelihoodRationale: e.target.value })} />
-                        </Field>
-                        <Field label="Impact rationale">
-                            <textarea value={t.impactRationale || ''} onChange={(e) => upd({ impactRationale: e.target.value })} />
-                        </Field>
-                    </div>
-                    <Field label="Supporting assumptions" hint="Cite assumptions that justify feasibility or the chosen risk rating.">
-                        <Chips options={assumptionOpts} value={t.assumptionRefs || []} onChange={(v) => upd({ assumptionRefs: v })} empty="No assumptions defined in step 02 yet." />
-                        {(t.assumptionRefs || []).length ? (
-                            <ul style={{ margin: '8px 0 0 18px' }}>
-                                {(t.assumptionRefs || []).map((aid) => {
-                                    const ref = assumptionById.get(aid);
-                                    const validId = ID_PATTERN.test(aid);
-                                    if (!validId) return <li key={aid}><b>{aid}</b> · invalid ID format</li>;
-                                    if (!ref) return <li key={aid}><b>{aid}</b> · assumption not found</li>;
-                                    return <li key={aid}><b>{aid}</b> ({ref.source}) · {ref.text || 'No detail text'}</li>;
-                                })}
-                            </ul>
-                        ) : null}
-                    </Field>
-                </details>
-                <RiskCalculator t={t} upd={upd} />
+                    {editTab === 'details' ? (
+                        <div className="calc">
+                            <div className="grid3">
+                                <Field label="Affected assets">
+                                    <TagSelect options={assetOpts} value={t.assets || []} onChange={(v) => upd({ assets: v })} empty="No assets yet." />
+                                </Field>
+                                <Field label="Attacker profile" hint="Grounds the likelihood rating.">
+                                    <select value={t.attackerRef || ''} onChange={(e) => upd({ attackerRef: e.target.value })}>
+                                        <option value="">— none —</option>
+                                        {attackers.map((a) => (
+                                            <option key={a.id} value={a.id}>
+                                                {a.name} (cap {a.capability}, {a.access})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </Field>
+                                <Field label="Affected interfaces / vectors" hint="Split by interface if the risk differs.">
+                                    <TagSelect options={ifaceOpts} value={interfaceRefs} onChange={setInterfaces} empty="No interfaces defined in step 03 yet." />
+                                    <input
+                                        className="inp"
+                                        style={{ marginTop: 6 }}
+                                        placeholder="Optional custom vector, e.g. over USB service port"
+                                        value={t.interfaceLabel || ''}
+                                        onChange={(e) => upd({ interfaceLabel: e.target.value || undefined })}
+                                    />
+                                    {interfaceRefs.length > 1 && !t.interfaceLabel && (
+                                        <button type="button" className="btn sm" style={{ marginTop: 6 }} onClick={splitByInterface}>
+                                            Split into one threat per interface
+                                        </button>
+                                    )}
+                                </Field>
+                            </div>
+                            <div className="grid2">
+                                <Field label="Likelihood rationale">
+                                    <textarea value={t.likelihoodRationale || ''} onChange={(e) => upd({ likelihoodRationale: e.target.value })} />
+                                </Field>
+                                <Field label="Impact rationale">
+                                    <textarea value={t.impactRationale || ''} onChange={(e) => upd({ impactRationale: e.target.value })} />
+                                </Field>
+                            </div>
+                            <Field label="Supporting assumptions" hint="Assumptions that justify feasibility or the chosen risk rating.">
+                                <TagSelect options={assumptionOpts} value={t.assumptionRefs || []} onChange={(v) => upd({ assumptionRefs: v })} empty="No assumptions defined in step 02 yet." />
+                                {(t.assumptionRefs || []).length ? (
+                                    <ul style={{ margin: '8px 0 0 18px' }}>
+                                        {(t.assumptionRefs || []).map((aid) => {
+                                            const ref = assumptionById.get(aid);
+                                            const validId = ID_PATTERN.test(aid);
+                                            if (!validId) return <li key={aid}><b>{aid}</b> · invalid ID format</li>;
+                                            if (!ref) return <li key={aid}><b>{aid}</b> · assumption not found</li>;
+                                            return <li key={aid}><b>{aid}</b> ({ref.source}) · {ref.text || 'No detail text'}</li>;
+                                        })}
+                                    </ul>
+                                ) : null}
+                            </Field>
+                        </div>
+                    ) : (
+                        <RiskCalculator t={t} upd={upd} />
+                    )}
+                </div>
                 <Field
                     label={t.status === 'transferred' ? 'Risk transfer requirements' : 'Linked requirements / rationale'}
                     hint="Link requirements that mitigate this threat or justify why its residual risk is accepted or transferred."
                 >
-                    <Chips options={requirementOpts} value={linkedRequirementIds} onChange={(v) => setThreatRequirements(t.id, v)} empty="Define requirements in step 05 first." />
+                    <TagSelect options={requirementOpts} value={linkedRequirementIds} onChange={(v) => setThreatRequirements(t.id, v)} empty="Define requirements in step 05 first." />
                 </Field>
                 {t.status === 'accepted' && (
                     <div className="grid3" style={{ marginTop: 8 }}>

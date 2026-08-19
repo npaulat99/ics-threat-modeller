@@ -3,7 +3,7 @@ import { useStore, uid } from '../state/store';
 import { validate, openIssues } from '../lib/validate';
 import { riskOf, descendantComponentIds } from '../lib/risk';
 import RiskMatrix from './RiskMatrix';
-import { RiskPill, Chips, IdInput } from './common';
+import { RiskPill, TagSelect, IdInput } from './common';
 import type { DfdNodeType, UseCaseArrow, UseCaseEntityKind } from '../types';
 
 const HANDLE_OPTS = [
@@ -100,7 +100,7 @@ function NodeInspector() {
             {isTb ? (
                 <div className="field">
                     <label>Members (a trust boundary must contain at least one)</label>
-                    <Chips
+                    <TagSelect
                         options={siblings.map((s) => ({ value: s.id, label: s.label }))}
                         value={node.members || []}
                         onChange={(v) => updNode({ members: v })}
@@ -521,7 +521,7 @@ function UcGroupInspector() {
             </div>
             <div className="field">
                 <label>Members</label>
-                <Chips
+                <TagSelect
                     options={diagram.entities.map((e) => ({ value: e.id, label: e.name || e.id }))}
                     value={group.members || []}
                     onChange={(v) => upd({ members: v })}
