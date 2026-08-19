@@ -144,7 +144,7 @@ export function TagSelect({
     addLabel = '+ Add…',
     label,
 }: {
-    options: { value: string; label: string }[];
+    options: { value: string; label: string; title?: string }[];
     value: string[];
     onChange: (next: string[]) => void;
     empty?: string;
@@ -152,7 +152,8 @@ export function TagSelect({
     label?: string;
 }) {
     const selected = value || [];
-    const labelOf = (v: string) => options.find((o) => o.value === v)?.label || v;
+    const optOf = (v: string) => options.find((o) => o.value === v);
+    const labelOf = (v: string) => optOf(v)?.label || v;
     const available = options.filter((o) => !selected.includes(o.value));
     if (!options.length) return <span className="hint">{empty || 'Nothing to select from yet.'}</span>;
     return (
@@ -160,7 +161,7 @@ export function TagSelect({
             <div className="tagselect-tags">
                 {selected.length ? (
                     selected.map((v) => (
-                        <span className="chip on" key={v}>
+                        <span className="chip on" key={v} title={optOf(v)?.title}>
                             {labelOf(v)}
                             <button
                                 type="button"
@@ -186,7 +187,7 @@ export function TagSelect({
                 >
                     <option value="">{addLabel}</option>
                     {available.map((o) => (
-                        <option key={o.value} value={o.value}>
+                        <option key={o.value} value={o.value} title={o.title}>
                             {o.label}
                         </option>
                     ))}

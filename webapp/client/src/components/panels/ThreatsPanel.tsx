@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore, uid } from '../../state/store';
 import { Field, Chips, TagSelect, cx, STRIDE, sortStride, RiskPill, useFocus, useEditMode, EditBackBar, ScaleSelect, LIKELIHOOD_LEVELS, IMPACT_LEVELS, Jump, HelpButton, confirmDelete, IdInput } from '../common';
-import { ID_PATTERN } from '../../lib/ids';
 import { riskOf } from '../../lib/risk';
 import { adId } from '../../lib/attackTree';
 import RiskCalculator from './RiskCalculator';
@@ -20,11 +19,11 @@ export default function ThreatsPanel() {
     const cms = data.countermeasures.countermeasures || [];
     const focusId = useFocus('threats');
     const { editingId, setEditingId } = useEditMode(focusId);
-    const [editTab, setEditTab] = useState<'details' | 'risk'>('details');
-    useEffect(() => setEditTab('details'), [editingId]);
+    const [editTab, setEditTab] = useState<'classification' | 'details' | 'risk'>('classification');
+    useEffect(() => setEditTab('classification'), [editingId]);
     const cmsFor = (tid: string) => cms.filter((c) => (c.addresses || []).some((a) => a.threat === tid));
     const requirements = data.requirements?.requirements || [];
-    const requirementOpts = requirements.map((r) => ({ value: r.id, label: `${r.id} · ${r.text}` }));
+    const requirementOpts = requirements.map((r) => ({ value: r.id, label: r.id, title: r.text }));
     const compOpts = (data.system.components || []).map((c) => ({ value: c.id, label: `${c.name}` }));
     const assetOpts = (data.system.assets || []).map((a) => ({ value: a.id, label: a.name }));
     const attackers = data.assumptions.attacker || [];
@@ -35,8 +34,7 @@ export default function ThreatsPanel() {
         ...(data.assumptions.operational || []).map((x) => ({ id: x.id, text: x.text || '', source: 'Operational' })),
         ...(attackers || []).map((x) => ({ id: x.id, text: x.text || x.name || '', source: 'Attacker' })),
     ];
-    const assumptionById = new Map(assumptionRows.map((x) => [x.id, x]));
-    const assumptionOpts = assumptionRows.map((x) => ({ value: x.id, label: `${x.id} · ${x.source}${x.text ? ` · ${x.text.slice(0, 64)}` : ''}` }));
+    const assumptionOpts = assumptionRows.map((x) => ({ value: x.id, label: `${x.id} · ${x.source}`, title: x.text || undefined }));
 
     const trees = data.attackTrees?.trees || [];
     const treeThreatRefs = (tree: any) => [...new Set([...(tree.threatRefs || []), ...(tree.threatRef ? [tree.threatRef] : [])])];
@@ -142,42 +140,15 @@ export default function ThreatsPanel() {
                         </Field>
                     </div>
                 </div>
-                <div className="grid2">
-                    <Field label="Classification">
-                        <select value={t.classification || ''} onChange={(e) => upd({ classification: e.target.value || undefined })}>
-                            <option value="">— none —</option>
-                            <option value="product-vulnerability">product-vulnerability</option>
-                            <option value="protocol-limitation">protocol-limitation</option>
-                            <option value="deployment-risk">deployment-risk</option>
-                            <option value="shared-responsibility">shared-responsibility</option>
-                        </select>
-                    </Field>
-                    <Field label="Responsibility">
-                        <select value={t.responsibility || ''} onChange={(e) => upd({ responsibility: e.target.value || undefined })}>
-                            <option value="">— none —</option>
-                            <option value="manufacturer">manufacturer</option>
-                            <option value="integrator-operator">integrator-operator</option>
-                            <option value="shared">shared</option>
-                        </select>
-                    </Field>
-                </div>
-                <Field label="Classification rationale">
-                    <textarea value={t.classificationRationale || ''} onChange={(e) => upd({ classificationRationale: e.target.value || undefined })} />
-                </Field>
-                {(t.classification === 'protocol-limitation' || t.classification === 'deployment-risk' || t.classification === 'shared-responsibility') && (
-                    <Field
-                        label="Deployment constraints"
-                        hint="Compensating controls required outside this component (segmentation, physical protection, gateway architecture, monitoring) for the residual risk to be acceptable in an actual deployment."
-                    >
-                        <textarea value={t.deploymentConstraints || ''} onChange={(e) => upd({ deploymentConstraints: e.target.value || undefined })} />
-                    </Field>
-                )}
 
                 <Field label="Affected components" hint={orphan ? 'A threat must affect at least one component.' : undefined}>
                     <TagSelect options={compOpts} value={t.components || []} onChange={(v) => upd({ components: v })} empty="Define components in step 03 first." />
                 </Field>
                 <div className="subtabs">
                     <div className="tabs sub">
+                        <button type="button" className={cx('tab', editTab === 'classification' && 'active')} onClick={() => setEditTab('classification')}>
+                            Classification
+                        </button>
                         <button type="button" className={cx('tab', editTab === 'details' && 'active')} onClick={() => setEditTab('details')}>
                             Assets, attacker &amp; interface
                         </button>
@@ -185,7 +156,41 @@ export default function ThreatsPanel() {
                             Risk rating
                         </button>
                     </div>
-                    {editTab === 'details' ? (
+                    {editTab === 'classification' && (
+                        <div className="calc">
+                            <div className="grid2">
+                                <Field label="Classification">
+                                    <select value={t.classification || ''} onChange={(e) => upd({ classification: e.target.value || undefined })}>
+                                        <option value="">— none —</option>
+                                        <option value="product-vulnerability">product-vulnerability</option>
+                                        <option value="protocol-limitation">protocol-limitation</option>
+                                        <option value="deployment-risk">deployment-risk</option>
+                                        <option value="shared-responsibility">shared-responsibility</option>
+                                    </select>
+                                </Field>
+                                <Field label="Responsibility">
+                                    <select value={t.responsibility || ''} onChange={(e) => upd({ responsibility: e.target.value || undefined })}>
+                                        <option value="">— none —</option>
+                                        <option value="manufacturer">manufacturer</option>
+                                        <option value="integrator-operator">integrator-operator</option>
+                                        <option value="shared">shared</option>
+                                    </select>
+                                </Field>
+                            </div>
+                            <Field label="Classification rationale">
+                                <textarea value={t.classificationRationale || ''} onChange={(e) => upd({ classificationRationale: e.target.value || undefined })} />
+                            </Field>
+                            {(t.classification === 'protocol-limitation' || t.classification === 'deployment-risk' || t.classification === 'shared-responsibility') && (
+                                <Field
+                                    label="Deployment constraints"
+                                    hint="Compensating controls required outside this component (segmentation, physical protection, gateway architecture, monitoring) for the residual risk to be acceptable in an actual deployment."
+                                >
+                                    <textarea value={t.deploymentConstraints || ''} onChange={(e) => upd({ deploymentConstraints: e.target.value || undefined })} />
+                                </Field>
+                            )}
+                        </div>
+                    )}
+                    {editTab === 'details' && (
                         <div className="calc">
                             <div className="grid3">
                                 <Field label="Affected assets">
@@ -227,22 +232,10 @@ export default function ThreatsPanel() {
                             </div>
                             <Field label="Supporting assumptions" hint="Assumptions that justify feasibility or the chosen risk rating.">
                                 <TagSelect options={assumptionOpts} value={t.assumptionRefs || []} onChange={(v) => upd({ assumptionRefs: v })} empty="No assumptions defined in step 02 yet." />
-                                {(t.assumptionRefs || []).length ? (
-                                    <ul style={{ margin: '8px 0 0 18px' }}>
-                                        {(t.assumptionRefs || []).map((aid) => {
-                                            const ref = assumptionById.get(aid);
-                                            const validId = ID_PATTERN.test(aid);
-                                            if (!validId) return <li key={aid}><b>{aid}</b> · invalid ID format</li>;
-                                            if (!ref) return <li key={aid}><b>{aid}</b> · assumption not found</li>;
-                                            return <li key={aid}><b>{aid}</b> ({ref.source}) · {ref.text || 'No detail text'}</li>;
-                                        })}
-                                    </ul>
-                                ) : null}
                             </Field>
                         </div>
-                    ) : (
-                        <RiskCalculator t={t} upd={upd} />
                     )}
+                    {editTab === 'risk' && <RiskCalculator t={t} upd={upd} />}
                 </div>
                 <Field
                     label={t.status === 'transferred' ? 'Risk transfer requirements' : 'Linked requirements / rationale'}
