@@ -367,7 +367,7 @@ export interface CountermeasuresDoc {
 // ---- Attack-Defense Trees (Kordy et al. 2010; Jhawar et al. 2015 SAND) -------------------
 export type AdGate = 'AND' | 'OR' | 'SAND';
 export type AdKind = 'goal' | 'path' | 'step' | 'substep' | 'category' | 'countermeasure' | 'vulnerability';
-/** Per-substep cost factors (1=very low … 5=very high), from notes/topics/bewertung.typ. */
+/** Per-step cost factors scored with the factor-specific 1-5 enumerations in lib/attackTree.ts. */
 export interface AdCost {
     time?: number;
     exploitability?: number;

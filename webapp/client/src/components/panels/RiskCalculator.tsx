@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
 import { deriveImpact, deriveLikelihood, exposureFromInterface } from '../../lib/risk';
 import { cvssBaseScore } from '../../lib/cvss';
-import { accessProbability, ACCESS_OPTS, COST_FACTORS, likelihoodFromProb, SKILL_OPTS, stepProb } from '../../lib/attackTree';
+import { accessProbability, ACCESS_OPTS, COST_FACTOR_LEVELS, COST_FACTORS, likelihoodFromProb, SKILL_OPTS, stepProb } from '../../lib/attackTree';
 import BugBarTable from '../BugBarTable';
 import type { Threat } from '../../types';
 
@@ -52,7 +52,7 @@ function CostRiskCalculator({ t, upd }: { t: GuidedRiskModel; upd: (patch: any) 
             <div className="costgrid" style={{ marginTop: 10 }}>
                 {COST_FACTORS.map((factor) => (
                     <div key={factor.k} className="minifield">
-                        <label><span>{factor.label}</span><select className="inp" value={(factors as any)[factor.k] ?? 3} onChange={(e) => update({ costFactors: { ...factors, [factor.k]: Number(e.target.value) } })}>{[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value} · {value === 1 ? 'very low' : value === 2 ? 'low' : value === 3 ? 'moderate' : value === 4 ? 'high' : 'very high'}</option>)}</select></label>
+                        <label><span>{factor.label}</span><select className="inp" value={(factors as any)[factor.k] ?? 3} onChange={(e) => update({ costFactors: { ...factors, [factor.k]: Number(e.target.value) } })}>{COST_FACTOR_LEVELS[factor.k].map(([value, label]) => <option key={value} value={value}>{value} · {label}</option>)}</select></label>
                         <textarea className="inp" rows={2} style={{ marginTop: 4 }} value={(rationales as any)[factor.k] || ''} placeholder="Assessment reason" onChange={(e) => update({ costRationales: { ...rationales, [factor.k]: e.target.value } })} />
                     </div>
                 ))}

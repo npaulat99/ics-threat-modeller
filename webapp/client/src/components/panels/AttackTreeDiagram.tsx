@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom';
 import { useStore } from '../../state/store';
 import {
     evaluate,
+    COST_FACTOR_LEVELS,
     COST_FACTORS,
     KIND_LABEL,
     GATES,
@@ -177,7 +178,7 @@ function CostAssessment({
                     <label key={factor.k} className="minifield">
                         <span>{factor.label} ({factor.weight})</span>
                         <select className="inp" value={cost?.[factor.k] ?? 3} onChange={(e) => onChange({ ...(cost || {}), [factor.k]: Number(e.target.value) }, { ...(rationales || {}) })}>
-                            {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value} · {value === 1 ? 'Very low' : value === 2 ? 'Low' : value === 3 ? 'Moderate' : value === 4 ? 'High' : 'Very high'}</option>)}
+                            {COST_FACTOR_LEVELS[factor.k].map(([value, label]) => <option key={value} value={value}>{value} · {label}</option>)}
                         </select>
                         <textarea className="inp" rows={2} value={rationales?.[factor.k] || ''} placeholder="Assessment reason" onChange={(e) => onChange({ ...(cost || {}) }, { ...(rationales || {}), [factor.k]: e.target.value })} />
                     </label>

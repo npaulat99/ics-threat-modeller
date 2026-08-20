@@ -9,11 +9,11 @@
   var GATES = ["AND", "OR", "SAND"];
   var STRUCTURAL = ["goal", "step", "substep", "category"];
   var COST_FACTORS = [
-    { k: "time", label: "Time", weight: 0.25 },
+    { k: "time", label: "Time effort", weight: 0.25 },
     { k: "exploitability", label: "Exploitability", weight: 0.2 },
     { k: "window", label: "Window of opportunity", weight: 0.15 },
-    { k: "detection", label: "Detection likelihood", weight: 0.15 },
-    { k: "notoriety", label: "Notoriety / prior knowledge", weight: 0.1 },
+    { k: "detection", label: "Detection probability", weight: 0.15 },
+    { k: "notoriety", label: "Prior knowledge", weight: 0.1 },
     { k: "prep", label: "Preparation effort", weight: 0.1 },
     { k: "abort", label: "Abort risk", weight: 0.05 },
   ];

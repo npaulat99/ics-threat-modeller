@@ -97,6 +97,15 @@ const KINDS=['goal','step','substep','category','countermeasure','vulnerability'
 const ADD_KINDS=['step','substep','category','countermeasure','vulnerability'];
 const ACCESS=[[1,'Remote (unauth.)'],[2,'Remote (auth.)'],[3,'Adjacent / fieldbus'],[4,'Local (on site)'],[5,'Physical (enclosure)']];
 const SKILL=[[1,'Script kiddie'],[2,'Experienced hacker'],[3,'Security engineer'],[4,'Expert team'],[5,'Nation-state']];
+const COST_LEVELS={
+  time:[[1,'Minutes'],[2,'Hours'],[3,'Days'],[4,'Weeks'],[5,'Months+']],
+  notoriety:[[1,'Public'],[2,'Known'],[3,'Limited'],[4,'Internal'],[5,'Unknown']],
+  exploitability:[[1,'Trivial'],[2,'Easy'],[3,'Moderate'],[4,'Difficult'],[5,'Very Difficult']],
+  window:[[1,'Permanent'],[2,'Regular'],[3,'Occasional'],[4,'Brief'],[5,'One-Time']],
+  detection:[[1,'None'],[2,'Low'],[3,'Moderate'],[4,'High'],[5,'Very High']],
+  prep:[[1,'None'],[2,'Software setup'],[3,'Test environment'],[4,'Procure'],[5,'Infrastructure']],
+  abort:[[1,'Robust'],[2,'Rare'],[3,'Moderate'],[4,'Frequent'],[5,'Very Likely']]
+};
 let doc={trees:[]}, ti=0, focus=null, cms=[], threats=[];
 const $=id=>document.getElementById(id);
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -146,7 +155,7 @@ function renderInspector(){
   if(isStep){
     html+='<div class="field"><label>Required access</label><select class="inp" id="in-access">'+opt(ACCESS,n.access||3)+'</select></div>';
     html+='<div class="field"><label>Required skill</label><select class="inp" id="in-skill">'+opt(SKILL,n.skill||2)+'</select></div>';
-    html+='<div class="field"><label>Cost factors (1 easy … 5 hard)</label><div class="costgrid">'+M.COST_FACTORS.map(function(f){var v=(n.cost||{})[f.k];return '<label class="hint">'+esc(f.label)+'<select class="inp" data-cost="'+f.k+'"><option value="">–</option>'+[1,2,3,4,5].map(function(x){return '<option'+(+v===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></label>';}).join('')+'</div></div>';
+    html+='<div class="field"><label>Cost factors</label><div class="costgrid">'+M.COST_FACTORS.map(function(f){var v=(n.cost||{})[f.k];return '<label class="hint">'+esc(f.label)+'<select class="inp" data-cost="'+f.k+'"><option value="">–</option>'+(COST_LEVELS[f.k]||[]).map(function(o){return '<option value="'+o[0]+'"'+(+v===o[0]?' selected':'')+'>'+o[0]+' · '+esc(o[1])+'</option>';}).join('')+'</select></label>';}).join('')+'</div></div>';
   }
   if(n.kind==='countermeasure')html+='<div class="field"><label>Linked countermeasure</label><select class="inp" id="in-cmref"><option value="">(link CM…)</option>'+cms.map(function(c){return '<option value="'+esc(c.id)+'"'+(n.countermeasureRef===c.id?' selected':'')+'>'+esc(c.id)+' · '+esc(c.title)+'</option>';}).join('')+'</select></div>';
   html+='<div class="field"><label>Add child</label><div class="chips">'+ADD_KINDS.map(function(k){return '<span class="chip" role="button" tabindex="0" data-addkind="'+k+'">+ '+esc(M.KIND_LABEL[k])+'</span>';}).join('')+'</div></div>';

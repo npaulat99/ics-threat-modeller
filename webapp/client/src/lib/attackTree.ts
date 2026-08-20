@@ -4,14 +4,24 @@
 import type { AdCost, AdGate, AdKind, AdNode } from '../types';
 
 export const COST_FACTORS: { k: keyof AdCost; label: string; weight: number }[] = [
-    { k: 'time', label: 'Time', weight: 0.25 },
+    { k: 'time', label: 'Time effort', weight: 0.25 },
     { k: 'exploitability', label: 'Exploitability', weight: 0.2 },
     { k: 'window', label: 'Window of opportunity', weight: 0.15 },
-    { k: 'detection', label: 'Detection likelihood', weight: 0.15 },
-    { k: 'notoriety', label: 'Notoriety / prior knowledge', weight: 0.1 },
+    { k: 'detection', label: 'Detection probability', weight: 0.15 },
+    { k: 'notoriety', label: 'Prior knowledge', weight: 0.1 },
     { k: 'prep', label: 'Preparation effort', weight: 0.1 },
     { k: 'abort', label: 'Abort risk', weight: 0.05 },
 ];
+
+export const COST_FACTOR_LEVELS: Record<keyof AdCost, [number, string][]> = {
+    time: [[1, 'Minutes'], [2, 'Hours'], [3, 'Days'], [4, 'Weeks'], [5, 'Months+']],
+    notoriety: [[1, 'Public'], [2, 'Known'], [3, 'Limited'], [4, 'Internal'], [5, 'Unknown']],
+    exploitability: [[1, 'Trivial'], [2, 'Easy'], [3, 'Moderate'], [4, 'Difficult'], [5, 'Very Difficult']],
+    window: [[1, 'Permanent'], [2, 'Regular'], [3, 'Occasional'], [4, 'Brief'], [5, 'One-Time']],
+    detection: [[1, 'None'], [2, 'Low'], [3, 'Moderate'], [4, 'High'], [5, 'Very High']],
+    prep: [[1, 'None'], [2, 'Software setup'], [3, 'Test environment'], [4, 'Procure'], [5, 'Infrastructure']],
+    abort: [[1, 'Robust'], [2, 'Rare'], [3, 'Moderate'], [4, 'Frequent'], [5, 'Very Likely']],
+};
 
 export type CostWeights = Partial<Record<keyof AdCost, number>>;
 

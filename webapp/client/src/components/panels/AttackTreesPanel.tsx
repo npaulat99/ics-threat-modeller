@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { useStore, uid } from '../../state/store';
 import { TagSelect, Field, HelpButton, confirmDelete, IdInput } from '../common';
-import { evaluate, COST_FACTORS, updateNode, addChild, removeNode, moveChild, adId, KIND_LABEL, likelihoodFromProb, newNode, GATES, ADD_KINDS, ACCESS_OPTS, SKILL_OPTS, accessLabel, skillLabel, accessProbability } from '../../lib/attackTree';
+import { evaluate, COST_FACTOR_LEVELS, COST_FACTORS, updateNode, addChild, removeNode, moveChild, adId, KIND_LABEL, likelihoodFromProb, newNode, GATES, ADD_KINDS, ACCESS_OPTS, SKILL_OPTS, accessLabel, skillLabel, accessProbability } from '../../lib/attackTree';
 import { deriveImpact } from '../../lib/risk';
 import AttackTreeDiagram from './AttackTreeDiagram';
 import type { AdGate, AdKind, AdNode, AttackTree } from '../../types';
@@ -97,8 +97,8 @@ function NodeRow({ node, depth, ops }: { node: AdNode; depth: number; ops: Ops }
                                     <span title={`weight ${f.weight}`}>{f.label}</span>
                                     <select className="inp" value={(node.cost as any)?.[f.k] ?? ''} onChange={(e) => ops.upd(node.id, { cost: { ...(node.cost || {}), [f.k]: e.target.value === '' ? undefined : Number(e.target.value) } })}>
                                         <option value="">–</option>
-                                        {[1, 2, 3, 4, 5].map((n) => (
-                                            <option key={n} value={n}>{n}</option>
+                                        {COST_FACTOR_LEVELS[f.k].map(([value, label]) => (
+                                            <option key={value} value={value}>{value} · {label}</option>
                                         ))}
                                     </select>
                                 </label>
