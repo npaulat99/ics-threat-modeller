@@ -58,6 +58,11 @@ export default function SettingsModal() {
         set({ costFactorWeights: nextWeights });
         syncCostLikelihoods(nextWeights);
     };
+    const restoreDefaultWeights = () => {
+        const defaultWeights = Object.fromEntries(COST_FACTORS.map((factor) => [factor.k, factor.weight]));
+        set({ costFactorWeights: defaultWeights });
+        syncCostLikelihoods(defaultWeights);
+    };
     const setAccessProbability = (level: 1 | 2 | 3 | 4 | 5, value: number) => {
         const nextAccessProbabilities = { ...(p.accessProbabilities || {}), [level]: Math.max(0.05, Math.min(1, value || 0.05)) };
         set({ accessProbabilities: nextAccessProbabilities });
@@ -100,6 +105,11 @@ export default function SettingsModal() {
                                         />
                                     </Field>
                                 ))}
+                                <div className="settings-weight-restore">
+                                    <button className="btn sm" type="button" onClick={restoreDefaultWeights}>
+                                        Restore defaults
+                                    </button>
+                                </div>
                             </div>
                             <h4 style={{ margin: '14px 0 6px' }}>Access probabilities</h4>
                             <p className="hint">Probability of obtaining each required access level. Values must be from 0.05 to 1.00.</p>
