@@ -281,9 +281,9 @@ export default function ThreatsPanel() {
                 Enumerate STRIDE threats and link each one to the affected components and assets.
             </p>
             <div className="assessment-basis" role="note">
-                <span className="assessment-basis-label">Assessment basis</span>
+                <span className="assessment-basis-label">Attacker Profile</span>
                 {attacker ? (
-                    <span>{attacker.name} <span className="muted">· capability {attacker.capability} · selected from the project SL-C target</span></span>
+                    <span>{attacker.name} <span className="muted">· capability {attacker.capability}</span></span>
                 ) : (
                     <span className="warnmark">Select a target SL-C level in Project settings to establish the assessment attacker.</span>
                 )}
