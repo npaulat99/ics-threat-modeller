@@ -203,6 +203,17 @@ const residualTree = { id: "s", kind: "step", label: "Protected", cost: all(2), 
 const residualMetrics = AtModel.evaluate(residualTree, {});
 ok("vulnerability residual cost overrides defence residual cost", residualMetrics.prob === 1 && residualMetrics.skillReq === 4 && residualMetrics.accessReq === 5);
 
+const aggregationFixture = JSON.parse(fs.readFileSync(path.join(root, "webapp/projects/test/07-attack-trees/attack-trees.json"), "utf8"));
+const aggregationById = Object.fromEntries(aggregationFixture.trees.map((fixture) => [fixture.id, fixture]));
+const fixtureOr = AtModel.evaluate(aggregationById["AT-TEST-OR"].root, {});
+ok("fixture OR chooses critical vulnerability vector", fixtureOr.prob === 1 && fixtureOr.accessReq === 1 && fixtureOr.skillReq === 1);
+const fixtureAnd = AtModel.evaluate(aggregationById["AT-TEST-AND"].root, {});
+ok("fixture AND multiplies and takes max requirements", Math.abs(fixtureAnd.prob - 0.32) < 1e-9 && fixtureAnd.accessReq === 4 && fixtureAnd.skillReq === 3);
+const fixtureSand = AtModel.evaluate(aggregationById["AT-TEST-SAND"].root, {});
+ok("fixture SAND multiplies and takes max requirements", Math.abs(fixtureSand.prob - 0.32) < 1e-9 && fixtureSand.accessReq === 5 && fixtureSand.skillReq === 5);
+const fixtureResidual = AtModel.evaluate(aggregationById["AT-TEST-RESIDUAL"].root, {});
+ok("fixture vulnerability overrides defence residual at leaf step", fixtureResidual.prob === 1 && fixtureResidual.accessReq === 5 && fixtureResidual.skillReq === 4);
+
 const html = AtModel.toHtml(tree.root);
 ok("toHtml nests gates", html.includes("[OR]") && html.includes("[AND]"));
 const r = AtModel.render(tree, "s1");

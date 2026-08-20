@@ -63,6 +63,7 @@ const nextGate = (g?: AdGate): AdGate => GATES[(GATES.indexOf(g || 'AND') + 1) %
 
 export default function AttackTreeDiagram({ tree, ops }: { tree: AttackTree; ops: Ops }) {
     const cms = useStore((s) => s.data!.countermeasures.countermeasures || []);
+    const weights = useStore((s) => s.data!.project.costFactorWeights);
     const cmById = useMemo(() => new Map(cms.map((c) => [c.id, c])), [cms]);
     const [selId, setSelId] = useState<string | null>(tree.root.id);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -127,9 +128,9 @@ export default function AttackTreeDiagram({ tree, ops }: { tree: AttackTree; ops
                     {edges}
                     {gates}
                     {placed.map(({ node, x, y }) => {
-                        const isStep = node.kind === 'step' || node.kind === 'substep';
-                        const hasStructuralKids = (node.children || []).some((c) => c.kind !== 'countermeasure' && c.kind !== 'vulnerability');
                         const cm = node.countermeasureRef ? cmById.get(node.countermeasureRef) : undefined;
+                        const metrics = evaluate(node, cmById, weights);
+                        const showMetrics = node.kind === 'goal' || node.kind === 'step' || node.kind === 'substep';
                         return (
                             <foreignObject key={node.id} x={x - NW / 2} y={y} width={NW} height={NH}>
                                 <div
@@ -139,9 +140,7 @@ export default function AttackTreeDiagram({ tree, ops }: { tree: AttackTree; ops
                                 >
                                     <div className="adt-node-kind">{KIND_LABEL[node.kind]}</div>
                                     <div className="adt-node-label" onDoubleClick={() => setEditingId(node.id)}>{node.label}</div>
-                                    {isStep && !hasStructuralKids && (
-                                        <div className="adt-node-sub">acc {node.access ?? '–'} · skill {node.skill ?? '–'}</div>
-                                    )}
+                                    {showMetrics && <div className="adt-node-sub">acc {metrics.accessReq || '–'} · skill {metrics.skillReq || '–'} · {Math.round(metrics.prob * 100)}%</div>}
                                     {node.kind === 'countermeasure' && <div className="adt-node-sub">{cm ? `${cm.id}` : 'unlinked'}</div>}
                                 </div>
                             </foreignObject>
