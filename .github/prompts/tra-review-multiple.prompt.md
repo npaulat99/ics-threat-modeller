@@ -11,6 +11,10 @@ Then add a **cross-project consistency** section:
 - Same or similar component/interface `kind`+`protocol` rated with materially different likelihood or
   impact across projects, without an apparent reason (different attacker assumptions, different
   exposure) — flag as a possible inconsistency.
+- Compare projects using their declared `riskScoringMethod`. For cost-based projects, compare
+  required access/skill, cost-factor values, weights, calculated cost likelihood, proposed matrix
+  likelihood, and documented overrides. Do not compare raw cost probabilities as if they were
+  matrix scores, and do not flag a difference caused by a documented scheme or context change.
 - The same threat pattern (matching a `knowledge-base/ot-threats.json` `key`, or clearly the same
   scenario) mitigated with different countermeasure types or left unmitigated in one project but
   addressed in another.

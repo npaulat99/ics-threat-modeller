@@ -30,12 +30,26 @@ For each proposed threat, use the `Threat` schema field names exactly (see
 `title`, `stride` (subset of S/T/R/I/D/E), `components`, `assets`, `attackerRef`, `interfaceRef`,
 `likelihood` (1-5), `impact` (1-5), `likelihoodRationale`, `impactRationale`.
 
+Read `project.riskScoringMethod` before rating threats. Both schemes retain the common 1-5
+`likelihood` and `impact` fields because they drive the shared risk matrix and traceability chain.
+For `exposure-exploitability-impact`, assess `likelihoodFactors` (`exposure` and
+`exploitability`) and `impactDimensions` when rigorous mode is enabled. For `cost-based`, also
+assess `requiredSkill`, `requiredAccess`, every `costFactors` dimension (`time`, `exploitability`,
+`window`, `detection`, `notoriety`, `prep`, `abort`), and a `costRationales` entry for each one.
+Use the project's cost weights, access probabilities, and likelihood thresholds when available.
+Report the calculated `costLikelihood` (0-1) and the resulting `costLikelihoodProposal` (1-5),
+then state whether the selected matrix `likelihood` agrees with that proposal. Do not invent missing
+weights, thresholds, attacker capability, or cost evidence; turn each missing item into a focused
+question for the Facilitator.
+
 Present each as:
 
 - **Threat**: title + STRIDE categories.
 - **Evidence**: the specific component/interface/attacker ids that justify it existing at all.
 - **Proposed rating**: likelihood, impact, each with one sentence of rationale referencing the
   attacker's capability/access vs. the interface's exposure.
+- **Cost-based assessment** (when selected): required access/skill, the seven cost-factor values,
+  rationale for each factor, calculated probability, proposed likelihood, and any manual override.
 - **Confidence**: state if this is a strong or weak inference, and what would firm it up.
 
 Do not propose a rating you cannot justify from cited evidence — flag it as an open question for the

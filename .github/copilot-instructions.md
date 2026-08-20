@@ -9,7 +9,7 @@ EmbedRisk is a Threat and Risk Assessment (TRA) toolset for embedded OT/ICS fiel
 - [knowledge-base/](../knowledge-base/) — reusable JSON catalogues (`ot-attackers.json`, `ot-threats.json`, `ot-countermeasures.json`) of attacker profiles, STRIDE/CVSS v4.0 threats, and countermeasures.
 - [tools/](../tools/) — standalone Node/Python scripts for DFD<->draw.io conversion and HTML report generation.
 
-A TRA project is a folder with one JSON artifact per step: `01-project-description` -> `02-assumptions` -> `03-system-assets` -> `04-dfd` -> `05-requirements` -> `06-threats` -> `07-attack-trees` -> `08-countermeasures` -> `09-defects`, plus a generated `report/index.html`. The core traceability chain is **asset -> threat -> risk rating (Likelihood x Impact, CIA + Safety) -> requirement -> countermeasure -> residual risk**. See [README.md](../README.md) and [docs/HOW-TO-TRA.md](../docs/HOW-TO-TRA.md) for the full methodology.
+A TRA project is a folder with one JSON artifact per step: `01-project-description` -> `02-assumptions` -> `03-system-assets` -> `04-dfd` -> `05-requirements` -> `06-threats` -> `07-attack-trees` -> `08-countermeasures` -> `09-defects`, plus a generated `report/index.html`. The core traceability chain is **asset -> threat -> risk rating (common Likelihood x Impact matrix, CIA + Safety, optionally supported by exposure/exploitability or cost-based feasibility) -> requirement -> countermeasure -> residual risk**. See [README.md](../README.md) and [docs/HOW-TO-TRA.md](../docs/HOW-TO-TRA.md) for the full methodology.
 
 ### Repo-specific things to keep in mind
 

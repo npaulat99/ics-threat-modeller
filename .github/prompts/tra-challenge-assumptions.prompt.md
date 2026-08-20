@@ -11,7 +11,9 @@ promoted into that file) for the project provided. For each assumption (or the o
   deployment, or attacker landscape changed since it was recorded?
 - Trace forward: which threats (`06-threats/threats.json`, via `assumptionRefs`) or attacker profiles
   depend on this assumption, and how would their rating change if the assumption were false or
-  weaker than stated?
+  weaker than stated? Use the project's `riskScoringMethod`: for cost-based threats, include any
+  affected required access/skill, cost factor, cost rationale, or `costLikelihoodProposal`; for the
+  other scheme, include affected exposure/exploitability and impact evidence.
 - Offer at least one plausible alternative assumption and its consequence, explicitly labeled as
   speculation for discussion, not a recommendation to adopt.
 
