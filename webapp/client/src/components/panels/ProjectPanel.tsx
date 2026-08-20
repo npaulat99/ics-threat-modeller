@@ -418,7 +418,7 @@ export default function ProjectPanel() {
                     {(p.sbom?.mode || 'in-tool') === 'in-tool' ? (
                         <Field label="Format">
                             <select value={p.sbom?.format || 'cyclonedx'} onChange={(e) => setSbom({ format: e.target.value })}>
-                                <option value="cyclonedx">CycloneDX 1.5 (JSON)</option>
+                                <option value="cyclonedx">CycloneDX (JSON)</option>
                                 <option value="spdx">SPDX 2.3 (JSON)</option>
                             </select>
                         </Field>

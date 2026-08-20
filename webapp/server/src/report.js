@@ -391,7 +391,7 @@ export function buildTraceability({ system, threats, requirements, countermeasur
     });
 }
 
-/** CycloneDX 1.5 SBOM (+ VEX vulnerabilities from the defect register) from the component list. */
+/** CycloneDX SBOM (+ VEX vulnerabilities from the defect register) from the component list. */
 export function buildSbom({ project, system, defects = [] }) {
     const comps = (system.components || []).filter((c) => c.kind !== 'external-entity');
     return {
@@ -765,7 +765,7 @@ export async function buildReport(id) {
                 ? `<h2>Software bill of materials (SBOM)</h2><p>Provided externally: <a href='${esc(project.sbom.url)}'>${esc(project.sbom.url)}</a></p>`
                 : `<h2>Software bill of materials (SBOM)</h2><p>Declared as externally provided; no URL was recorded.</p>`
             : sbomRows
-                ? `<h2>Software bill of materials (SBOM)</h2><p>${sbomFormat === 'spdx' ? 'SPDX 2.3' : 'CycloneDX 1.5'} — <code>${esc(sbomFile)}</code></p><table><tr><th>Component</th><th>Version</th><th>Supplier</th><th>License</th><th>CPE / purl</th><th>Provenance</th></tr>${sbomRows}</table>`
+                ? `<h2>Software bill of materials (SBOM)</h2><p>${sbomFormat === 'spdx' ? 'SPDX 2.3' : 'CycloneDX'} — <code>${esc(sbomFile)}</code></p><table><tr><th>Component</th><th>Version</th><th>Supplier</th><th>License</th><th>CPE / purl</th><th>Provenance</th></tr>${sbomRows}</table>`
                 : '';
 
     const html =

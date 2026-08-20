@@ -483,7 +483,7 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
                 <option value="external">External</option>
               </select></div>
             <div class="field" id="p-sbom-fmt"><label>Format</label>
-              <select class="inp" id="p-sbom-format"><option value="cyclonedx">CycloneDX 1.5</option><option value="spdx">SPDX 2.3</option></select></div>
+              <select class="inp" id="p-sbom-format"><option value="cyclonedx">CycloneDX</option><option value="spdx">SPDX 2.3</option></select></div>
             <div class="field" id="p-sbom-url" style="display:none"><label>External SBOM URL</label>
               <input class="inp" id="p-sbom-url-inp" placeholder="https://…/device-sbom.cdx.json"></div>
           </div>
