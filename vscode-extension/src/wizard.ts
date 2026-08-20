@@ -607,7 +607,7 @@ function riskCell(t){var r=R.riskOf(t,cms);return pill(r.initial,r.initialBand)+
 function chip(text,on,attrs,title){return '<span class="chip'+(on?' on':'')+'" role="button" tabindex="0" '+attrs+(title?' title="'+esc(title)+'"':'')+'>'+esc(text)+'</span>';}
 
 const STEPS=[
-  ['01','Project','Scope, device, SL-T','scroll','#card-project','project'],
+  ['01','Project','Scope, device, SL-C','scroll','#card-project','project'],
   ['02','Assumptions','Device, system, environment, operational','scroll','#card-assumptions','assumptions'],
   ['03','System & Assets','Components, C/I/A/S','scroll','#card-system','system'],
   ['04','Data Flow Diagram','Layered DeMarco model','cmd','dfd','dfd'],

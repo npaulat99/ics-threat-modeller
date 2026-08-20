@@ -178,8 +178,24 @@ ok("remove root returns false", AtModel.remove(t3b.root, "g1") === false);
 const cmMap = { CM1: { status: "implemented" } };
 const met = AtModel.evaluate(tree.root, cmMap);
 ok("evaluate returns a probability in [0,1]", met.prob >= 0 && met.prob <= 1);
-ok("evaluate aggregates required access (AND/SAND = max of members)", AtModel.evaluate(AtModel.find(tree.root, "s1"), cmMap).accessReq === 5);
+ok("evaluate derives required access from leaf attack steps", AtModel.evaluate(AtModel.find(tree.root, "s1"), cmMap).accessReq === 4);
 ok("likelihoodFromProb maps to 1-5", AtModel.likelihoodFromProb(1) === 5 && AtModel.likelihoodFromProb(0.01) === 1);
+
+const all = (value) => ({ time: value, exploitability: value, window: value, detection: value, notoriety: value, prep: value, abort: value });
+const structuralGoal = { id: "g", kind: "goal", label: "Goal", gate: "AND", children: [{ id: "s", kind: "step", label: "Unassessed", children: [] }] };
+ok("goal and unassessed step contribute probability 1", AtModel.evaluate(structuralGoal, {}).prob === 1);
+const andTree = { id: "g", kind: "goal", label: "Goal", gate: "AND", children: [{ id: "a", kind: "step", label: "A", cost: all(2), children: [] }, { id: "b", kind: "step", label: "B", cost: all(4), children: [] }] };
+ok("AND multiplies sequential step probabilities", Math.abs(AtModel.evaluate(andTree, {}).prob - 0.32) < 1e-9);
+const derivedParent = { id: "p", kind: "step", label: "Parent", cost: all(5), access: 5, skill: 5, children: [{ id: "c", kind: "substep", label: "Child", cost: all(2), access: 2, skill: 3, children: [] }] };
+const derivedParentMetrics = AtModel.evaluate(derivedParent, {});
+ok("non-leaf steps derive probability and requirements from child steps", derivedParentMetrics.prob === 0.8 && derivedParentMetrics.accessReq === 2 && derivedParentMetrics.skillReq === 3);
+const legacyLevels = { id: "s", kind: "step", label: "Legacy", access: "local", skill: "expert", children: [] };
+ok("legacy text access and skill do not poison aggregation", AtModel.evaluate(legacyLevels, {}).accessReq === 0 && AtModel.evaluate(legacyLevels, {}).skillReq === 0);
+const categoryTree = { id: "c", kind: "category", label: "Alternatives", gate: "AND", children: [{ id: "a", kind: "step", label: "Easy", cost: all(1), children: [] }, { id: "b", kind: "step", label: "Hard", cost: all(5), children: [] }] };
+ok("categories are OR containers regardless of stored gate", AtModel.evaluate(categoryTree, {}).prob === 1);
+const residualTree = { id: "s", kind: "step", label: "Protected", cost: all(2), children: [{ id: "d", kind: "countermeasure", label: "Defence", residualCost: all(5), children: [] }, { id: "v", kind: "vulnerability", label: "Bypass", residualCost: all(1), skill: 4, access: 5, children: [] }] };
+const residualMetrics = AtModel.evaluate(residualTree, {});
+ok("vulnerability residual cost overrides defence residual cost", residualMetrics.prob === 1 && residualMetrics.skillReq === 4 && residualMetrics.accessReq === 5);
 
 const html = AtModel.toHtml(tree.root);
 ok("toHtml nests gates", html.includes("[OR]") && html.includes("[AND]"));

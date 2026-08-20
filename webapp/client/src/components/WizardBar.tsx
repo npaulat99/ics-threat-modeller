@@ -17,11 +17,11 @@ const LABEL: Record<string, string> = {
     versions: 'TRA versions',
 };
 const DONE_WHEN: Record<string, string> = {
-    project: 'the device, a one-sentence scope boundary and the SL-T are set.',
+    project: 'the device, a one-sentence scope boundary and the SL-C are set.',
     assumptions: 'at least one attacker profile is defined (it grounds the likelihood).',
     system: 'components and the protected assets (with C/I/A/S ratings) are listed.',
     dfd: 'the device, its trust boundaries and external interfaces are on the diagram.',
-    requirements: 'the security requirements (from the SL-T and security context) are captured; refine them against the threats.',
+    requirements: 'the security requirements (from the SL-C and security context) are captured; refine them against the threats.',
     threats: 'every component and interface has at least one rated STRIDE threat, linked to the requirements it violates.',
     attackTrees: 'optional — decompose your highest-risk threats (you can skip this).',
     countermeasures: 'each requirement is satisfied by a control with a residual rating.',

@@ -48,6 +48,10 @@ export interface AdMetrics {
     vulns: number;
 }
 
+const hasCostAssessment = (cost?: AdCost) => COST_FACTORS.some((factor) => typeof cost?.[factor.k] === 'number');
+const assessedStepProb = (cost: AdCost | undefined, weights?: CostWeights) => hasCostAssessment(cost) ? stepProb(cost, weights) : 1;
+const level = (value: unknown) => typeof value === 'number' && value >= 1 && value <= 5 ? value : 0;
+
 /**
  * Bottom-up evaluation returning the attacker's success probability of the *cheapest* path
  * (Kordy et al. attack–defense trees; Jhawar et al. SAND). Semantics:
@@ -66,11 +70,28 @@ const DEF_FACTOR: Record<string, number> = { proposed: 0.85, planned: 0.7, imple
 export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>, weights?: CostWeights): AdMetrics {
     const kids = (node.children || []).filter((c) => c.kind !== 'countermeasure' && c.kind !== 'vulnerability');
     const defChildren = (node.children || []).filter((c) => c.kind === 'countermeasure');
+    const vulnChildren = (node.children || []).filter((c) => c.kind === 'vulnerability');
     const ownDef = defChildren.length;
-    const ownVuln = (node.children || []).filter((c) => c.kind === 'vulnerability').length;
-    const selfProb = stepProb(node.cost, weights);
-    const selfSkill = node.skill || 0;
-    const selfAccess = node.access || 0;
+    const ownVuln = vulnChildren.length;
+    // A non-leaf attack step is structural: its cost, required skill, and required access are
+    // derived from the attack-step descendants rather than assessed independently.
+    const assessedNode = (node.kind === 'step' || node.kind === 'substep') && !kids.length;
+    let selfProb = assessedNode ? assessedStepProb(node.cost, weights) : 1;
+    let selfSkill = assessedNode ? level(node.skill) : 0;
+    let selfAccess = assessedNode ? level(node.access) : 0;
+
+    // Defence residual costs replace the parent step cost; a vulnerability represents a successful
+    // bypass and therefore has the final say. Among equivalent alternatives, use the attacker-favourable
+    // (highest-probability) vulnerability and the most protective defence.
+    const defenceResiduals = defChildren.filter((child) => hasCostAssessment(child.residualCost));
+    if (defenceResiduals.length) selfProb = Math.min(...defenceResiduals.map((child) => assessedStepProb(child.residualCost, weights)));
+    const vulnerabilityResiduals = vulnChildren.filter((child) => hasCostAssessment(child.residualCost));
+    if (vulnerabilityResiduals.length) {
+        const selected = vulnerabilityResiduals.reduce((best, child) => assessedStepProb(child.residualCost, weights) > assessedStepProb(best.residualCost, weights) ? child : best);
+        selfProb = assessedStepProb(selected.residualCost, weights);
+        selfSkill = level(selected.skill);
+        selfAccess = level(selected.access);
+    }
 
     let skillReq: number;
     let accessReq: number;
@@ -86,7 +107,7 @@ export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>
         const childM = kids.map((k) => evaluate(k, cmById, weights));
         defenses += childM.reduce((s, c) => s + c.defenses, 0);
         vulns += childM.reduce((s, c) => s + c.vulns, 0);
-        if (node.gate === 'OR') {
+        if (node.kind === 'category' || node.gate === 'OR') {
             const best = childM.reduce((a, b) => (b.prob > a.prob ? b : a));
             skillReq = Math.max(best.skillReq, selfSkill);
             accessReq = Math.max(best.accessReq, selfAccess);
@@ -97,8 +118,10 @@ export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>
             prob = childM.reduce((p, c) => p * c.prob, 1) * selfProb;
         }
     }
-    const defMult = defChildren.reduce((m, c) => m * (DEF_FACTOR[(c.countermeasureRef ? cmById?.get(c.countermeasureRef)?.status : '') ?? ''] ?? 0.6), 1);
-    prob = clamp01(prob * defMult * Math.pow(1.6, ownVuln));
+    const legacyDefChildren = defChildren.filter((child) => !hasCostAssessment(child.residualCost));
+    const legacyVulns = vulnChildren.filter((child) => !hasCostAssessment(child.residualCost)).length;
+    const defMult = legacyDefChildren.reduce((m, c) => m * (DEF_FACTOR[(c.countermeasureRef ? cmById?.get(c.countermeasureRef)?.status : '') ?? ''] ?? 0.6), 1);
+    prob = clamp01(prob * defMult * Math.pow(1.6, legacyVulns));
     return { skillReq, accessReq, prob, defenses, vulns };
 }
 

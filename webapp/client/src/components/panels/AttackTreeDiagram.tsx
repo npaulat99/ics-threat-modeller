@@ -4,6 +4,7 @@
 // with a connecting arc, SAND = AND arc carrying a left→right arrow (child order = execution order).
 // Attack, defence and vulnerability nodes are drawn the same way and may alternate recursively.
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../state/store';
 import {
     evaluate,
@@ -16,6 +17,7 @@ import {
     accessLabel,
     skillLabel,
 } from '../../lib/attackTree';
+import BugBarTable from '../BugBarTable';
 import type { AdGate, AdKind, AdNode, AttackTree } from '../../types';
 
 const NW = 182; // node width
@@ -63,6 +65,7 @@ export default function AttackTreeDiagram({ tree, ops }: { tree: AttackTree; ops
     const cms = useStore((s) => s.data!.countermeasures.countermeasures || []);
     const cmById = useMemo(() => new Map(cms.map((c) => [c.id, c])), [cms]);
     const [selId, setSelId] = useState<string | null>(tree.root.id);
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     const placed = useMemo(() => {
         const out: Placed[] = [];
@@ -94,7 +97,7 @@ export default function AttackTreeDiagram({ tree, ops }: { tree: AttackTree; ops
         edges.push(<path key={'stem' + node.id} className="adt-edge" d={`M ${px},${parentBottom} L ${px},${gateY}`} />);
         for (const k of kidPos) edges.push(<path key={'e' + node.id + k.node.id} className="adt-edge" d={`M ${px},${gateY} L ${k.x},${childTop}`} />);
 
-        const gate = node.gate || 'AND';
+        const gate = node.kind === 'category' ? 'OR' : node.gate || 'AND';
         if (gate !== 'OR') {
             const arcY = gateY + 22;
             const t = (arcY - gateY) / (childTop - gateY);
@@ -104,7 +107,7 @@ export default function AttackTreeDiagram({ tree, ops }: { tree: AttackTree; ops
             if (gate === 'SAND') gates.push(<path key={'arr' + node.id} className="adt-arrow" d={`M ${rx - 2},${arcY - 4.5} L ${rx + 6},${arcY} L ${rx - 2},${arcY + 4.5} Z`} />);
         }
         gates.push(
-            <g key={'g' + node.id} className="adt-gate" transform={`translate(${px},${gateY})`} onClick={() => ops.upd(node.id, { gate: nextGate(node.gate) })}>
+            <g key={'g' + node.id} className="adt-gate" transform={`translate(${px},${gateY})`} onClick={() => node.kind !== 'category' && ops.upd(node.id, { gate: nextGate(node.gate) })}>
                 <rect x={-22} y={-11} width={44} height={22} rx={11} />
                 <text x={0} y={4} textAnchor="middle">{gate}</text>
             </g>,
@@ -117,7 +120,7 @@ export default function AttackTreeDiagram({ tree, ops }: { tree: AttackTree; ops
                 <span className="adt-lg k-step">Attack</span>
                 <span className="adt-lg k-countermeasure">Defence</span>
                 <span className="adt-lg k-vulnerability">Vulnerability</span>
-                <span className="muted">· click a node to edit · click a gate to change AND / OR / SAND · SAND arrow = sequence</span>
+                <span className="muted">· double-click a node label to assess it · click a gate to change AND / OR / SAND · SAND arrow = sequence</span>
             </div>
             <div className="adt-canvas">
                 <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
@@ -135,7 +138,7 @@ export default function AttackTreeDiagram({ tree, ops }: { tree: AttackTree; ops
                                     title={node.label}
                                 >
                                     <div className="adt-node-kind">{KIND_LABEL[node.kind]}</div>
-                                    <div className="adt-node-label">{node.label}</div>
+                                    <div className="adt-node-label" onDoubleClick={() => setEditingId(node.id)}>{node.label}</div>
                                     {isStep && !hasStructuralKids && (
                                         <div className="adt-node-sub">acc {node.access ?? '–'} · skill {node.skill ?? '–'}</div>
                                     )}
@@ -147,123 +150,124 @@ export default function AttackTreeDiagram({ tree, ops }: { tree: AttackTree; ops
                 </svg>
             </div>
 
-            {selected && <NodeEditor node={selected} ops={ops} isRoot={selected.id === tree.root.id} cmById={cmById} cms={cms} />}
+            {editingId && posById.get(editingId)?.node && createPortal(
+                <div className="modal-overlay" onClick={() => setEditingId(null)}>
+                    <NodeAssessmentOverlay node={posById.get(editingId)!.node} ops={ops} isRoot={editingId === tree.root.id} cms={cms} onClose={() => setEditingId(null)} />
+                </div>,
+                document.body,
+            )}
         </div>
     );
 }
 
-function NodeEditor({
+function CostAssessment({
+    title,
+    cost,
+    rationales,
+    onChange,
+}: {
+    title: string;
+    cost?: AdNode['cost'];
+    rationales?: AdNode['costRationales'];
+    onChange: (cost: NonNullable<AdNode['cost']>, rationales: NonNullable<AdNode['costRationales']>) => void;
+}) {
+    return (
+        <section className="adt-assessment-section">
+            <h4>{title}</h4>
+            <div className="costgrid">
+                {COST_FACTORS.map((factor) => (
+                    <label key={factor.k} className="minifield">
+                        <span>{factor.label} ({factor.weight})</span>
+                        <select className="inp" value={cost?.[factor.k] ?? 3} onChange={(e) => onChange({ ...(cost || {}), [factor.k]: Number(e.target.value) }, { ...(rationales || {}) })}>
+                            {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value} · {value === 1 ? 'Very low' : value === 2 ? 'Low' : value === 3 ? 'Moderate' : value === 4 ? 'High' : 'Very high'}</option>)}
+                        </select>
+                        <textarea className="inp" rows={2} value={rationales?.[factor.k] || ''} placeholder="Assessment reason" onChange={(e) => onChange({ ...(cost || {}) }, { ...(rationales || {}), [factor.k]: e.target.value })} />
+                    </label>
+                ))}
+            </div>
+        </section>
+    );
+}
+
+function NodeAssessmentOverlay({
     node,
     ops,
     isRoot,
-    cmById,
     cms,
+    onClose,
 }: {
     node: AdNode;
     ops: Ops;
     isRoot: boolean;
-    cmById: Map<string, any>;
     cms: { id: string; title: string; status?: string }[];
+    onClose: () => void;
 }) {
-    const weights = useStore((s) => s.data!.project.costFactorWeights);
     const isStep = node.kind === 'step' || node.kind === 'substep';
+    const isGoal = node.kind === 'goal';
+    const isVulnerability = node.kind === 'vulnerability';
+    const isCountermeasure = node.kind === 'countermeasure';
     const isStructural = !['countermeasure', 'vulnerability'].includes(node.kind);
-    const hasStructuralKids = (node.children || []).some((c) => c.kind !== 'countermeasure' && c.kind !== 'vulnerability');
-    const m = evaluate(node, cmById, weights);
+    const hasAttackChildren = (node.children || []).some((child) => child.kind === 'step' || child.kind === 'substep');
+    const weights = useStore((s) => s.data!.project.costFactorWeights);
+    const metrics = hasAttackChildren ? evaluate(node, new Map(cms.map((countermeasure) => [countermeasure.id, countermeasure])), weights) : null;
+    const setImpact = (key: 'confidentiality' | 'integrity' | 'availability' | 'safety', value: number) => ops.upd(node.id, { impactDimensions: { ...(node.impactDimensions || {}), [key]: value } });
     return (
-        <div className="adt-editor">
-            <div className="adt-editrow">
+        <div className="modal adt-page-modal" role="dialog" aria-modal="true" aria-label={`Assess ${node.label}`} onClick={(event) => event.stopPropagation()}>
+            <div className="modalhead">
                 <span className={'adkind k-' + node.kind}>{KIND_LABEL[node.kind]}</span>
                 <input className="inp grow" value={node.label} onChange={(e) => ops.upd(node.id, { label: e.target.value })} />
-                {isStructural && (
-                    <select className="inp" style={{ width: 92 }} value={node.gate || 'AND'} onChange={(e) => ops.upd(node.id, { gate: e.target.value as AdGate })} title="How the children combine">
-                        {GATES.map((g) => (
-                            <option key={g}>{g}</option>
-                        ))}
-                    </select>
-                )}
-                {node.kind === 'countermeasure' && (
-                    <select className="inp" style={{ width: 170 }} value={node.countermeasureRef || ''} onChange={(e) => ops.upd(node.id, { countermeasureRef: e.target.value || undefined })} title="Link an existing countermeasure">
-                        <option value="">(link CM…)</option>
-                        {cms.map((c) => (
-                            <option key={c.id} value={c.id}>
-                                {c.id} · {c.title}
-                            </option>
-                        ))}
-                    </select>
-                )}
-                {!isRoot && (
-                    <>
-                        <button className="btn sm" title="Move left (earlier in sequence)" onClick={() => ops.move(node.id, -1)}>
-                            ←
-                        </button>
-                        <button className="btn sm" title="Move right (later in sequence)" onClick={() => ops.move(node.id, 1)}>
-                            →
-                        </button>
-                        <button className="btn sm danger" title="Delete node" onClick={() => ops.del(node.id)}>
-                            ✕
-                        </button>
-                    </>
-                )}
+                <button className="btn sm" type="button" onClick={onClose}>Close</button>
             </div>
+            <div className="adt-node-modal-body">
+                <div className="adt-editrow">
+                    {isStructural && node.kind !== 'category' && (
+                        <label className="minifield" style={{ width: 120 }}><span>Gate</span><select className="inp" value={node.gate || 'AND'} onChange={(e) => ops.upd(node.id, { gate: e.target.value as AdGate })}>{GATES.map((gate) => <option key={gate}>{gate}</option>)}</select></label>
+                    )}
+                    {node.kind === 'category' && <span className="hint">Categories always aggregate alternatives with OR.</span>}
+                    {isCountermeasure && (
+                        <label className="minifield" style={{ width: 260 }}><span>Linked countermeasure</span><select className="inp" value={node.countermeasureRef || ''} onChange={(e) => ops.upd(node.id, { countermeasureRef: e.target.value || undefined })}>
+                            <option value="">(link CM…)</option>
+                            {cms.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                    {c.id} · {c.title}
+                                </option>
+                            ))}
+                        </select></label>
+                    )}
+                    {!isRoot && <button className="btn sm danger" type="button" onClick={() => { ops.del(node.id); onClose(); }}>Delete node</button>}
+                </div>
 
-            {isStep && !hasStructuralKids && (
-                <div className="adattrs">
-                    <label className="minifield" style={{ width: 172 }}>
-                        <span>Required access</span>
-                        <select className="inp" value={node.access ?? 3} onChange={(e) => ops.upd(node.id, { access: Number(e.target.value) })}>
+                {((isStep && !hasAttackChildren) || isVulnerability) && (
+                    <div className="adattrs">
+                        <label className="minifield" style={{ width: 220 }}><span>Required access</span><select className="inp" value={node.access ?? 3} onChange={(e) => ops.upd(node.id, { access: Number(e.target.value) })}>
                             {ACCESS_OPTS.map(([v, l]) => (
-                                <option key={v} value={v}>
-                                    {v} · {l}
-                                </option>
+                                <option key={v} value={v}>{v} · {l}</option>
                             ))}
-                        </select>
-                    </label>
-                    <label className="minifield" style={{ width: 172 }}>
-                        <span>Required skill</span>
-                        <select className="inp" value={node.skill ?? 2} onChange={(e) => ops.upd(node.id, { skill: Number(e.target.value) })}>
+                        </select></label>
+                        <label className="minifield" style={{ width: 220 }}><span>Required skill</span><select className="inp" value={node.skill ?? 2} onChange={(e) => ops.upd(node.id, { skill: Number(e.target.value) })}>
                             {SKILL_OPTS.map(([v, l]) => (
-                                <option key={v} value={v}>
-                                    {v} · {l}
-                                </option>
+                                <option key={v} value={v}>{v} · {l}</option>
                             ))}
-                        </select>
-                    </label>
-                    <details className="costf">
-                        <summary>cost factors</summary>
-                        <div className="costgrid">
-                            {COST_FACTORS.map((f) => (
-                                <label key={f.k} className="minifield">
-                                    <span title={`weight ${f.weight}`}>{f.label}</span>
-                                    <select className="inp" value={(node.cost as any)?.[f.k] ?? ''} onChange={(e) => ops.upd(node.id, { cost: { ...(node.cost || {}), [f.k]: e.target.value === '' ? undefined : Number(e.target.value) } })}>
-                                        <option value="">–</option>
-                                        {[1, 2, 3, 4, 5].map((n) => (
-                                            <option key={n} value={n}>{n}</option>
-                                        ))}
-                                    </select>
-                                </label>
-                            ))}
+                        </select></label>
+                    </div>
+                )}
+                {isStep && !hasAttackChildren && <CostAssessment title="Step difficulty assessment" cost={node.cost} rationales={node.costRationales} onChange={(cost, costRationales) => ops.upd(node.id, { cost, costRationales })} />}
+                {isStep && hasAttackChildren && metrics && <div className="adderived"><span className="dtag">derived access <b>{metrics.accessReq || '–'} · {accessLabel(metrics.accessReq)}</b></span><span className="dtag">derived skill <b>{metrics.skillReq || '–'} · {skillLabel(metrics.skillReq)}</b></span><span className="dtag">derived probability <b>{Math.round(metrics.prob * 100)}%</b></span></div>}
+                {isCountermeasure && <CostAssessment title="Residual difficulty after this defence" cost={node.residualCost} rationales={node.residualCostRationales} onChange={(residualCost, residualCostRationales) => ops.upd(node.id, { residualCost, residualCostRationales })} />}
+                {isVulnerability && <CostAssessment title="Residual difficulty after exploiting this vulnerability" cost={node.residualCost} rationales={node.residualCostRationales} onChange={(residualCost, residualCostRationales) => ops.upd(node.id, { residualCost, residualCostRationales })} />}
+                {isGoal && (
+                    <section className="adt-assessment-section">
+                        <h4>Bug Bar impact</h4>
+                        <div className="grid4">
+                            {(['confidentiality', 'integrity', 'availability', 'safety'] as const).map((key) => <label key={key} className="minifield"><span>{key}</span><select className="inp" value={node.impactDimensions?.[key] ?? ''} onChange={(e) => setImpact(key, Number(e.target.value))}><option value="">-</option>{[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>)}
                         </div>
-                    </details>
+                        <details><summary className="hint">Bug Bar reference</summary><BugBarTable /></details>
+                    </section>
+                )}
+                <div className="adadd">
+                    <span className="hint" style={{ marginRight: 4 }}>Add child:</span>
+                    {ADD_KINDS.map((kind) => <button key={kind} className="btn sm ghost" type="button" onClick={() => ops.add(node.id, kind)}>+ {KIND_LABEL[kind]}</button>)}
                 </div>
-            )}
-
-            {hasStructuralKids && (
-                <div className="adderived" title="Derived bottom-up from the sub-steps via the gate logic (AND/SAND = hardest sub-step, OR = easiest).">
-                    <span className="dtag">required access <b>{Math.round(m.accessReq) || '–'} · {accessLabel(m.accessReq)}</b></span>
-                    <span className="dtag">required skill <b>{Math.round(m.skillReq) || '–'} · {skillLabel(m.skillReq)}</b></span>
-                    <span className="dtag">success ≈ {Math.round(m.prob * 100)}%</span>
-                    <span className="muted">derived from {node.gate} of sub-steps</span>
-                </div>
-            )}
-
-            <div className="adadd">
-                <span className="hint" style={{ marginRight: 4 }}>Add child:</span>
-                {ADD_KINDS.map((k) => (
-                    <button key={k} className="btn sm ghost" onClick={() => ops.add(node.id, k)}>
-                        + {KIND_LABEL[k]}
-                    </button>
-                ))}
             </div>
         </div>
     );

@@ -115,7 +115,7 @@ const atkRows = (ass.attacker || []).map((a) => {
 
 const html = `<!doctype html><meta charset=utf8><title>TRA ${project.title}</title>
 <style>body{font:14px system-ui;margin:2rem;max-width:60rem}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px;text-align:left}h1{font-size:1.4rem}.warn{color:#c62828}</style>
-<h1>${project.title}</h1><p>Device: ${project.device.name} (${project.device.type}) | SL-T ${project.slTarget} | mode ${project.scope.mode} | status ${project.status}</p>
+<h1>${project.title}</h1><p>Device: ${project.device.name} (${project.device.type}) | SL-C ${project.slTarget} | mode ${project.scope.mode} | status ${project.status}</p>
 <h2>Attacker profiles</h2><ul>${atkRows}</ul>
 ${assRows ? `<h2>Assumptions</h2>${assRows}` : ''}
 <h2>Assets</h2><ul>${sys.assets.map((a) => `<li>${a.name} (C${a.objectives.confidentiality}/I${a.objectives.integrity}/A${a.objectives.availability}/S${a.objectives.safety})</li>`).join("")}</ul>

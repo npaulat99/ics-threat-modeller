@@ -184,7 +184,7 @@ if (sbomMode !== 'in-tool') {
 const html = `<!doctype html><meta charset=utf8><title>TRA ${esc(project.title || project.device?.name || 'Report')}</title>
 <style>body{font:14px system-ui;margin:2rem;max-width:72rem}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px;text-align:left}th{background:#f5f5f5;font-size:12px;text-transform:uppercase;letter-spacing:.04em}h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:2rem}.warn{color:#c62828}code{font-size:12px}ul{padding-left:1.4rem}</style>
 <h1>${esc(project.title || project.device?.name || 'TRA Report')}</h1>
-<p>Device: <b>${esc(project.device?.name || '—')}</b> | SL-T ${esc(project.slTarget || '—')} | scope ${esc(project.scope?.mode || '—')} | boundary: ${esc(project.scope?.boundary || '—')}</p>
+<p>Device: <b>${esc(project.device?.name || '—')}</b> | SL-C ${esc(project.slTarget || '—')} | scope ${esc(project.scope?.mode || '—')} | boundary: ${esc(project.scope?.boundary || '—')}</p>
 <h2>Attacker profiles</h2><ul>${atkRows}</ul>
 ${assRows ? `<h2>Assumptions</h2>${assRows}` : ''}
 <h2>Assets</h2><ul>${(sys.assets || []).map(a => `<li>${esc(a.name)} (C${a.objectives?.confidentiality}/I${a.objectives?.integrity}/A${a.objectives?.availability}/S${a.objectives?.safety})</li>`).join('')}</ul>

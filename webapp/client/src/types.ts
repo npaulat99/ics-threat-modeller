@@ -384,6 +384,10 @@ export interface AdNode {
     access?: number; // 1-5 required access (step/substep)
     skill?: number; // 1-5 required attacker skill (step/substep)
     cost?: AdCost;
+    costRationales?: Partial<Record<keyof AdCost, string>>;
+    residualCost?: AdCost; // defence/vulnerability assessment overriding the parent step cost
+    residualCostRationales?: Partial<Record<keyof AdCost, string>>;
+    impactDimensions?: Objectives; // Bug Bar impact assessed on an attack goal
     countermeasureRef?: string; // for kind 'countermeasure' -> links an existing countermeasure id
     note?: string;
     children?: AdNode[];

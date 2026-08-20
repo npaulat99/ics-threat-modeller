@@ -174,7 +174,7 @@ re-attach to the most specific visible component as you zoom in.
 One JSON file per step under `projects/<id>/`, matching the `tra/` methodology and schemas
 (`tra/.assets/schema/*`):
 
-- `01-project-description/project.json` — device, scope, modelling depth, SL-T.
+- `01-project-description/project.json` — device, scope, modelling depth, SL-C.
 - `02-assumptions/assumptions.json` — device/system/environment/operational + **mandatory** attacker profiles.
 - `03-system-assets/system.json` — components, interfaces, trust boundaries, assets with C/I/A/Safety.
 - `04-dfd/dfd.json` — layered DeMarco nodes + flows; nodes additionally carry `x`/`y` for layout.

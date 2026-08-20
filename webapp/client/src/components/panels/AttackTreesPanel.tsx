@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useStore, uid } from '../../state/store';
 import { TagSelect, Field, HelpButton, confirmDelete, IdInput } from '../common';
 import { evaluate, COST_FACTORS, updateNode, addChild, removeNode, moveChild, adId, KIND_LABEL, likelihoodFromProb, newNode, GATES, ADD_KINDS, ACCESS_OPTS, SKILL_OPTS, accessLabel, skillLabel, accessProbability } from '../../lib/attackTree';
+import { deriveImpact } from '../../lib/risk';
 import AttackTreeDiagram from './AttackTreeDiagram';
 import type { AdGate, AdKind, AdNode, AttackTree } from '../../types';
 
@@ -35,7 +36,7 @@ function NodeRow({ node, depth, ops }: { node: AdNode; depth: number; ops: Ops }
                 <span className={'adkind k-' + node.kind}>{KIND_LABEL[node.kind]}</span>
                 <input className="inp grow" value={node.label} onChange={(e) => ops.upd(node.id, { label: e.target.value })} />
                 {isStructural && (
-                    <select className="inp" style={{ width: 86 }} value={node.gate || 'AND'} onChange={(e) => ops.upd(node.id, { gate: e.target.value as AdGate })} title="How the children combine">
+                    <select className="inp" style={{ width: 86 }} value={node.kind === 'category' ? 'OR' : node.gate || 'AND'} disabled={node.kind === 'category'} onChange={(e) => ops.upd(node.id, { gate: e.target.value as AdGate })} title={node.kind === 'category' ? 'Categories always combine alternatives with OR.' : 'How the children combine'}>
                         {GATES.map((g) => (
                             <option key={g}>{g}</option>
                         ))}
@@ -155,17 +156,17 @@ function TreeCard({ tree, view }: { tree: AttackTree; view: 'list' | 'diagram' }
 
     const m = evaluate(tree.root, new Map((data.countermeasures.countermeasures || []).map((c) => [c.id, c])), data.project.costFactorWeights);
     const vectorProbability = m.prob * accessProbability(m.accessReq, data.project.accessProbabilities);
+    const treeUnfeasible = !!attackers[0] && m.skillReq > attackers[0].capability;
     const hasSteps = (tree.root.children || []).some((c) => c.kind !== 'countermeasure' && c.kind !== 'vulnerability');
     const setThreatLinks = (next: string[]) => updTree({ threatRefs: next, threatRef: next[0] || undefined });
 
     const applyToThreat = () => {
         if (!linkedThreatIds.length) return;
-        const selectedAttacker = attackers[0];
-        const unfeasible = !!selectedAttacker && m.skillReq > selectedAttacker.capability;
-        const L = likelihoodFromProb(unfeasible ? 0 : vectorProbability);
+        const L = likelihoodFromProb(treeUnfeasible ? 0 : vectorProbability);
+        const goalImpact = deriveImpact(tree.root.impactDimensions);
         save('threats', {
             threats: threats.map((t) => linkedThreatIds.includes(t.id)
-                ? { ...t, requiredSkill: m.skillReq, requiredAccess: m.accessReq, costLikelihood: unfeasible ? 0 : vectorProbability, costLikelihoodProposal: L, likelihood: L, status: unfeasible ? 'unfeasible' : t.status === 'unfeasible' ? 'open' : t.status }
+                ? { ...t, requiredSkill: m.skillReq, requiredAccess: m.accessReq, costLikelihood: treeUnfeasible ? 0 : vectorProbability, costLikelihoodProposal: L, likelihood: L, ...(tree.root.impactDimensions ? { impactDimensions: tree.root.impactDimensions, impact: goalImpact ?? t.impact } : {}), status: treeUnfeasible ? 'unfeasible' : t.status === 'unfeasible' ? 'open' : t.status }
                 : t),
         });
     };
@@ -200,7 +201,7 @@ function TreeCard({ tree, view }: { tree: AttackTree; view: 'list' | 'diagram' }
                         {m.vulns ? <span className="tag">vulnerabilities {m.vulns}</span> : null}
                         {linkedThreatIds.length > 0 && (
                             <button className="btn sm" onClick={applyToThreat} title={`Set linked threat likelihoods (${linkedThreatLabel}) from this tree's cheapest path`}>
-                                → set linked threat likelihood{linkedThreatIds.length > 1 ? 's' : ''} = {likelihoodFromProb(m.prob)}
+                                → set linked threat likelihood{linkedThreatIds.length > 1 ? 's' : ''} = {likelihoodFromProb(treeUnfeasible ? 0 : vectorProbability)}
                             </button>
                         )}
                         <span className="muted" style={{ marginLeft: 8 }}>
