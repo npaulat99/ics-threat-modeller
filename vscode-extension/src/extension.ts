@@ -115,7 +115,7 @@ async function scaffoldProject(dir: vscode.Uri, name: string, slug: string) {
     device: { name, type: "field device", modelReference: "", purdueLevel: "0-1", version: "" },
     scope: { mode: "graybox", boundary: "", inScope: [], outOfScope: [] },
     slTarget: "SL2",
-    riskScoringMethod: "exposure-exploitability-impact",
+    riskScoringMethod: "cost-based",
     intendedUse: "",
     foreseeableUse: [],
     repo: { projectBranchUrl: "", kbUrl: "" },

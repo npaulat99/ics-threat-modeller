@@ -91,7 +91,7 @@ export default function SettingsModal() {
                 <div className="card" style={{ marginBottom: 12 }}>
                     <h3 style={{ marginTop: 0 }}>Risk scoring</h3>
                     <Field label="Scoring method">
-                        <select value={p.riskScoringMethod || 'exposure-exploitability-impact'} onChange={(e) => setScoringMethod(e.target.value)}>
+                        <select value={p.riskScoringMethod || 'cost-based'} onChange={(e) => setScoringMethod(e.target.value)}>
                             <option value="exposure-exploitability-impact">Exposure x Exploitability x Impact</option>
                             <option value="cost-based">Cost-based</option>
                         </select>

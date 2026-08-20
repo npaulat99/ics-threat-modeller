@@ -83,7 +83,7 @@ async function buildData(proj: vscode.Uri) {
     project: {
       name: project.device?.name || "",
       sl: project.slTarget || "SL2",
-      riskScoringMethod: project.riskScoringMethod || "exposure-exploitability-impact",
+      riskScoringMethod: project.riskScoringMethod || "cost-based",
       mode: project.scope?.mode || "graybox",
       boundary: project.scope?.boundary || "",
       sbom: project.sbom || {},
@@ -391,7 +391,7 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
         if (d.project) {
           const proj = await rdRaw(f.proj, "01-project-description/project.json", {});
           proj.device = proj.device || {}; proj.device.name = d.project.name;
-          proj.slTarget = d.project.sl; proj.riskScoringMethod = d.project.riskScoringMethod || "exposure-exploitability-impact"; proj.scope = proj.scope || {};
+          proj.slTarget = d.project.sl; proj.riskScoringMethod = d.project.riskScoringMethod || "cost-based"; proj.scope = proj.scope || {};
           proj.scope.mode = d.project.mode; proj.scope.boundary = d.project.boundary;
           proj.reportOptions = proj.reportOptions || {};
           proj.reportOptions.includeUseCases = !!d.project.includeUseCases;
@@ -643,7 +643,7 @@ function renderRail(){
 }
 function renderProject(p){
   p=p||{};
-  project={name:p.name||'',sl:p.sl||'SL2',riskScoringMethod:p.riskScoringMethod||'exposure-exploitability-impact',mode:p.mode||'graybox',boundary:p.boundary||'',sbom:p.sbom||{},includeUseCases:!!p.includeUseCases,useCaseNames:p.useCaseNames||[],useCaseNoticePending:!!p.useCaseNoticePending};
+  project={name:p.name||'',sl:p.sl||'SL2',riskScoringMethod:p.riskScoringMethod||'cost-based',mode:p.mode||'graybox',boundary:p.boundary||'',sbom:p.sbom||{},includeUseCases:!!p.includeUseCases,useCaseNames:p.useCaseNames||[],useCaseNoticePending:!!p.useCaseNoticePending};
   $('#devname').textContent=project.name?('· '+project.name):'';
   $('#p-name').value=project.name;$('#p-sl').value=project.sl;$('#p-risk').value=project.riskScoringMethod;$('#p-mode').value=project.mode;$('#p-bnd').value=project.boundary;
   var ucInc=$('#p-uc-inc'); if(ucInc) ucInc.checked=!!project.includeUseCases;

@@ -137,7 +137,7 @@ export default function RiskCalculator({
     const attackers = useStore((s) => s.data?.assumptions.attacker || []);
     const interfaces = useStore((s) => s.data?.system.interfaces || []);
     const attacker = attackers.find((a) => a.id === t.attackerRef);
-    const scoringMethod = useStore((s) => s.data?.project.riskScoringMethod || 'exposure-exploitability-impact');
+    const scoringMethod = useStore((s) => s.data?.project.riskScoringMethod || 'cost-based');
     const primaryInterface = t.interfaceRefs?.[0] || t.interfaceRef;
     const iface = interfaces.find((i) => i.id === primaryInterface);
     const today = new Date().toISOString().slice(0, 10);
