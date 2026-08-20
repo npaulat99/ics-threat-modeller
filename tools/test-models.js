@@ -180,6 +180,7 @@ const met = AtModel.evaluate(tree.root, cmMap);
 ok("evaluate returns a probability in [0,1]", met.prob >= 0 && met.prob <= 1);
 ok("evaluate derives required access from leaf attack steps", AtModel.evaluate(AtModel.find(tree.root, "s1"), cmMap).accessReq === 4);
 ok("likelihoodFromProb maps to 1-5", AtModel.likelihoodFromProb(1) === 5 && AtModel.likelihoodFromProb(0.01) === 1);
+ok("custom likelihood thresholds remap probability bands", AtModel.likelihoodFromProb(0.6, { 2: 0.2, 3: 0.4, 4: 0.6, 5: 0.8 }) === 4);
 
 const all = (value) => ({ time: value, exploitability: value, window: value, detection: value, notoriety: value, prep: value, abort: value });
 const structuralGoal = { id: "g", kind: "goal", label: "Goal", gate: "AND", children: [{ id: "s", kind: "step", label: "Unassessed", children: [] }] };

@@ -132,8 +132,15 @@ export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>
 }
 
 /** Suggested threat likelihood (1-5) from a tree's root success probability. */
-export function likelihoodFromProb(prob: number): number {
-    return prob <= 0 ? 0 : Math.min(5, Math.max(1, Math.round(prob * 5)));
+export const DEFAULT_LIKELIHOOD_PROBABILITY_THRESHOLDS: Record<2 | 3 | 4 | 5, number> = { 2: 0.3, 3: 0.5, 4: 0.7, 5: 0.9 };
+
+/** Maps a success probability to the project's L1-L5 matrix scale. L1 covers every positive
+ * probability below the L2 threshold; L0 is reserved for an impossible/unfeasible path. */
+export function likelihoodFromProb(prob: number, thresholds?: Partial<Record<2 | 3 | 4 | 5, number>>): number {
+    if (prob <= 0) return 0;
+    for (const level of [5, 4, 3, 2] as const)
+        if (prob >= (thresholds?.[level] ?? DEFAULT_LIKELIHOOD_PROBABILITY_THRESHOLDS[level])) return level;
+    return 1;
 }
 
 // ---- immutable tree editing -------------------------------------------------

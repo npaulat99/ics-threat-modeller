@@ -21,6 +21,7 @@ function CostRiskCalculator({ t, upd }: { t: GuidedRiskModel; upd: (patch: any) 
     const attacker = useStore((s) => s.data?.assumptions.attacker?.[0]);
     const weights = useStore((s) => s.data?.project.costFactorWeights);
     const accessProbabilities = useStore((s) => s.data?.project.accessProbabilities);
+    const likelihoodThresholds = useStore((s) => s.data?.project.likelihoodProbabilityThresholds);
     const factors = t.costFactors || {};
     const rationales = t.costRationales || {};
     const access = t.requiredAccess || 3;
@@ -28,7 +29,7 @@ function CostRiskCalculator({ t, upd }: { t: GuidedRiskModel; upd: (patch: any) 
     const feasible = !attacker || skill <= attacker.capability;
     const costProbability = stepProb(factors, weights);
     const probability = feasible ? accessProbability(access, accessProbabilities) * costProbability : 0;
-    const proposal = likelihoodFromProb(probability);
+    const proposal = likelihoodFromProb(probability, likelihoodThresholds);
     const update = (patch: Partial<Threat>) => {
         const nextFactors = patch.costFactors ?? factors;
         const nextSkill = patch.requiredSkill ?? skill;
@@ -36,7 +37,8 @@ function CostRiskCalculator({ t, upd }: { t: GuidedRiskModel; upd: (patch: any) 
         const status = attacker && nextSkill > attacker.capability ? 'unfeasible' : t.status === 'unfeasible' ? 'open' : t.status;
         const nextCostProbability = stepProb(nextFactors, weights);
         const nextProbability = status === 'unfeasible' ? 0 : accessProbability(nextAccess, accessProbabilities) * nextCostProbability;
-        upd({ ...patch, status, costLikelihood: nextProbability, costLikelihoodProposal: likelihoodFromProb(nextProbability), likelihood: likelihoodFromProb(nextProbability) });
+        const nextProposal = likelihoodFromProb(nextProbability, likelihoodThresholds);
+        upd({ ...patch, status, costLikelihood: nextProbability, costLikelihoodProposal: nextProposal, likelihood: nextProposal });
     };
     return (
         <div className="calc">

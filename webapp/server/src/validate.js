@@ -59,6 +59,10 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
             if (typeof probability === 'number' && (probability < 0.05 || probability > 1))
                 add('warning', `Access probability for level ${level} must be between 0.05 and 1.00.`, `access-probability:${level}`);
         }
+        const thresholdDefaults = { 2: 0.3, 3: 0.5, 4: 0.7, 5: 0.9 };
+        const thresholds = [2, 3, 4, 5].map((level) => project.likelihoodProbabilityThresholds?.[level] ?? thresholdDefaults[level]);
+        if (thresholds.some((value) => typeof value !== 'number' || value <= 0 || value > 1) || thresholds.some((value, index) => index > 0 && value <= thresholds[index - 1]))
+            add('warning', 'Likelihood probability thresholds must be strictly increasing from L2 through L5 and within 0.01 to 1.00.', 'likelihood-thresholds');
     }
 
     if (!attackers.length) add('warning', 'No attacker assumptions (required to ground the likelihood assessment).', 'no-attacker');

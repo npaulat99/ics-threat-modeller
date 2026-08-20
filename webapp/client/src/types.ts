@@ -76,6 +76,7 @@ export interface Project {
     riskScoringMethod?: 'exposure-exploitability-impact' | 'cost-based';
     costFactorWeights?: Partial<Record<keyof AdCost, number>>;
     accessProbabilities?: Partial<Record<1 | 2 | 3 | 4 | 5, number>>;
+    likelihoodProbabilityThresholds?: Partial<Record<2 | 3 | 4 | 5, number>>; // lower probability bounds for L2-L5; L1 covers remaining positive values
     intendedUse?: string; // CRA: the manufacturer's intended purpose of the product
     foreseeableUse?: string[]; // CRA: reasonably foreseeable use scenarios
     repo?: RepoLinks;

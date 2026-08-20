@@ -203,6 +203,13 @@ function testAccessProbabilityAndLikelihoodOverrideNotices() {
     assert.ok(notices.includes('T-1: manually selected likelihood (4) differs from the calculated cost-based proposal (2).'));
 }
 
+function testLikelihoodThresholdValidation() {
+    const project = baseProject();
+    project.project = { riskScoringMethod: 'cost-based', likelihoodProbabilityThresholds: { 2: 0.4, 3: 0.3, 4: 0.7, 5: 0.9 } };
+    const warnings = issueMessages(validate(project), 'warning');
+    assert.ok(warnings.includes('Likelihood probability thresholds must be strictly increasing from L2 through L5 and within 0.01 to 1.00.'));
+}
+
 testClassificationNoticeAndTransferRequirementWarning();
 testDeploymentConstraintsRuleSkipsAcceptedOrTransferredAndFlagsOpen();
 testContradictoryProductVulnerabilityClassification();
@@ -212,5 +219,6 @@ testUnfeasibleThreatHasNoResidualRiskWarning();
 testCostWeightLimitWarning();
 testCostWeightUnderAllocationWarning();
 testAccessProbabilityAndLikelihoodOverrideNotices();
+testLikelihoodThresholdValidation();
 
 console.log('validation tests passed');

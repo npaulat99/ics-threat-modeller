@@ -114,7 +114,12 @@
     prob = clamp01(prob * defMult * Math.pow(1.6, legacyVulns));
     return { skillReq: skillReq, accessReq: accessReq, prob: prob, defenses: defenses, vulns: vulns };
   }
-  function likelihoodFromProb(p) { return p <= 0 ? 0 : Math.min(5, Math.max(1, Math.round(p * 5))); }
+  var DEFAULT_LIKELIHOOD_THRESHOLDS = { 2: 0.3, 3: 0.5, 4: 0.7, 5: 0.9 };
+  function likelihoodFromProb(p, thresholds) {
+    if (p <= 0) return 0;
+    for (var level = 5; level >= 2; level--) if (p >= (thresholds && thresholds[level] != null ? thresholds[level] : DEFAULT_LIKELIHOOD_THRESHOLDS[level])) return level;
+    return 1;
+  }
 
   var FILL = { goal: "#eef4ff", step: "#eef4ff", substep: "#f3f6fb", category: "#f0f0f5", countermeasure: "#e7f6ec", vulnerability: "#fdeaea" };
   // Graphical attack-defence tree — mirrors the tra-webapp AttackTreeDiagram notation:
@@ -177,7 +182,7 @@
     return "<ul><li>" + ul(root) + "</li></ul>";
   }
 
-  var api = { KIND_LABEL: KIND_LABEL, GATES: GATES, COST_FACTORS: COST_FACTORS, esc: esc, isStructural: isStructural, walk: walk, find: find, parentOf: parentOf, uid: uid, newNode: newNode, addChild: addChild, addSibling: addSibling, remove: remove, cycleGate: cycleGate, setKind: setKind, stepProb: stepProb, evaluate: evaluate, likelihoodFromProb: likelihoodFromProb, render: render, toHtml: toHtml };
+  var api = { KIND_LABEL: KIND_LABEL, GATES: GATES, COST_FACTORS: COST_FACTORS, DEFAULT_LIKELIHOOD_THRESHOLDS: DEFAULT_LIKELIHOOD_THRESHOLDS, esc: esc, isStructural: isStructural, walk: walk, find: find, parentOf: parentOf, uid: uid, newNode: newNode, addChild: addChild, addSibling: addSibling, remove: remove, cycleGate: cycleGate, setKind: setKind, stepProb: stepProb, evaluate: evaluate, likelihoodFromProb: likelihoodFromProb, render: render, toHtml: toHtml };
   g.AtModel = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

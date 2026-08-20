@@ -162,7 +162,7 @@ function TreeCard({ tree, view }: { tree: AttackTree; view: 'list' | 'diagram' }
 
     const applyToThreat = () => {
         if (!linkedThreatIds.length) return;
-        const L = likelihoodFromProb(treeUnfeasible ? 0 : vectorProbability);
+        const L = likelihoodFromProb(treeUnfeasible ? 0 : vectorProbability, data.project.likelihoodProbabilityThresholds);
         const goalImpact = deriveImpact(tree.root.impactDimensions);
         save('threats', {
             threats: threats.map((t) => linkedThreatIds.includes(t.id)
@@ -201,7 +201,7 @@ function TreeCard({ tree, view }: { tree: AttackTree; view: 'list' | 'diagram' }
                         {m.vulns ? <span className="tag">vulnerabilities {m.vulns}</span> : null}
                         {linkedThreatIds.length > 0 && (
                             <button className="btn sm" onClick={applyToThreat} title={`Set linked threat likelihoods (${linkedThreatLabel}) from this tree's cheapest path`}>
-                                → set linked threat likelihood{linkedThreatIds.length > 1 ? 's' : ''} = {likelihoodFromProb(treeUnfeasible ? 0 : vectorProbability)}
+                                → set linked threat likelihood{linkedThreatIds.length > 1 ? 's' : ''} = {likelihoodFromProb(treeUnfeasible ? 0 : vectorProbability, data.project.likelihoodProbabilityThresholds)}
                             </button>
                         )}
                         <span className="muted" style={{ marginLeft: 8 }}>

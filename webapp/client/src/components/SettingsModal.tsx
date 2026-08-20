@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { useStore } from '../state/store';
 import { DEFAULT_ACCEPTABLE_RISK } from '../types';
 import { Field } from './common';
-import { accessProbability, costWeightTotal, COST_FACTORS, likelihoodFromProb, stepProb } from '../lib/attackTree';
+import { accessProbability, costWeightTotal, COST_FACTORS, DEFAULT_LIKELIHOOD_PROBABILITY_THRESHOLDS, likelihoodFromProb, stepProb } from '../lib/attackTree';
 import { deriveImpact } from '../lib/risk';
 
 export default function SettingsModal() {
@@ -28,14 +28,14 @@ export default function SettingsModal() {
     const acceptable = typeof p.acceptableRisk === 'number' ? p.acceptableRisk : DEFAULT_ACCEPTABLE_RISK;
     const weightTotal = costWeightTotal(p.costFactorWeights);
     const weightsInvalid = Math.abs(weightTotal - 1) > 0.000001;
-    const syncCostLikelihoods = (nextWeights = p.costFactorWeights, nextAccessProbabilities = p.accessProbabilities) => {
+    const syncCostLikelihoods = (nextWeights = p.costFactorWeights, nextAccessProbabilities = p.accessProbabilities, nextThresholds = p.likelihoodProbabilityThresholds) => {
         const attacker = data.assumptions.attacker?.[0];
         save('threats', {
             threats: data.threats.threats.map((threat) => {
                 const unfeasible = !!attacker && typeof threat.requiredSkill === 'number' && threat.requiredSkill > attacker.capability;
                 const probability = unfeasible ? 0 : accessProbability(threat.requiredAccess ?? 3, nextAccessProbabilities) * stepProb(threat.costFactors, nextWeights);
                 const impact = deriveImpact(threat.impactDimensions) ?? threat.impact ?? 0;
-                const proposal = likelihoodFromProb(probability);
+                const proposal = likelihoodFromProb(probability, nextThresholds);
                 return {
                     ...threat,
                     status: unfeasible ? 'unfeasible' : threat.status === 'unfeasible' ? 'open' : threat.status,
@@ -67,6 +67,15 @@ export default function SettingsModal() {
         const nextAccessProbabilities = { ...(p.accessProbabilities || {}), [level]: Math.max(0.05, Math.min(1, value || 0.05)) };
         set({ accessProbabilities: nextAccessProbabilities });
         syncCostLikelihoods(p.costFactorWeights, nextAccessProbabilities);
+    };
+    const setLikelihoodThreshold = (level: 2 | 3 | 4 | 5, value: number) => {
+        const nextThresholds = { ...(p.likelihoodProbabilityThresholds || {}), [level]: Math.max(0.01, Math.min(1, value || 0.01)) };
+        set({ likelihoodProbabilityThresholds: nextThresholds });
+        syncCostLikelihoods(p.costFactorWeights, p.accessProbabilities, nextThresholds);
+    };
+    const restoreDefaultLikelihoodThresholds = () => {
+        set({ likelihoodProbabilityThresholds: DEFAULT_LIKELIHOOD_PROBABILITY_THRESHOLDS });
+        syncCostLikelihoods(p.costFactorWeights, p.accessProbabilities, DEFAULT_LIKELIHOOD_PROBABILITY_THRESHOLDS);
     };
 
     return (
@@ -125,6 +134,16 @@ export default function SettingsModal() {
                                         <input className="inp" type="number" min={0.05} max={1} step={0.05} value={p.accessProbabilities?.[level as 1 | 2 | 3 | 4 | 5] ?? fallback} onChange={(e) => setAccessProbability(level as 1 | 2 | 3 | 4 | 5, Number(e.target.value))} />
                                     </Field>
                                 ))}
+                            </div>
+                            <h4 style={{ margin: '14px 0 6px' }}>Likelihood probability thresholds</h4>
+                            <p className="hint">Lower probability bound for each matrix likelihood. L1 covers positive probabilities below L2; 0% is L0.</p>
+                            <div className="settings-weight-grid">
+                                {([2, 3, 4, 5] as const).map((level) => (
+                                    <Field key={level} label={`L${level} or higher`}>
+                                        <input className="inp" type="number" min={0.01} max={1} step={0.05} value={p.likelihoodProbabilityThresholds?.[level] ?? DEFAULT_LIKELIHOOD_PROBABILITY_THRESHOLDS[level]} onChange={(e) => setLikelihoodThreshold(level, Number(e.target.value))} />
+                                    </Field>
+                                ))}
+                                <div className="settings-weight-restore"><button className="btn sm" type="button" onClick={restoreDefaultLikelihoodThresholds}>Restore defaults</button></div>
                             </div>
                         </>
                     )}
