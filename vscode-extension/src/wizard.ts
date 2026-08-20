@@ -83,6 +83,7 @@ async function buildData(proj: vscode.Uri) {
     project: {
       name: project.device?.name || "",
       sl: project.slTarget || "SL2",
+      riskScoringMethod: project.riskScoringMethod || "cost-based",
       mode: project.scope?.mode || "graybox",
       boundary: project.scope?.boundary || "",
       sbom: project.sbom || {},
@@ -119,6 +120,13 @@ async function buildData(proj: vscode.Uri) {
       versions: tracker.entries.length,
     },
   };
+}
+
+function managedSlcAttacker(sl: string) {
+  const level = Math.max(1, Math.min(4, Number(String(sl).replace(/\D/g, "")) || 2));
+  const capability = ({ 1: 1, 2: 2, 3: 3, 4: 5 } as Record<number, number>)[level];
+  const names = ["", "Casual or Coincidental Violation", "Simple Intentional Attacks", "Sophisticated ACS Attacks", "State-Sponsored/Professional Attacks"];
+  return { id: `ATK-SLC-${level}`, name: `Threat Actor ${level}: ${names[level]}`, capability, motivation: "Managed by the selected SL-C level", resources: "Managed SL-C attacker profile", text: `SL-C ${level} attacker profile managed by EmbedRisk.` };
 }
 
 export async function openWizard(ctx: vscode.ExtensionContext) {
@@ -383,7 +391,7 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
         if (d.project) {
           const proj = await rdRaw(f.proj, "01-project-description/project.json", {});
           proj.device = proj.device || {}; proj.device.name = d.project.name;
-          proj.slTarget = d.project.sl; proj.scope = proj.scope || {};
+          proj.slTarget = d.project.sl; proj.riskScoringMethod = d.project.riskScoringMethod || "cost-based"; proj.scope = proj.scope || {};
           proj.scope.mode = d.project.mode; proj.scope.boundary = d.project.boundary;
           proj.reportOptions = proj.reportOptions || {};
           proj.reportOptions.includeUseCases = !!d.project.includeUseCases;
@@ -392,6 +400,11 @@ export async function openWizard(ctx: vscode.ExtensionContext) {
           }
           if (d.project.sbom) proj.sbom = d.project.sbom;
           await write(f.proj, "01-project-description/project.json", proj);
+          const attacker = managedSlcAttacker(proj.slTarget);
+          const assumptions = await rdRaw(f.proj, "02-assumptions/assumptions.json", {});
+          await write(f.proj, "02-assumptions/assumptions.json", { ...assumptions, attacker: [attacker] });
+          const threatDoc = await rdRaw(f.proj, "06-threats/threats.json", { threats: [] });
+          await write(f.proj, "06-threats/threats.json", { threats: (threatDoc.threats || []).map((threat: any) => ({ ...threat, attackerRef: attacker.id, status: typeof threat.requiredSkill === "number" && threat.requiredSkill > attacker.capability ? "unfeasible" : threat.status === "unfeasible" ? "open" : threat.status })) });
         }
         if (Array.isArray(d.threats)) await write(f.proj, "06-threats/threats.json", { threats: d.threats });
         if (Array.isArray(d.cms)) await write(f.proj, "08-countermeasures/countermeasures.json", { countermeasures: d.cms });
@@ -445,6 +458,7 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
           <div class="field" style="flex:2"><label>Device name</label><input class="inp" id="p-name"></div>
           <div class="field"><label>SL target</label>
             <select class="inp" id="p-sl"><option>SL1</option><option>SL2</option><option>SL3</option><option>SL4</option></select></div>
+          <div class="field"><label>Risk scoring</label><select class="inp" id="p-risk"><option value="exposure-exploitability-impact">Exposure x Exploitability x Impact</option><option value="cost-based">Cost-based</option></select></div>
           <div class="field"><label>Scope mode</label>
             <select class="inp" id="p-mode"><option>blackbox</option><option>graybox</option><option>whitebox</option></select></div>
         </div>
@@ -479,7 +493,7 @@ function shell(cssUri: vscode.Uri, riskUri: vscode.Uri, logoUri: vscode.Uri, csp
 
       <div class="card" id="card-assumptions">
         <h2>02 · Assumptions</h2>
-        <div class="desc">Attacker profiles and device, system, environment, and operational assumptions.</div>
+        <div class="desc">Device, system, environment, and operational assumptions. The attacker is selected by SL-C.</div>
         <div class="tabs" id="asm-tabs"></div>
         <div id="asm-body"></div>
 
@@ -562,7 +576,7 @@ let system={components:[],interfaces:[],trustBoundaries:[],assets:[]};
 let requirements=[];
 let project={name:'',sl:'SL2',mode:'graybox',boundary:'',includeUseCases:false,useCaseNames:[],useCaseNoticePending:false};
 let undoStack=[], redoStack=[], histKey='', histTime=0;
-let asmTab='attacker', sysTab='components';
+let asmTab='device', sysTab='components';
 const $=function(s){return document.querySelector(s);};
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function uid(prefix,ids){var i=1,id;do{id=prefix+i++;}while((ids||[]).indexOf(id)>=0);return id;}
@@ -593,8 +607,8 @@ function riskCell(t){var r=R.riskOf(t,cms);return pill(r.initial,r.initialBand)+
 function chip(text,on,attrs,title){return '<span class="chip'+(on?' on':'')+'" role="button" tabindex="0" '+attrs+(title?' title="'+esc(title)+'"':'')+'>'+esc(text)+'</span>';}
 
 const STEPS=[
-  ['01','Project','Scope, device, SL-T','scroll','#card-project','project'],
-  ['02','Assumptions','Incl. attacker profiles','scroll','#card-assumptions','assumptions'],
+  ['01','Project','Scope, device, SL-C','scroll','#card-project','project'],
+  ['02','Assumptions','Device, system, environment, operational','scroll','#card-assumptions','assumptions'],
   ['03','System & Assets','Components, C/I/A/S','scroll','#card-system','system'],
   ['04','Data Flow Diagram','Layered DeMarco model','cmd','dfd','dfd'],
   ['05','Requirements','Security requirements','scroll','#card-requirements','requirements'],
@@ -629,9 +643,9 @@ function renderRail(){
 }
 function renderProject(p){
   p=p||{};
-  project={name:p.name||'',sl:p.sl||'SL2',mode:p.mode||'graybox',boundary:p.boundary||'',sbom:p.sbom||{},includeUseCases:!!p.includeUseCases,useCaseNames:p.useCaseNames||[],useCaseNoticePending:!!p.useCaseNoticePending};
+  project={name:p.name||'',sl:p.sl||'SL2',riskScoringMethod:p.riskScoringMethod||'cost-based',mode:p.mode||'graybox',boundary:p.boundary||'',sbom:p.sbom||{},includeUseCases:!!p.includeUseCases,useCaseNames:p.useCaseNames||[],useCaseNoticePending:!!p.useCaseNoticePending};
   $('#devname').textContent=project.name?('· '+project.name):'';
-  $('#p-name').value=project.name;$('#p-sl').value=project.sl;$('#p-mode').value=project.mode;$('#p-bnd').value=project.boundary;
+  $('#p-name').value=project.name;$('#p-sl').value=project.sl;$('#p-risk').value=project.riskScoringMethod;$('#p-mode').value=project.mode;$('#p-bnd').value=project.boundary;
   var ucInc=$('#p-uc-inc'); if(ucInc) ucInc.checked=!!project.includeUseCases;
   var ucList=$('#p-uc-list'); if(ucList) ucList.innerHTML=(project.useCaseNames||[]).length?(project.useCaseNames||[]).map(function(n){return '<li>'+esc(n)+'</li>';}).join(''):'<li>No use-case diagrams yet.</li>';
   var ucNote=$('#p-uc-note'); if(ucNote) ucNote.style.display=project.useCaseNoticePending?'block':'none';
@@ -722,11 +736,7 @@ function renderThreats(){
     var primaryIface=(system.interfaces||[]).find(function(f){return f.id===primaryIfaceId;});
     var seedAct=primaryIface?'data-act="seedExp" data-i='+i+' title="Seed from '+esc(primaryIface.name)+'"':'';
     var moreDetails='<div class="grid3" style="margin-top:8px">'+
-      '<div class="field"><label>Attacker profile</label>'+
-        '<select class="inp" data-i='+i+' data-k="attackerRef">'+
-        '<option value="">— none —</option>'+
-        (assumptions.attacker||[]).map(function(a){return '<option value="'+esc(a.id)+'"'+(t.attackerRef===a.id?' selected':'')+'>'+esc(a.name)+' (cap '+a.capability+', '+a.access+')</option>';}).join('')+
-        '</select></div>'+
+      '<div class="field"><label>SL-C attacker</label><span class="hint">'+esc(((assumptions.attacker||[])[0]||{}).name||'Select SL-C in project settings')+'</span></div>'+
       '<div class="field"><label>Interfaces / vectors</label>'+
         '<div class="chips">'+(system.interfaces||[]).map(function(itf){return chip(itf.tag||itf.name,(t.interfaceRefs||[]).indexOf(itf.id)>=0,'data-act="tIface" data-i='+i+' data-val="'+esc(itf.id)+'"',itf.protocol||itf.category||'');}).join('')+
         (!(system.interfaces||[]).length?'<span class="hint">Define in step 03 first.</span>':'')+
@@ -857,25 +867,10 @@ function renderVersions(){
     '<div class="itemcard"><h3 style="margin:0 0 8px">History ('+entries.length+')</h3>'+history+'</div>';
 }
 function renderAssumptions(){
-  var tabs=[['attacker','Attacker',(assumptions.attacker||[]).length]].concat(ASM_CATS.map(function(c){return [c[0],c[1],(assumptions[c[0]]||[]).length];}));
+  var tabs=ASM_CATS.map(function(c){return [c[0],c[1],(assumptions[c[0]]||[]).length];});
   $('#asm-tabs').innerHTML=tabs.map(function(t){return '<button class="tab'+(asmTab===t[0]?' active':'')+'" data-asmtab="'+t[0]+'">'+esc(t[1])+' <span class="badge">'+t[2]+'</span></button>';}).join('');
   var html='';
-  if(asmTab==='attacker'){
-    var list=assumptions.attacker||[];
-    html+=list.length?list.map(function(p,i){
-      return '<div class="itemcard"><div class="head"><span class="idtag">'+esc(p.id||('ATK-'+(i+1)))+'</span>'+
-        '<input class="inp grow" data-atk='+i+' data-k="name" value="'+esc(p.name||'')+'" placeholder="Profile name">'+
-        '<button class="btn sm danger" data-act="delAtk" data-i='+i+'>&#10005;</button></div>'+
-        '<div class="grid4">'+
-          '<div class="field"><label>Capability</label><select class="inp" data-atk='+i+' data-k="capability">'+[1,2,3,4,5].map(function(n){return '<option'+((+p.capability||2)===n?' selected':'')+'>'+n+'</option>';}).join('')+'</select></div>'+
-          '<div class="field"><label>Access</label><select class="inp" data-atk='+i+' data-k="access">'+optTags(ACCESS,p.access||'local')+'</select></div>'+
-          '<div class="field"><label>Motivation</label><input class="inp" data-atk='+i+' data-k="motivation" value="'+esc(p.motivation||'')+'"></div>'+
-          '<div class="field"><label>Resources</label><input class="inp" data-atk='+i+' data-k="resources" value="'+esc(p.resources||'')+'"></div>'+
-        '</div>'+
-        '<div class="field"><label>Description</label><textarea class="inp" rows=2 data-atk='+i+' data-k="text">'+esc(p.text||'')+'</textarea></div></div>';
-    }).join(''):'<p class="hint">No attacker profiles yet.</p>';
-    html+='<button class="btn sm primary" data-act="addAtk">+ Attacker profile</button>';
-  } else {
+  {
     var key=asmTab, arr=assumptions[key]||[];
     html+=arr.length?arr.map(function(item,i){
       return '<div class="itemcard"><div class="head" style="align-items:flex-start"><span class="idtag">'+esc(item.id||('A-'+(i+1)))+'</span>'+
@@ -884,7 +879,6 @@ function renderAssumptions(){
         '<button class="btn sm danger" data-act="delAsm" data-asm="'+key+'" data-i='+i+'>&#10005;</button></div></div>';
     }).join(''):'<p class="hint">No assumptions yet.</p>';
     html+='<button class="btn sm" data-act="addAsm" data-asm="'+key+'">+ Add</button>';
-  }
   $('#asm-body').innerHTML=html;
 }
 function renderSystem(){
@@ -998,8 +992,6 @@ document.addEventListener('click',function(e){
   else if(act==='addAddr'){cms[+el.dataset.c].addresses.push({threat:el.dataset.val,residualLikelihood:2,residualImpact:2});renderCms();updatePills();}
   else if(act==='addTicket'){var cm2=cms[+el.dataset.ci];cm2.ticketUrls=cm2.ticketUrls&&cm2.ticketUrls.length?cm2.ticketUrls:[''];cm2.ticketUrls.push('');renderCms();}
   else if(act==='delTicket'){var cm3=cms[+el.dataset.ci],ti3=+el.dataset.ti;var urls3=cm3.ticketUrls&&cm3.ticketUrls.length?cm3.ticketUrls:[''];urls3.splice(ti3,1);cm3.ticketUrls=urls3;renderCms();}
-  else if(act==='addAtk'){assumptions.attacker=assumptions.attacker||[];assumptions.attacker.push({id:uid('ATK-',assumptions.attacker.map(function(x){return x.id;})),name:'New attacker',capability:2,access:'local',motivation:'',resources:'',text:''});asmTab='attacker';renderAssumptions();}
-  else if(act==='delAtk'){assumptions.attacker.splice(+el.dataset.i,1);renderAssumptions();}
   else if(act==='addAsm'){var ak=el.dataset.asm;assumptions[ak]=assumptions[ak]||[];assumptions[ak].push({id:uid('A-'+ak.charAt(0).toUpperCase()+'-',assumptions[ak].map(function(x){return x.id;})),text:''});renderAssumptions();}
   else if(act==='delAsm'){assumptions[el.dataset.asm].splice(+el.dataset.i,1);renderAssumptions();}
   else if(act==='addComp'){system.components=system.components||[];system.components.push({id:uid('C-',system.components.map(function(x){return x.id;})),name:'New component',kind:'software',layer:2,parent:(system.components[0]||{}).id||null});sysTab='components';renderSystem();renderThreats();}
@@ -1066,6 +1058,7 @@ document.addEventListener('input',function(e){
   recordBefore(keyOf(t));
   if(t.id==='p-name'){project.name=t.value;$('#devname').textContent=t.value?('· '+t.value):'';return;}
   if(t.id==='p-sl'){project.sl=t.value;return;}
+  if(t.id==='p-risk'){project.riskScoringMethod=t.value;return;}
   if(t.id==='p-mode'){project.mode=t.value;return;}
   if(t.id==='p-bnd'){project.boundary=t.value;return;}
   if(t.id==='p-uc-inc'){project.includeUseCases=!!t.checked;return;}
@@ -1082,7 +1075,6 @@ document.addEventListener('input',function(e){
     return;
   }
   if(t.dataset.c!==undefined&&t.dataset.j!==undefined&&t.dataset.k){cms[+t.dataset.c].addresses[+t.dataset.j][t.dataset.k]=Math.max(1,Math.min(5,+t.value||1));updatePills();return;}
-  if(t.dataset.atk!==undefined&&t.dataset.k){var p=assumptions.attacker[+t.dataset.atk];if(p)p[t.dataset.k]=(t.dataset.k==='capability')?(+t.value||2):t.value;return;}
   if(t.dataset.asm!==undefined&&t.dataset.ai!==undefined&&t.dataset.k){var arr=assumptions[t.dataset.asm];if(arr&&arr[+t.dataset.ai])arr[+t.dataset.ai][t.dataset.k]=t.value;return;}
   if(t.dataset.comp!==undefined&&t.dataset.k){var c=system.components[+t.dataset.comp];if(c)c[t.dataset.k]=(t.dataset.k==='layer')?(+t.value||1):(t.dataset.k==='parent'?(t.value||null):t.value);return;}
   if(t.dataset.if!==undefined&&t.dataset.k){var f=system.interfaces[+t.dataset.if];if(f)f[t.dataset.k]=t.value;return;}

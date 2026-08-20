@@ -1,7 +1,7 @@
 /* Attack-defense tree model + renderer — schema-identical to tra-webapp (types.ts AdNode / AttackTree
    and lib/attackTree.ts). Isomorphic: window (webview) + module.exports (Node tests).
    Tree: { id, title, threatRef?, description?, root: AdNode }.
-   AdNode: { id, kind, label, gate?, access?, skill?, cost?, countermeasureRef?, note?, children? }.
+  AdNode: { id, kind, label, gate?, access?, skill?, cost?, residualCost?, impactDimensions?, countermeasureRef?, note?, children? }.
    kind ∈ goal|step|substep|category|countermeasure|vulnerability ; gate ∈ AND|OR|SAND. */
 (function (g) {
   "use strict";
@@ -9,11 +9,11 @@
   var GATES = ["AND", "OR", "SAND"];
   var STRUCTURAL = ["goal", "step", "substep", "category"];
   var COST_FACTORS = [
-    { k: "time", label: "Time", weight: 0.25 },
+    { k: "time", label: "Time effort", weight: 0.25 },
     { k: "exploitability", label: "Exploitability", weight: 0.2 },
     { k: "window", label: "Window of opportunity", weight: 0.15 },
-    { k: "detection", label: "Detection likelihood", weight: 0.15 },
-    { k: "notoriety", label: "Notoriety / prior knowledge", weight: 0.1 },
+    { k: "detection", label: "Detection probability", weight: 0.15 },
+    { k: "notoriety", label: "Prior knowledge", weight: 0.1 },
     { k: "prep", label: "Preparation effort", weight: 0.1 },
     { k: "abort", label: "Abort risk", weight: 0.05 },
   ];
@@ -32,11 +32,13 @@
   function newNode(kind, root) {
     var n = { id: uid(root), kind: kind, label: KIND_LABEL[kind] || "Node", children: [] };
     if (kind === "step" || kind === "substep") { n.access = 3; n.skill = 2; n.cost = {}; }
-    if (isStructural(n)) n.gate = "AND";
+    if (kind === "countermeasure" || kind === "vulnerability") { n.access = 3; n.skill = 2; n.residualCost = {}; }
+    if (isStructural(n)) n.gate = kind === "category" ? "OR" : "AND";
     return n;
   }
   function addChild(root, parentId, kind) {
     var p = find(root, parentId); if (!p) return null;
+    if (p.kind === "substep" && ["step", "substep", "category"].indexOf(kind) >= 0) return null;
     if (!p.children) p.children = [];
     var n = newNode(kind || "step", root); p.children.push(n); return n;
   }
@@ -63,25 +65,42 @@
 
   // ---- deterministic bottom-up metrics (mirrors lib/attackTree.ts) ----
   function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+  function hasCost(cost) { return COST_FACTORS.some(function (f) { return typeof (cost || {})[f.k] === "number"; }); }
+  function level(value) { return typeof value === "number" && value >= 1 && value <= 5 ? value : 0; }
   function stepProb(cost) {
-    if (!cost) return 1;
-    var p = 1;
-    COST_FACTORS.forEach(function (f) { var v = cost[f.k]; if (typeof v === "number") p *= Math.pow((6 - v) / 5, f.weight); });
-    return clamp01(p);
+    if (!hasCost(cost)) return 1;
+    var weightedCost = COST_FACTORS.reduce(function (sum, f) {
+      var value = typeof cost[f.k] === "number" ? cost[f.k] : 3;
+      return sum + f.weight * Math.max(1, Math.min(5, value));
+    }, 0);
+    return clamp01((6 - weightedCost) / 5);
   }
   function evaluate(node, cmById) {
     var kids = (node.children || []).filter(function (c) { return c.kind !== "countermeasure" && c.kind !== "vulnerability"; });
     var defChildren = (node.children || []).filter(function (c) { return c.kind === "countermeasure"; });
-    var ownVuln = (node.children || []).filter(function (c) { return c.kind === "vulnerability"; }).length;
-    var selfProb = stepProb(node.cost), selfSkill = node.skill || 0, selfAccess = node.access || 0;
+    var vulnChildren = (node.children || []).filter(function (c) { return c.kind === "vulnerability"; });
+    var ownVuln = vulnChildren.length;
+    var leafAttackStep = (node.kind === "step" || node.kind === "substep") && !kids.length;
+    var residualEntity = node.kind === "countermeasure" || node.kind === "vulnerability";
+    var assessed = leafAttackStep || residualEntity;
+    var assessmentCost = residualEntity ? node.residualCost : node.cost;
+    var selfProb = assessed ? stepProb(assessmentCost) : 1, selfSkill = assessed ? level(node.skill) : 0, selfAccess = assessed ? level(node.access) : 0;
+    var defenceResiduals = leafAttackStep ? defChildren.filter(function (c) { return hasCost(c.residualCost); }) : [];
+    if (defenceResiduals.length) selfProb = Math.min.apply(null, defenceResiduals.map(function (c) { return stepProb(c.residualCost); }));
+    var vulnerabilityResiduals = leafAttackStep ? vulnChildren.filter(function (c) { return hasCost(c.residualCost); }) : [];
+    if (vulnerabilityResiduals.length) {
+      var selected = vulnerabilityResiduals.reduce(function (best, c) { return stepProb(c.residualCost) > stepProb(best.residualCost) ? c : best; });
+      selfProb = stepProb(selected.residualCost); selfSkill = level(selected.skill); selfAccess = level(selected.access);
+    }
     var skillReq, accessReq, prob, defenses = defChildren.length, vulns = ownVuln;
     if (!kids.length) { skillReq = selfSkill; accessReq = selfAccess; prob = selfProb; }
     else {
       var cm = kids.map(function (k) { return evaluate(k, cmById); });
       defenses += cm.reduce(function (s, c) { return s + c.defenses; }, 0);
       vulns += cm.reduce(function (s, c) { return s + c.vulns; }, 0);
-      if (node.gate === "OR") {
-        var best = cm.reduce(function (a, b) { return b.prob > a.prob ? b : a; });
+      if (node.kind === "category" || node.gate === "OR") {
+        var alternatives = cm.concat(vulnChildren.map(function (c) { return evaluate(c, cmById); }));
+        var best = alternatives.reduce(function (a, b) { return b.prob > a.prob ? b : a; });
         skillReq = Math.max(best.skillReq, selfSkill); accessReq = Math.max(best.accessReq, selfAccess); prob = best.prob * selfProb;
       } else {
         skillReq = Math.max.apply(null, [selfSkill].concat(cm.map(function (c) { return c.skillReq; })));
@@ -89,11 +108,18 @@
         prob = cm.reduce(function (p, c) { return p * c.prob; }, 1) * selfProb;
       }
     }
-    var defMult = defChildren.reduce(function (m, c) { var st = c.countermeasureRef && cmById ? (cmById[c.countermeasureRef] || {}).status : ""; return m * (DEF_FACTOR[st] || 0.6); }, 1);
-    prob = clamp01(prob * defMult * Math.pow(1.6, ownVuln));
+    var legacyDefChildren = leafAttackStep ? defChildren.filter(function (c) { return !hasCost(c.residualCost); }) : [];
+    var legacyVulns = leafAttackStep ? vulnChildren.filter(function (c) { return !hasCost(c.residualCost); }).length : 0;
+    var defMult = legacyDefChildren.reduce(function (m, c) { var st = c.countermeasureRef && cmById ? (cmById[c.countermeasureRef] || {}).status : ""; return m * (DEF_FACTOR[st] || 0.6); }, 1);
+    prob = clamp01(prob * defMult * Math.pow(1.6, legacyVulns));
     return { skillReq: skillReq, accessReq: accessReq, prob: prob, defenses: defenses, vulns: vulns };
   }
-  function likelihoodFromProb(p) { return Math.min(5, Math.max(1, Math.round(p * 5))); }
+  var DEFAULT_LIKELIHOOD_THRESHOLDS = { 2: 0.3, 3: 0.5, 4: 0.7, 5: 0.9 };
+  function likelihoodFromProb(p, thresholds) {
+    if (p <= 0) return 0;
+    for (var level = 5; level >= 2; level--) if (p >= (thresholds && thresholds[level] != null ? thresholds[level] : DEFAULT_LIKELIHOOD_THRESHOLDS[level])) return level;
+    return 1;
+  }
 
   var FILL = { goal: "#eef4ff", step: "#eef4ff", substep: "#f3f6fb", category: "#f0f0f5", countermeasure: "#e7f6ec", vulnerability: "#fdeaea" };
   // Graphical attack-defence tree — mirrors the tra-webapp AttackTreeDiagram notation:
@@ -156,7 +182,7 @@
     return "<ul><li>" + ul(root) + "</li></ul>";
   }
 
-  var api = { KIND_LABEL: KIND_LABEL, GATES: GATES, COST_FACTORS: COST_FACTORS, esc: esc, isStructural: isStructural, walk: walk, find: find, parentOf: parentOf, uid: uid, newNode: newNode, addChild: addChild, addSibling: addSibling, remove: remove, cycleGate: cycleGate, setKind: setKind, stepProb: stepProb, evaluate: evaluate, likelihoodFromProb: likelihoodFromProb, render: render, toHtml: toHtml };
+  var api = { KIND_LABEL: KIND_LABEL, GATES: GATES, COST_FACTORS: COST_FACTORS, DEFAULT_LIKELIHOOD_THRESHOLDS: DEFAULT_LIKELIHOOD_THRESHOLDS, esc: esc, isStructural: isStructural, walk: walk, find: find, parentOf: parentOf, uid: uid, newNode: newNode, addChild: addChild, addSibling: addSibling, remove: remove, cycleGate: cycleGate, setKind: setKind, stepProb: stepProb, evaluate: evaluate, likelihoodFromProb: likelihoodFromProb, render: render, toHtml: toHtml };
   g.AtModel = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

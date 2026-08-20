@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore, uid } from '../../state/store';
-import { Field, HelpButton, confirmDelete, IdInput, ScaleSelect, CAPABILITY_LEVELS } from '../common';
-import type { Assumption, AttackerProfile } from '../../types';
+import { Field, HelpButton, confirmDelete, IdInput } from '../common';
+import type { Assumption } from '../../types';
 
 const CATS: { key: 'device' | 'system' | 'environment' | 'operational'; label: string; help: string }[] = [
     { key: 'device', label: 'Device', help: 'Secure boot, debug ports, hardware roots of trust…' },
@@ -17,7 +17,7 @@ const ASSUMPTION_PREFIX: Record<typeof CATS[number]['key'], string> = {
     operational: 'AO-',
 };
 
-type TabKey = 'overview' | 'attacker' | 'device' | 'system' | 'environment' | 'operational';
+type TabKey = 'overview' | 'device' | 'system' | 'environment' | 'operational';
 
 export default function AssumptionsPanel() {
     const data = useStore((s) => s.data)!;
@@ -31,64 +31,6 @@ export default function AssumptionsPanel() {
         const list = a[key] || [];
         setList(key, [...list, { id: uid(ASSUMPTION_PREFIX[key], list.map((x) => x.id)), text: '' }]);
     };
-    const setAttacker = (list: AttackerProfile[]) => set({ attacker: list });
-    const addAttacker = () =>
-        setAttacker([
-            ...(a.attacker || []),
-            { id: uid('ATK-', (a.attacker || []).map((x) => x.id)), name: 'New attacker', capability: 2, access: 'local', motivation: '', text: '' },
-        ]);
-
-    const attackerCard = (
-        <div className="card" key="attacker">
-            <div className="toolbar">
-                <h3 style={{ margin: 0 }}>Attacker profiles</h3>
-                <div className="right">
-                    <button className="btn sm primary" onClick={addAttacker}>
-                        + Attacker
-                    </button>
-                </div>
-            </div>
-            {!(a.attacker || []).length && <p className="hint">At least one attacker profile is required.</p>}
-            <div className="list">
-                {(a.attacker || []).map((p, i) => ({ p, i })).sort((a, b) => a.p.id.localeCompare(b.p.id, undefined, { numeric: true })).map(({ p, i }) => {
-                    const upd = (patch: any) => setAttacker(a.attacker.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-                    return (
-                        <div className="itemcard" key={i}>
-                            <div className="head">
-                                <IdInput id={p.id} />
-                                <input className="inp grow" value={p.name} onChange={(e) => upd({ name: e.target.value })} placeholder="Profile name" />
-                                <button className="btn sm danger" aria-label="Delete attacker profile" onClick={() => confirmDelete('this attacker profile') && setAttacker(a.attacker.filter((_, j) => j !== i))}>
-                                    ✕
-                                </button>
-                            </div>
-                            <div className="grid4">
-                                <Field label="Capability">
-                                    <ScaleSelect value={p.capability} onChange={(n) => upd({ capability: n })} levels={CAPABILITY_LEVELS} />
-                                </Field>
-                                <Field label="Access">
-                                    <select value={p.access} onChange={(e) => upd({ access: e.target.value })}>
-                                        {['remote', 'adjacent', 'local', 'physical'].map((o) => (
-                                            <option key={o}>{o}</option>
-                                        ))}
-                                    </select>
-                                </Field>
-                                <Field label="Motivation">
-                                    <input value={p.motivation || ''} onChange={(e) => upd({ motivation: e.target.value })} />
-                                </Field>
-                                <Field label="Resources">
-                                    <input value={p.resources || ''} onChange={(e) => upd({ resources: e.target.value })} />
-                                </Field>
-                            </div>
-                            <Field label="Description">
-                                <textarea value={p.text || ''} onChange={(e) => upd({ text: e.target.value })} />
-                            </Field>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-
     const catCard = (cat: typeof CATS[number]) => (
         <div className="card" key={cat.key}>
             <div className="toolbar">
@@ -123,10 +65,9 @@ export default function AssumptionsPanel() {
         </div>
     );
 
-    const total = (a.attacker?.length || 0) + CATS.reduce((s, c) => s + (a[c.key]?.length || 0), 0);
+    const total = CATS.reduce((s, c) => s + (a[c.key]?.length || 0), 0);
     const tabs: { key: TabKey; label: string; count: number }[] = [
         { key: 'overview', label: 'Overview', count: total },
-        { key: 'attacker', label: 'Attacker', count: a.attacker?.length || 0 },
         ...CATS.map((c) => ({ key: c.key as TabKey, label: c.label, count: a[c.key]?.length || 0 })),
     ];
 
@@ -136,7 +77,7 @@ export default function AssumptionsPanel() {
                 <h1>Assumptions</h1>
                 <HelpButton title="Assumptions (tips)">
                     <ul>
-                        <li><b>Attacker profiles are mandatory</b> — capability and access feed the likelihood rubric.</li>
+                        <li>The attacker profile is selected from the project SL-C level; access is rated on each threat or attack path.</li>
                         <li>Be explicit about the awkward truths: default passwords left in place, 15–20 year lifetime, rare firmware updates.</li>
                         <li>Separate <b>device</b> (what the product guarantees), <b>system</b> (its role in the plant/safety chain), <b>environment</b> (physical/network exposure) and <b>operational</b> (how it is run).</li>
                     </ul>
@@ -155,7 +96,6 @@ export default function AssumptionsPanel() {
                 ))}
             </div>
 
-            {(tab === 'overview' || tab === 'attacker') && attackerCard}
             {CATS.filter((c) => tab === 'overview' || tab === c.key).map(catCard)}
         </div>
     );

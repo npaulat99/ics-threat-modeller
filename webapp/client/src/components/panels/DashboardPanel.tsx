@@ -56,7 +56,7 @@ export default function DashboardPanel() {
                 </HelpButton>
             </div>
             <p className="lead">
-                {project.device?.name || 'Device'} · SL-T {project.slTarget || '—'} · {project.scope?.mode || 'graybox'} · status {project.status || 'draft'}
+                {project.device?.name || 'Device'} · SL-C {project.slTarget || '—'} · {project.scope?.mode || 'graybox'} · status {project.status || 'draft'}
             </p>
 
             <div className="dashgrid">

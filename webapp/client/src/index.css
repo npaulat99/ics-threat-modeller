@@ -473,6 +473,25 @@ textarea {
     font-size: 12px;
 }
 
+.assessment-basis {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 8px 10px;
+    margin: -4px 0 14px;
+    border-left: 3px solid var(--accent-2);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 13px;
+}
+
+.assessment-basis-label {
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
 /* ---- Tables / list rows -------------------------------------------------- */
 .list {
     display: flex;
@@ -525,6 +544,33 @@ textarea {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 10px;
+}
+
+.settings-weight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.settings-weight-grid .field {
+    min-width: 0;
+}
+
+.settings-weight-restore {
+    display: flex;
+    align-items: end;
+    padding-bottom: 12px;
+}
+
+.settings-error-banner {
+    margin: 8px 0 10px;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in srgb, var(--danger) 42%, var(--border));
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+    color: var(--danger);
+    font-size: 13px;
+    font-weight: 600;
 }
 
 .inline {
@@ -1661,6 +1707,7 @@ button.linkbtn {
 .adt-diagram {
     border-top: 1px solid var(--border);
     padding-top: 10px;
+    position: relative;
 }
 
 .adt-legend {
@@ -1931,6 +1978,37 @@ button.linkbtn {
     align-items: center;
     gap: 7px;
     flex-wrap: wrap;
+}
+
+.adt-page-modal {
+    width: min(96vw, 1400px);
+    height: min(92vh, 1000px);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: 0 12px 30px rgba(20, 28, 45, 0.25);
+}
+
+.adt-page-modal .modalhead {
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.adt-node-modal-body {
+    min-height: 0;
+    overflow: auto;
+    padding: 14px;
+}
+
+.adt-assessment-section {
+    margin-top: 14px;
+}
+
+.adt-assessment-section h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
 }
 
 /* ---- Cross-links, focus, help, tabs (session 3) -------------------------- */

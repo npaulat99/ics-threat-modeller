@@ -9,6 +9,7 @@ import type { ProjectData } from '../types';
 import { DEFAULT_ACCEPTABLE_RISK } from '../types';
 import { ID_PATTERN, idCollisions } from './ids';
 import { residual } from './risk';
+import { costWeightTotal } from './attackTree';
 
 export type IssueSeverity = 'error' | 'warning' | 'notice';
 export interface Issue {
@@ -56,6 +57,20 @@ export function validate(data: ProjectData): Issue[] {
     const cmIds = new Set(cms.map((c) => c.id));
     const threatById = new Map(threats.map((t) => [t.id, t]));
     const acceptableRisk = Number.isFinite(project.acceptableRisk) ? project.acceptableRisk : DEFAULT_ACCEPTABLE_RISK;
+    const costBased = project.riskScoringMethod === 'cost-based';
+
+    if (costBased && Math.abs(costWeightTotal(project.costFactorWeights) - 1) > 0.000001)
+        add('warning', `Cost-factor weights total ${costWeightTotal(project.costFactorWeights).toFixed(2)}; they must combine to 1.00.`, 'cost-factor-weights');
+    if (costBased) {
+        for (const level of [1, 2, 3, 4, 5] as const) {
+            const probability = project.accessProbabilities?.[level];
+            if (typeof probability === 'number' && (probability < 0.05 || probability > 1))
+                add('warning', `Access probability for level ${level} must be between 0.05 and 1.00.`, `access-probability:${level}`);
+        }
+        const thresholds = [2, 3, 4, 5].map((level) => project.likelihoodProbabilityThresholds?.[level as 2 | 3 | 4 | 5] ?? ({ 2: 0.3, 3: 0.5, 4: 0.7, 5: 0.9 } as Record<number, number>)[level]);
+        if (thresholds.some((value) => typeof value !== 'number' || value <= 0 || value > 1) || thresholds.some((value, index) => index > 0 && value <= thresholds[index - 1]))
+            add('warning', 'Likelihood probability thresholds must be strictly increasing from L2 through L5 and within 0.01 to 1.00.', 'likelihood-thresholds');
+    }
 
     if (!attackers.length) add('warning', 'No attacker assumptions (required to ground the likelihood assessment).', 'no-attacker');
     for (const m of idCollisions(data)) add('error', m);
@@ -82,6 +97,15 @@ export function validate(data: ProjectData): Issue[] {
             add('warning', `${t.id}: attacker ${atk.id} (${atk.access}) is not proximate enough to reach an exposure-${exposure} surface.`);
         if (atk && typeof atk.capability === 'number' && typeof exploit === 'number' && atk.capability + exploit < 6)
             add('warning', `${t.id}: exploit difficulty (${6 - exploit}) exceeds attacker ${atk.id}'s capability (${atk.capability}) — likelihood may be over-stated.`);
+        if (costBased) {
+            const costKeys = ['time', 'exploitability', 'window', 'detection', 'notoriety', 'prep', 'abort'] as const;
+            if (typeof t.requiredSkill !== 'number' || typeof t.requiredAccess !== 'number' || costKeys.some((key) => typeof t.costFactors?.[key] !== 'number'))
+                add('warning', `${t.id}: cost-based scoring requires required skill, required access, and all seven difficulty dimensions.`);
+            if (costKeys.some((key) => !hasText(t.costRationales?.[key])))
+                add('warning', `${t.id}: cost-based scoring requires a rationale for each difficulty dimension.`);
+            if (typeof t.costLikelihoodProposal === 'number' && t.likelihood !== t.costLikelihoodProposal)
+                add('notice', `${t.id}: manually selected likelihood (${t.likelihood}) differs from the calculated cost-based proposal (${t.costLikelihoodProposal}).`, `cost-likelihood-override:${t.id}:${t.costLikelihoodProposal}`);
+        }
         if (t.status === 'accepted' && (!t.acceptedBy || !t.acceptanceRationale || !t.reviewDate))
             add('warning', `${t.id}: accepted residual risk requires a sign-off owner (acceptedBy), a rationale (acceptanceRationale) and a next-review date (reviewDate).`);
         if ((t.stride || []).some((s) => s === 'S' || s === 'T' || s === 'I') && !t.classification)
@@ -99,7 +123,7 @@ export function validate(data: ProjectData): Issue[] {
         // Residual risk above the project's acceptable threshold — unless the residual is knowingly accepted.
         const [rl, ri] = residual(t, cms);
         const res = (rl || 0) * (ri || 0);
-        if (res > acceptableRisk && t.status !== 'accepted') {
+        if (res > acceptableRisk && t.status !== 'accepted' && t.status !== 'unfeasible') {
             const threatLabel = t.id || 'threat';
             add('warning', `${threatLabel}: residual risk ${res} exceeds the acceptable risk (${acceptableRisk}) — reduce it or accept the residual.`, t.id ? `risk-over-acceptable:${t.id}` : undefined);
         }

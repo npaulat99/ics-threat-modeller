@@ -10,7 +10,7 @@ interface StepDef {
     sub: string;
 }
 const STEPS: StepDef[] = [
-    { key: 'project', num: '01', label: 'Project', sub: 'Scope, device, SL-T' },
+    { key: 'project', num: '01', label: 'Project', sub: 'Scope, device, SL-C' },
     { key: 'assumptions', num: '02', label: 'Assumptions', sub: 'Incl. attacker profiles' },
     { key: 'system', num: '03', label: 'System & Assets', sub: 'Components, C/I/A/S' },
     { key: 'dfd', num: '04', label: 'Data Flow Diagram', sub: 'Layered DeMarco model' },

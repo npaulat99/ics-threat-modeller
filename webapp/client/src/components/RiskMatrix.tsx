@@ -22,6 +22,7 @@ export default function RiskMatrix({ componentRef }: { componentRef?: string }) 
         rolledUp = ids.size > 1;
         threats = threats.filter((t) => (t.components || []).some((c) => ids.has(c)));
     }
+    threats = threats.filter((threat) => threat.status !== 'unfeasible');
 
     const cellThreats: Record<string, string[]> = {};
     for (const t of threats) {

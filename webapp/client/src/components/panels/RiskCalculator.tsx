@@ -6,15 +6,61 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
 import { deriveImpact, deriveLikelihood, exposureFromInterface } from '../../lib/risk';
 import { cvssBaseScore } from '../../lib/cvss';
+import { accessProbability, ACCESS_OPTS, COST_FACTOR_LEVELS, COST_FACTORS, likelihoodFromProb, SKILL_OPTS, stepProb } from '../../lib/attackTree';
 import BugBarTable from '../BugBarTable';
 import type { Threat } from '../../types';
 
-type GuidedRiskModel = Pick<Threat, 'attackerRef' | 'interfaceRef' | 'interfaceRefs' | 'impactDimensions' | 'likelihoodFactors' | 'cvss' | 'ratedBy' | 'ratedAt'> & {
+type GuidedRiskModel = Pick<Threat, 'attackerRef' | 'interfaceRef' | 'interfaceRefs' | 'impactDimensions' | 'likelihoodFactors' | 'cvss' | 'ratedBy' | 'ratedAt' | 'requiredSkill' | 'requiredAccess' | 'costFactors' | 'costRationales' | 'costLikelihood' | 'costLikelihoodProposal' | 'status'> & {
     likelihood?: number;
     impact?: number;
     residualLikelihood?: number;
     residualImpact?: number;
 };
+
+function CostRiskCalculator({ t, upd }: { t: GuidedRiskModel; upd: (patch: any) => void }) {
+    const attacker = useStore((s) => s.data?.assumptions.attacker?.[0]);
+    const weights = useStore((s) => s.data?.project.costFactorWeights);
+    const accessProbabilities = useStore((s) => s.data?.project.accessProbabilities);
+    const likelihoodThresholds = useStore((s) => s.data?.project.likelihoodProbabilityThresholds);
+    const factors = t.costFactors || {};
+    const rationales = t.costRationales || {};
+    const access = t.requiredAccess || 3;
+    const skill = t.requiredSkill || 1;
+    const feasible = !attacker || skill <= attacker.capability;
+    const costProbability = stepProb(factors, weights);
+    const probability = feasible ? accessProbability(access, accessProbabilities) * costProbability : 0;
+    const proposal = likelihoodFromProb(probability, likelihoodThresholds);
+    const update = (patch: Partial<Threat>) => {
+        const nextFactors = patch.costFactors ?? factors;
+        const nextSkill = patch.requiredSkill ?? skill;
+        const nextAccess = patch.requiredAccess ?? access;
+        const status = attacker && nextSkill > attacker.capability ? 'unfeasible' : t.status === 'unfeasible' ? 'open' : t.status;
+        const nextCostProbability = stepProb(nextFactors, weights);
+        const nextProbability = status === 'unfeasible' ? 0 : accessProbability(nextAccess, accessProbabilities) * nextCostProbability;
+        const nextProposal = likelihoodFromProb(nextProbability, likelihoodThresholds);
+        upd({ ...patch, status, costLikelihood: nextProbability, costLikelihoodProposal: nextProposal, likelihood: nextProposal });
+    };
+    return (
+        <div className="calc">
+            <div className="calchead">Cost-based likelihood <span className="muted">weighted attack difficulty and required access</span></div>
+            <div className="grid4">
+                <label className="minifield"><span>Required skill</span><select className="inp" value={skill} onChange={(e) => update({ requiredSkill: Number(e.target.value) })}>{SKILL_OPTS.map(([value, label]) => <option key={value} value={value}>{value} · {label}</option>)}</select></label>
+                <label className="minifield"><span>Required access</span><select className="inp" value={access} onChange={(e) => update({ requiredAccess: Number(e.target.value) })}>{ACCESS_OPTS.map(([value, label]) => <option key={value} value={value}>{value} · {label}</option>)}</select></label>
+                <div className="minifield"><span>Calculated vector probability</span><b>{(probability * 100).toFixed(1)}%</b></div>
+                <div className="minifield"><span>Proposed matrix likelihood</span><b>L{proposal} · {proposal === 1 ? 'Very low' : proposal === 2 ? 'Low' : proposal === 3 ? 'Moderate' : proposal === 4 ? 'High' : proposal === 5 ? 'Very high' : 'None'}</b></div>
+            </div>
+            <div className="costgrid" style={{ marginTop: 10 }}>
+                {COST_FACTORS.map((factor) => (
+                    <div key={factor.k} className="minifield">
+                        <label><span>{factor.label}</span><select className="inp" value={(factors as any)[factor.k] ?? 3} onChange={(e) => update({ costFactors: { ...factors, [factor.k]: Number(e.target.value) } })}>{COST_FACTOR_LEVELS[factor.k].map(([value, label]) => <option key={value} value={value}>{value} · {label}</option>)}</select></label>
+                        <textarea className="inp" rows={2} style={{ marginTop: 4 }} value={(rationales as any)[factor.k] || ''} placeholder="Assessment reason" onChange={(e) => update({ costRationales: { ...rationales, [factor.k]: e.target.value } })} />
+                    </div>
+                ))}
+            </div>
+            {!feasible && <p className="hint warnmark">Required skill exceeds the selected SL-C attacker capability ({attacker?.capability}); this threat is marked unfeasible.</p>}
+        </div>
+    );
+}
 
 const IMPACT_DIMS: { k: 'confidentiality' | 'integrity' | 'availability' | 'safety'; label: string }[] = [
     { k: 'confidentiality', label: 'Confidentiality' },
@@ -91,6 +137,7 @@ export default function RiskCalculator({
     const attackers = useStore((s) => s.data?.assumptions.attacker || []);
     const interfaces = useStore((s) => s.data?.system.interfaces || []);
     const attacker = attackers.find((a) => a.id === t.attackerRef);
+    const scoringMethod = useStore((s) => s.data?.project.riskScoringMethod || 'cost-based');
     const primaryInterface = t.interfaceRefs?.[0] || t.interfaceRef;
     const iface = interfaces.find((i) => i.id === primaryInterface);
     const today = new Date().toISOString().slice(0, 10);
@@ -129,6 +176,8 @@ export default function RiskCalculator({
     const derivedI = deriveImpact(dims);
     const overridden = (derivedL != null && derivedL !== likelihood) || (derivedI != null && derivedI !== impact);
     const capGate = attacker && typeof attacker.capability === 'number' && typeof fac.exploitability === 'number' && attacker.capability + fac.exploitability < 6;
+
+    if (scoringMethod === 'cost-based') return <CostRiskCalculator t={t} upd={upd} />;
 
     return (
         <>

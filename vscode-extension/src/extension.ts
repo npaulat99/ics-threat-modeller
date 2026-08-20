@@ -115,6 +115,7 @@ async function scaffoldProject(dir: vscode.Uri, name: string, slug: string) {
     device: { name, type: "field device", modelReference: "", purdueLevel: "0-1", version: "" },
     scope: { mode: "graybox", boundary: "", inScope: [], outOfScope: [] },
     slTarget: "SL2",
+    riskScoringMethod: "cost-based",
     intendedUse: "",
     foreseeableUse: [],
     repo: { projectBranchUrl: "", kbUrl: "" },
@@ -136,7 +137,7 @@ async function scaffoldProject(dir: vscode.Uri, name: string, slug: string) {
   };
   const assumptions = {
     device: [], system: [], environment: [], operational: [],
-    attacker: [{ id: "ATK-1", name: "Opportunistic attacker", capability: 2, access: "local", motivation: "disruption", resources: "limited", text: "" }]
+    attacker: [{ id: "ATK-SLC-2", name: "Threat Actor 2: Simple Intentional Attacks", capability: 2, motivation: "Intentional attack using simple means", resources: "Low resources, general IT knowledge, low motivation", text: "SL-C 2 attacker profile managed by EmbedRisk." }]
   };
   const system = {
     components: [{ id: "C-DEV", name, kind: "device", layer: 1, parent: null, trustZone: "device", provenance: "own" }],

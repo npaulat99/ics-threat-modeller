@@ -73,6 +73,10 @@ export interface Project {
     device?: DeviceInfo;
     scope?: Scope;
     slTarget?: string;
+    riskScoringMethod?: 'exposure-exploitability-impact' | 'cost-based';
+    costFactorWeights?: Partial<Record<keyof AdCost, number>>;
+    accessProbabilities?: Partial<Record<1 | 2 | 3 | 4 | 5, number>>;
+    likelihoodProbabilityThresholds?: Partial<Record<2 | 3 | 4 | 5, number>>; // lower probability bounds for L2-L5; L1 covers remaining positive values
     intendedUse?: string; // CRA: the manufacturer's intended purpose of the product
     foreseeableUse?: string[]; // CRA: reasonably foreseeable use scenarios
     repo?: RepoLinks;
@@ -146,7 +150,7 @@ export interface AttackerProfile {
     id: string;
     name: string;
     capability: number;
-    access: 'remote' | 'adjacent' | 'local' | 'physical';
+    access?: 'remote' | 'adjacent' | 'local' | 'physical'; // legacy-only; access is now scored per threat/path
     motivation?: string;
     resources?: string;
     text?: string;
@@ -297,11 +301,17 @@ export interface Threat {
     // objectively-rateable factors (both 1-5, higher = more likely). Exposure = attack-surface
     // reachability; Exploitability = ease of exploitation once the surface is reached.
     likelihoodFactors?: { exposure?: number; exploitability?: number };
+    requiredSkill?: number; // 1-5; cost-based feasibility requirement
+    requiredAccess?: number; // 1-5; cost-based access requirement
+    costFactors?: AdCost; // cost-based difficulty dimensions; retained alongside legacy factors
+    costRationales?: Partial<Record<keyof AdCost, string>>; // assessor rationale for each cost factor
+    costLikelihood?: number; // 0-1 calculated cost-based success probability
+    costLikelihoodProposal?: number; // 0-5 likelihood proposed from costLikelihood for the L x I matrix
     cvss?: { baseScore?: number; vector?: string; version?: string }; // CVSS 3.1 or 4.0
     countermeasures?: string[];
     residualLikelihood?: number | null;
     residualImpact?: number | null;
-    status?: 'open' | 'mitigated' | 'accepted' | 'transferred';
+    status?: 'open' | 'mitigated' | 'accepted' | 'transferred' | 'unfeasible';
     ratedBy?: string; // inter-rater provenance: who rated this threat
     ratedAt?: string; // ISO timestamp of the last rating
     acceptedBy?: string; // residual-risk sign-off owner (required when status = accepted)
@@ -356,8 +366,8 @@ export interface CountermeasuresDoc {
 
 // ---- Attack-Defense Trees (Kordy et al. 2010; Jhawar et al. 2015 SAND) -------------------
 export type AdGate = 'AND' | 'OR' | 'SAND';
-export type AdKind = 'goal' | 'step' | 'substep' | 'category' | 'countermeasure' | 'vulnerability';
-/** Per-substep cost factors (1=very low … 5=very high), from notes/topics/bewertung.typ. */
+export type AdKind = 'goal' | 'path' | 'step' | 'substep' | 'category' | 'countermeasure' | 'vulnerability';
+/** Per-step cost factors scored with the factor-specific 1-5 enumerations in lib/attackTree.ts. */
 export interface AdCost {
     time?: number;
     exploitability?: number;
@@ -372,9 +382,13 @@ export interface AdNode {
     kind: AdKind;
     label: string;
     gate?: AdGate; // combination of children, for goal/step/substep/category nodes
-    access?: number; // 1-5 required access (step/substep)
-    skill?: number; // 1-5 required attacker skill (step/substep)
+    access?: number; // 1-5 required access for a step, defence, or vulnerability assessment
+    skill?: number; // 1-5 required attacker skill for a step, defence, or vulnerability assessment
     cost?: AdCost;
+    costRationales?: Partial<Record<keyof AdCost, string>>;
+    residualCost?: AdCost; // defence/vulnerability assessment overriding the parent step cost
+    residualCostRationales?: Partial<Record<keyof AdCost, string>>;
+    impactDimensions?: Objectives; // Bug Bar impact assessed on an attack goal
     countermeasureRef?: string; // for kind 'countermeasure' -> links an existing countermeasure id
     note?: string;
     children?: AdNode[];
