@@ -203,6 +203,7 @@ export function newNode(kind: AdKind): AdNode {
         kind,
         label: KIND_LABEL[kind],
         ...(kind === 'step' || kind === 'substep' ? { access: 3, skill: 2, cost: {} } : {}),
+        ...(kind === 'countermeasure' || kind === 'vulnerability' ? { access: 3, skill: 2, residualCost: {} } : {}),
         ...(['goal', 'path', 'step', 'substep', 'category'].includes(kind) ? { gate: kind === 'category' ? 'OR' as AdGate : 'AND' as AdGate } : {}),
         children: [],
     };

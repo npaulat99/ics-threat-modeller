@@ -202,6 +202,9 @@ ok("substeps cannot receive structural attack children", AtModel.addChild(subste
 const residualTree = { id: "s", kind: "step", label: "Protected", cost: all(2), children: [{ id: "d", kind: "countermeasure", label: "Defence", residualCost: all(5), children: [] }, { id: "v", kind: "vulnerability", label: "Bypass", residualCost: all(1), skill: 4, access: 5, children: [] }] };
 const residualMetrics = AtModel.evaluate(residualTree, {});
 ok("vulnerability residual cost overrides defence residual cost", residualMetrics.prob === 1 && residualMetrics.skillReq === 4 && residualMetrics.accessReq === 5);
+const defenceAssessment = { id: "d", kind: "countermeasure", label: "Defence", access: 4, skill: 3, residualCost: all(5), children: [] };
+const defenceMetrics = AtModel.evaluate(defenceAssessment, {});
+ok("defence residual assessment retains configured access and skill", defenceMetrics.prob === 0.2 && defenceMetrics.accessReq === 4 && defenceMetrics.skillReq === 3);
 
 const aggregationFixture = JSON.parse(fs.readFileSync(path.join(root, "webapp/projects/test/07-attack-trees/attack-trees.json"), "utf8"));
 const aggregationById = Object.fromEntries(aggregationFixture.trees.map((fixture) => [fixture.id, fixture]));

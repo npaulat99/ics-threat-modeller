@@ -130,7 +130,7 @@ export default function AttackTreeDiagram({ tree, ops }: { tree: AttackTree; ops
                     {placed.map(({ node, x, y }) => {
                         const cm = node.countermeasureRef ? cmById.get(node.countermeasureRef) : undefined;
                         const metrics = evaluate(node, cmById, weights);
-                        const showMetrics = node.kind === 'goal' || node.kind === 'step' || node.kind === 'substep';
+                        const showMetrics = node.kind === 'goal' || node.kind === 'step' || node.kind === 'substep' || node.kind === 'vulnerability' || node.kind === 'countermeasure';
                         return (
                             <foreignObject key={node.id} x={x - NW / 2} y={y} width={NW} height={NH}>
                                 <div
@@ -140,8 +140,7 @@ export default function AttackTreeDiagram({ tree, ops }: { tree: AttackTree; ops
                                 >
                                     <div className="adt-node-kind">{KIND_LABEL[node.kind]}</div>
                                     <div className="adt-node-label" onDoubleClick={() => setEditingId(node.id)}>{node.label}</div>
-                                    {showMetrics && <div className="adt-node-sub">acc {metrics.accessReq || '–'} · skill {metrics.skillReq || '–'} · {Math.round(metrics.prob * 100)}%</div>}
-                                    {node.kind === 'countermeasure' && <div className="adt-node-sub">{cm ? `${cm.id}` : 'unlinked'}</div>}
+                                    {showMetrics && <div className="adt-node-sub">{node.kind === 'countermeasure' && cm ? `${cm.id} · ` : ''}acc {metrics.accessReq || '–'} · skill {metrics.skillReq || '–'} · {Math.round(metrics.prob * 100)}%</div>}
                                 </div>
                             </foreignObject>
                         );
@@ -210,6 +209,8 @@ function NodeAssessmentOverlay({
     const weights = useStore((s) => s.data!.project.costFactorWeights);
     const metrics = evaluate(node, new Map(cms.map((countermeasure) => [countermeasure.id, countermeasure])), weights);
     const addKinds = node.kind === 'substep' ? ADD_KINDS.filter((kind) => !['step', 'substep', 'category'].includes(kind)) : ADD_KINDS;
+    const directAssessment = (isStep && !hasAttackChildren) || isVulnerability || isCountermeasure;
+    const metricsLabel = isGoal || (isStep && hasAttackChildren) ? 'calculated' : 'assessed';
     const setImpact = (key: 'confidentiality' | 'integrity' | 'availability' | 'safety', value: number) => ops.upd(node.id, { impactDimensions: { ...(node.impactDimensions || {}), [key]: value } });
     return (
         <div className="modal adt-page-modal" role="dialog" aria-modal="true" aria-label={`Assess ${node.label}`} onClick={(event) => event.stopPropagation()}>
@@ -237,12 +238,12 @@ function NodeAssessmentOverlay({
                     {!isRoot && <button className="btn sm danger" type="button" onClick={() => { ops.del(node.id); onClose(); }}>Delete node</button>}
                 </div>
                 <div className="adderived">
-                    <span className="dtag">calculated probability <b>{Math.round(metrics.prob * 100)}%</b></span>
-                    <span className="dtag">calculated access <b>{metrics.accessReq || '–'} · {accessLabel(metrics.accessReq)}</b></span>
-                    <span className="dtag">calculated skill <b>{metrics.skillReq || '–'} · {skillLabel(metrics.skillReq)}</b></span>
+                    <span className="dtag">{metricsLabel} probability <b>{Math.round(metrics.prob * 100)}%</b></span>
+                    <span className="dtag">{metricsLabel} access <b>{metrics.accessReq || '–'} · {accessLabel(metrics.accessReq)}</b></span>
+                    <span className="dtag">{metricsLabel} skill <b>{metrics.skillReq || '–'} · {skillLabel(metrics.skillReq)}</b></span>
                 </div>
 
-                {((isStep && !hasAttackChildren) || isVulnerability) && (
+                {directAssessment && (
                     <div className="adattrs">
                         <label className="minifield" style={{ width: 220 }}><span>Required access</span><select className="inp" value={node.access ?? 3} onChange={(e) => ops.upd(node.id, { access: Number(e.target.value) })}>
                             {ACCESS_OPTS.map(([v, l]) => (

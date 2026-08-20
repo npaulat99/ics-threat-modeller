@@ -32,6 +32,7 @@
   function newNode(kind, root) {
     var n = { id: uid(root), kind: kind, label: KIND_LABEL[kind] || "Node", children: [] };
     if (kind === "step" || kind === "substep") { n.access = 3; n.skill = 2; n.cost = {}; }
+    if (kind === "countermeasure" || kind === "vulnerability") { n.access = 3; n.skill = 2; n.residualCost = {}; }
     if (isStructural(n)) n.gate = kind === "category" ? "OR" : "AND";
     return n;
   }

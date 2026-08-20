@@ -381,8 +381,8 @@ export interface AdNode {
     kind: AdKind;
     label: string;
     gate?: AdGate; // combination of children, for goal/step/substep/category nodes
-    access?: number; // 1-5 required access (step/substep)
-    skill?: number; // 1-5 required attacker skill (step/substep)
+    access?: number; // 1-5 required access for a step, defence, or vulnerability assessment
+    skill?: number; // 1-5 required attacker skill for a step, defence, or vulnerability assessment
     cost?: AdCost;
     costRationales?: Partial<Record<keyof AdCost, string>>;
     residualCost?: AdCost; // defence/vulnerability assessment overriding the parent step cost
