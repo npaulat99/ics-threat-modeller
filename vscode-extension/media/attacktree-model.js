@@ -80,9 +80,9 @@
     var ownVuln = vulnChildren.length;
     var assessed = (node.kind === "step" || node.kind === "substep") && !kids.length;
     var selfProb = assessed ? stepProb(node.cost) : 1, selfSkill = assessed ? level(node.skill) : 0, selfAccess = assessed ? level(node.access) : 0;
-    var defenceResiduals = defChildren.filter(function (c) { return hasCost(c.residualCost); });
+    var defenceResiduals = assessed ? defChildren.filter(function (c) { return hasCost(c.residualCost); }) : [];
     if (defenceResiduals.length) selfProb = Math.min.apply(null, defenceResiduals.map(function (c) { return stepProb(c.residualCost); }));
-    var vulnerabilityResiduals = vulnChildren.filter(function (c) { return hasCost(c.residualCost); });
+    var vulnerabilityResiduals = assessed ? vulnChildren.filter(function (c) { return hasCost(c.residualCost); }) : [];
     if (vulnerabilityResiduals.length) {
       var selected = vulnerabilityResiduals.reduce(function (best, c) { return stepProb(c.residualCost) > stepProb(best.residualCost) ? c : best; });
       selfProb = stepProb(selected.residualCost); selfSkill = level(selected.skill); selfAccess = level(selected.access);
@@ -102,8 +102,8 @@
         prob = cm.reduce(function (p, c) { return p * c.prob; }, 1) * selfProb;
       }
     }
-    var legacyDefChildren = defChildren.filter(function (c) { return !hasCost(c.residualCost); });
-    var legacyVulns = vulnChildren.filter(function (c) { return !hasCost(c.residualCost); }).length;
+    var legacyDefChildren = assessed ? defChildren.filter(function (c) { return !hasCost(c.residualCost); }) : [];
+    var legacyVulns = assessed ? vulnChildren.filter(function (c) { return !hasCost(c.residualCost); }).length : 0;
     var defMult = legacyDefChildren.reduce(function (m, c) { var st = c.countermeasureRef && cmById ? (cmById[c.countermeasureRef] || {}).status : ""; return m * (DEF_FACTOR[st] || 0.6); }, 1);
     prob = clamp01(prob * defMult * Math.pow(1.6, legacyVulns));
     return { skillReq: skillReq, accessReq: accessReq, prob: prob, defenses: defenses, vulns: vulns };

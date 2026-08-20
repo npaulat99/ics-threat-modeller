@@ -193,6 +193,8 @@ const legacyLevels = { id: "s", kind: "step", label: "Legacy", access: "local", 
 ok("legacy text access and skill do not poison aggregation", AtModel.evaluate(legacyLevels, {}).accessReq === 0 && AtModel.evaluate(legacyLevels, {}).skillReq === 0);
 const categoryTree = { id: "c", kind: "category", label: "Alternatives", gate: "AND", children: [{ id: "a", kind: "step", label: "Easy", cost: all(1), children: [] }, { id: "b", kind: "step", label: "Hard", cost: all(5), children: [] }] };
 ok("categories are OR containers regardless of stored gate", AtModel.evaluate(categoryTree, {}).prob === 1);
+const orWithVulnerability = { id: "g", kind: "goal", label: "Goal", gate: "OR", children: [{ id: "likely", kind: "step", label: "Likely path", cost: all(2), children: [] }, { id: "unlikely", kind: "step", label: "Unlikely path", cost: all(5), children: [] }, { id: "v", kind: "vulnerability", label: "Low-probability vulnerability", residualCost: all(5), children: [] }] };
+ok("a low vulnerability does not suppress the best OR path", AtModel.evaluate(orWithVulnerability, {}).prob === 0.8);
 const residualTree = { id: "s", kind: "step", label: "Protected", cost: all(2), children: [{ id: "d", kind: "countermeasure", label: "Defence", residualCost: all(5), children: [] }, { id: "v", kind: "vulnerability", label: "Bypass", residualCost: all(1), skill: 4, access: 5, children: [] }] };
 const residualMetrics = AtModel.evaluate(residualTree, {});
 ok("vulnerability residual cost overrides defence residual cost", residualMetrics.prob === 1 && residualMetrics.skillReq === 4 && residualMetrics.accessReq === 5);

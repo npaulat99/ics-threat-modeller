@@ -80,12 +80,12 @@ export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>
     let selfSkill = assessedNode ? level(node.skill) : 0;
     let selfAccess = assessedNode ? level(node.access) : 0;
 
-    // Defence residual costs replace the parent step cost; a vulnerability represents a successful
-    // bypass and therefore has the final say. Among equivalent alternatives, use the attacker-favourable
-    // (highest-probability) vulnerability and the most protective defence.
-    const defenceResiduals = defChildren.filter((child) => hasCostAssessment(child.residualCost));
+    // Residual assessments modify only a leaf attack step. Structural AND/OR/SAND nodes aggregate
+    // their child paths first; applying a low-probability vulnerability to an OR container would
+    // incorrectly suppress a more likely sibling path.
+    const defenceResiduals = assessedNode ? defChildren.filter((child) => hasCostAssessment(child.residualCost)) : [];
     if (defenceResiduals.length) selfProb = Math.min(...defenceResiduals.map((child) => assessedStepProb(child.residualCost, weights)));
-    const vulnerabilityResiduals = vulnChildren.filter((child) => hasCostAssessment(child.residualCost));
+    const vulnerabilityResiduals = assessedNode ? vulnChildren.filter((child) => hasCostAssessment(child.residualCost)) : [];
     if (vulnerabilityResiduals.length) {
         const selected = vulnerabilityResiduals.reduce((best, child) => assessedStepProb(child.residualCost, weights) > assessedStepProb(best.residualCost, weights) ? child : best);
         selfProb = assessedStepProb(selected.residualCost, weights);
@@ -118,8 +118,8 @@ export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>
             prob = childM.reduce((p, c) => p * c.prob, 1) * selfProb;
         }
     }
-    const legacyDefChildren = defChildren.filter((child) => !hasCostAssessment(child.residualCost));
-    const legacyVulns = vulnChildren.filter((child) => !hasCostAssessment(child.residualCost)).length;
+    const legacyDefChildren = assessedNode ? defChildren.filter((child) => !hasCostAssessment(child.residualCost)) : [];
+    const legacyVulns = assessedNode ? vulnChildren.filter((child) => !hasCostAssessment(child.residualCost)).length : 0;
     const defMult = legacyDefChildren.reduce((m, c) => m * (DEF_FACTOR[(c.countermeasureRef ? cmById?.get(c.countermeasureRef)?.status : '') ?? ''] ?? 0.6), 1);
     prob = clamp01(prob * defMult * Math.pow(1.6, legacyVulns));
     return { skillReq, accessReq, prob, defenses, vulns };
