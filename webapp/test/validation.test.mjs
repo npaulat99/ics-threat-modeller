@@ -148,9 +148,69 @@ function testTransferredThreatWithLinkedRequirementDoesNotWarn() {
     assert.ok(!warnings.includes('T-1: transferred risk requires a linked requirement documenting the risk transfer in the user guide.'));
 }
 
+function testCostBasedSlcValidation() {
+    const project = baseProject();
+    project.project = { slTarget: 'SL-C 2', riskScoringMethod: 'cost-based' };
+    project.assumptions.attacker = [{ id: 'ATK-SLC-2', name: 'Managed SL-C attacker', capability: 2 }];
+    project.threats.threats.push({
+        id: 'T-1', title: 'Cost threat', stride: ['T'], components: ['C-1'], assets: ['AS-1'], attackerRef: 'ATK-SLC-2',
+        likelihood: 1, impact: 3, requiredSkill: 3, requiredAccess: 3,
+        costFactors: { time: 2, exploitability: 2, window: 3, detection: 3, notoriety: 2, prep: 2, abort: 2 },
+        costRationales: { time: 'Measured effort', exploitability: 'Known weakness', window: 'Routine access', detection: 'Monitoring is limited', notoriety: 'Public knowledge', prep: 'Standard tools', abort: 'Low consequence' }, status: 'open',
+    });
+    const warnings = issueMessages(validate(project), 'warning');
+    assert.ok(warnings.includes('T-1: required skill exceeds the SL-C 2 attacker capability and should be marked unfeasible.'));
+    assert.ok(!warnings.some((message) => message.includes('unassessed difficulty dimensions')));
+}
+
+function testUnfeasibleThreatHasNoResidualRiskWarning() {
+    const project = baseProject();
+    project.threats.threats.push({
+        id: 'T-1', title: 'Unfeasible threat', stride: ['T'], components: ['C-1'], likelihood: 5, impact: 5, status: 'unfeasible',
+    });
+    const warnings = issueMessages(validate(project), 'warning');
+    assert.ok(!warnings.some((message) => message.includes('residual risk 25 exceeds')));
+}
+
+function testCostWeightLimitWarning() {
+    const project = baseProject();
+    project.project = {
+        riskScoringMethod: 'cost-based',
+        costFactorWeights: { time: 0.5, exploitability: 0.5, window: 0.5 },
+    };
+    const warnings = issueMessages(validate(project), 'warning');
+    assert.ok(warnings.includes('Cost-factor weights total 1.90; they must combine to 1.00.'));
+}
+
+function testCostWeightUnderAllocationWarning() {
+    const project = baseProject();
+    project.project = { riskScoringMethod: 'cost-based', costFactorWeights: { time: 0 } };
+    const warnings = issueMessages(validate(project), 'warning');
+    assert.ok(warnings.includes('Cost-factor weights total 0.75; they must combine to 1.00.'));
+}
+
+function testAccessProbabilityAndLikelihoodOverrideNotices() {
+    const project = baseProject();
+    project.project = { riskScoringMethod: 'cost-based', accessProbabilities: { 3: 0.02 } };
+    project.threats.threats.push({
+        id: 'T-1', title: 'Manual likelihood override', stride: ['T'], components: ['C-1'], likelihood: 4, impact: 3,
+        costLikelihoodProposal: 2,
+    });
+    const issues = validate(project);
+    const warnings = issueMessages(issues, 'warning');
+    const notices = issueMessages(issues, 'notice');
+    assert.ok(warnings.includes('Access probability for level 3 must be between 0.05 and 1.00.'));
+    assert.ok(notices.includes('T-1: manually selected likelihood (4) differs from the calculated cost-based proposal (2).'));
+}
+
 testClassificationNoticeAndTransferRequirementWarning();
 testDeploymentConstraintsRuleSkipsAcceptedOrTransferredAndFlagsOpen();
 testContradictoryProductVulnerabilityClassification();
 testTransferredThreatWithLinkedRequirementDoesNotWarn();
+testCostBasedSlcValidation();
+testUnfeasibleThreatHasNoResidualRiskWarning();
+testCostWeightLimitWarning();
+testCostWeightUnderAllocationWarning();
+testAccessProbabilityAndLikelihoodOverrideNotices();
 
 console.log('validation tests passed');

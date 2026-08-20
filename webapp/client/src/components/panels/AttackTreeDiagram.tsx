@@ -165,10 +165,11 @@ function NodeEditor({
     cmById: Map<string, any>;
     cms: { id: string; title: string; status?: string }[];
 }) {
+    const weights = useStore((s) => s.data!.project.costFactorWeights);
     const isStep = node.kind === 'step' || node.kind === 'substep';
     const isStructural = !['countermeasure', 'vulnerability'].includes(node.kind);
     const hasStructuralKids = (node.children || []).some((c) => c.kind !== 'countermeasure' && c.kind !== 'vulnerability');
-    const m = evaluate(node, cmById);
+    const m = evaluate(node, cmById, weights);
     return (
         <div className="adt-editor">
             <div className="adt-editrow">

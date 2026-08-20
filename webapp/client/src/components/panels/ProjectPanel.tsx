@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
 import type { StepKey } from '../../types';
 import { Field, HelpButton, confirmDelete } from '../common';
+import { attackerForSlc, slcLevel, syncThreatFeasibility } from '../../lib/slc';
 
 type GitWorkspace = {
     repoUrl: string;
@@ -106,6 +107,16 @@ export default function ProjectPanel() {
     const setScope = (patch: any) => set({ scope: { ...(p.scope || {}), ...patch } });
     const setRepo = (patch: any) => set({ repo: { ...(p.repo || {}), ...patch } });
     const setSbom = (patch: any) => set({ sbom: { ...(p.sbom || {}), ...patch } });
+    const setSlc = (level: number) => {
+        const attacker = attackerForSlc(`SL-C ${level}`)!;
+        save('project', { ...p, slTarget: `SL-C ${level}` });
+        save('assumptions', { ...data.assumptions, attacker: [attacker] });
+        save('threats', {
+            threats: data.threats.threats.map((threat) =>
+                syncThreatFeasibility({ ...threat, attackerRef: attacker.id }, attacker.capability),
+            ),
+        });
+    };
     const ucDiagrams = data.useCases?.diagrams || [];
     const acceptedNotices = p.acceptedNotices || [];
     const includeUseCases = !!p.reportOptions?.includeUseCases;
@@ -317,8 +328,11 @@ export default function ProjectPanel() {
                             <option value="whitebox">White-box — full internals</option>
                         </select>
                     </Field>
-                    <Field label="Target Security Level">
-                        <input value={p.slTarget || ''} onChange={(e) => set({ slTarget: e.target.value })} placeholder="SL2" />
+                    <Field label="Target Security Level" hint="Sets the built-in SL-C attacker profile for this project.">
+                        <select value={slcLevel(p.slTarget) || ''} onChange={(e) => e.target.value && setSlc(Number(e.target.value))}>
+                            <option value="">Select SL-C level</option>
+                            {[1, 2, 3, 4].map((level) => <option key={level} value={level}>SL-C {level}</option>)}
+                        </select>
                     </Field>
                     <Field label="Status">
                         <select value={p.status || 'draft'} onChange={(e) => set({ status: e.target.value })}>

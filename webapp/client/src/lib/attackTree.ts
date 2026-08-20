@@ -13,21 +13,31 @@ export const COST_FACTORS: { k: keyof AdCost; label: string; weight: number }[] 
     { k: 'abort', label: 'Abort risk', weight: 0.05 },
 ];
 
+export type CostWeights = Partial<Record<keyof AdCost, number>>;
+
+export function costWeightTotal(weights?: CostWeights): number {
+    return COST_FACTORS.reduce((sum, factor) => sum + Math.max(0, Number(weights?.[factor.k] ?? factor.weight) || 0), 0);
+}
+
+export function normalizedCostWeights(weights?: CostWeights): Record<keyof AdCost, number> {
+    const total = costWeightTotal(weights);
+    return Object.fromEntries(COST_FACTORS.map((factor) => [factor.k, Math.max(0, Number(weights?.[factor.k] ?? factor.weight) || 0) / (total || 1)])) as Record<keyof AdCost, number>;
+}
+
+export function weightedCost(cost?: AdCost, weights?: CostWeights): number {
+    const normalized = normalizedCostWeights(weights);
+    return COST_FACTORS.reduce((sum, factor) => sum + normalized[factor.k] * Math.max(1, Math.min(5, cost?.[factor.k] ?? 3)), 0);
+}
+
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 /**
  * Per-step attacker success probability (0..1) from the cost factors. Each factor c (1-5, higher =
- * harder) contributes ((6-c)/5) — i.e. harder factors lower the success probability — raised to its
- * relative weight, giving a weighted geometric mean per step (after bewertung.typ's ∏P_cost model).
+ * harder) contributes to the weighted arithmetic cost C = sum(weight * factor). The cost is then
+ * converted to success probability as (6 - C) / 5.
  */
-export function stepProb(cost?: AdCost): number {
-    if (!cost) return 1;
-    let p = 1;
-    for (const { k, weight } of COST_FACTORS) {
-        const v = cost[k];
-        if (typeof v === 'number') p *= Math.pow((6 - v) / 5, weight);
-    }
-    return clamp01(p);
+export function stepProb(cost?: AdCost, weights?: CostWeights): number {
+    return clamp01((6 - weightedCost(cost, weights)) / 5);
 }
 
 export interface AdMetrics {
@@ -53,12 +63,12 @@ export interface AdMetrics {
  */
 const DEF_FACTOR: Record<string, number> = { proposed: 0.85, planned: 0.7, implemented: 0.5, verified: 0.35 };
 
-export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>): AdMetrics {
+export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>, weights?: CostWeights): AdMetrics {
     const kids = (node.children || []).filter((c) => c.kind !== 'countermeasure' && c.kind !== 'vulnerability');
     const defChildren = (node.children || []).filter((c) => c.kind === 'countermeasure');
     const ownDef = defChildren.length;
     const ownVuln = (node.children || []).filter((c) => c.kind === 'vulnerability').length;
-    const selfProb = stepProb(node.cost);
+    const selfProb = stepProb(node.cost, weights);
     const selfSkill = node.skill || 0;
     const selfAccess = node.access || 0;
 
@@ -73,7 +83,7 @@ export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>
         accessReq = selfAccess;
         prob = selfProb;
     } else {
-        const childM = kids.map((k) => evaluate(k, cmById));
+        const childM = kids.map((k) => evaluate(k, cmById, weights));
         defenses += childM.reduce((s, c) => s + c.defenses, 0);
         vulns += childM.reduce((s, c) => s + c.vulns, 0);
         if (node.gate === 'OR') {
@@ -94,7 +104,7 @@ export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>
 
 /** Suggested threat likelihood (1-5) from a tree's root success probability. */
 export function likelihoodFromProb(prob: number): number {
-    return Math.min(5, Math.max(1, Math.round(prob * 5)));
+    return prob <= 0 ? 0 : Math.min(5, Math.max(1, Math.round(prob * 5)));
 }
 
 // ---- immutable tree editing -------------------------------------------------
@@ -141,6 +151,11 @@ export const ACCESS_OPTS: [number, string][] = [
     [4, 'Local (on site)'],
     [5, 'Physical (open enclosure)'],
 ];
+const DEFAULT_ACCESS_PROBABILITIES: Record<number, number> = { 1: 0.9, 2: 0.7, 3: 0.5, 4: 0.3, 5: 0.1 };
+export const accessProbability = (access: number, probabilities?: Partial<Record<1 | 2 | 3 | 4 | 5, number>>) => {
+    const value = probabilities?.[Math.round(access) as 1 | 2 | 3 | 4 | 5] ?? DEFAULT_ACCESS_PROBABILITIES[Math.round(access)] ?? 0.05;
+    return Math.max(0.05, Math.min(1, value));
+};
 export const SKILL_OPTS: [number, string][] = [
     [1, 'Script kiddie'],
     [2, 'Experienced hacker'],
@@ -159,7 +174,7 @@ export function newNode(kind: AdKind): AdNode {
         kind,
         label: KIND_LABEL[kind],
         ...(kind === 'step' || kind === 'substep' ? { access: 3, skill: 2, cost: {} } : {}),
-        ...(['goal', 'step', 'substep', 'category'].includes(kind) ? { gate: 'AND' as AdGate } : {}),
+        ...(['goal', 'path', 'step', 'substep', 'category'].includes(kind) ? { gate: kind === 'category' ? 'OR' as AdGate : 'AND' as AdGate } : {}),
         children: [],
     };
 }

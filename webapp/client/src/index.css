@@ -473,6 +473,25 @@ textarea {
     font-size: 12px;
 }
 
+.assessment-basis {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 8px 10px;
+    margin: -4px 0 14px;
+    border-left: 3px solid var(--accent-2);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 13px;
+}
+
+.assessment-basis-label {
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
 /* ---- Tables / list rows -------------------------------------------------- */
 .list {
     display: flex;
@@ -525,6 +544,27 @@ textarea {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 10px;
+}
+
+.settings-weight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.settings-weight-grid .field {
+    min-width: 0;
+}
+
+.settings-error-banner {
+    margin: 8px 0 10px;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in srgb, var(--danger) 42%, var(--border));
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+    color: var(--danger);
+    font-size: 13px;
+    font-weight: 600;
 }
 
 .inline {

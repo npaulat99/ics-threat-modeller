@@ -9,6 +9,18 @@ const PROX = { remote: 1, adjacent: 2, local: 3, physical: 4 };
 const reqProx = (e) => (e >= 4 ? 1 : e === 3 ? 2 : e === 2 ? 3 : 4);
 const ID_PATTERN = /^[A-Za-z0-9 _\-:.]+$/;
 const DEFAULT_ACCEPTABLE_RISK = 12;
+const SLC_CAPABILITY = { 1: 1, 2: 2, 3: 3, 4: 5 };
+const COST_WEIGHT_KEYS = ['time', 'exploitability', 'window', 'detection', 'notoriety', 'prep', 'abort'];
+const DEFAULT_COST_WEIGHTS = { time: 0.25, exploitability: 0.2, window: 0.15, detection: 0.15, notoriety: 0.1, prep: 0.1, abort: 0.05 };
+
+function costWeightTotal(weights = {}) {
+    return COST_WEIGHT_KEYS.reduce((sum, key) => sum + Math.max(0, Number(weights[key] ?? DEFAULT_COST_WEIGHTS[key]) || 0), 0);
+}
+
+function slcLevel(value) {
+    const match = /(?:SL(?:-C)?\s*)?([1-4])/i.exec(String(value || ''));
+    return match ? Number(match[1]) : null;
+}
 
 export function validate({ project = {}, assumptions = {}, system = {}, threats = {}, requirements = {}, countermeasures = {}, dfd = {}, useCases = {}, attackTrees = {}, defects = {} } = {}) {
     const issues = [];
@@ -36,8 +48,25 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
     const threatById = new Map(threatList.map((t) => [t.id, t]));
 
     const acceptableRisk = Number.isFinite(project.acceptableRisk) ? project.acceptableRisk : DEFAULT_ACCEPTABLE_RISK;
+    const selectedSlc = slcLevel(project.slTarget);
+    const costBased = project.riskScoringMethod === 'cost-based';
+
+    if (costBased && Math.abs(costWeightTotal(project.costFactorWeights) - 1) > 1e-6)
+        add('warning', `Cost-factor weights total ${costWeightTotal(project.costFactorWeights).toFixed(2)}; they must combine to 1.00.`, 'cost-factor-weights');
+    if (costBased) {
+        for (const level of [1, 2, 3, 4, 5]) {
+            const probability = project.accessProbabilities?.[level];
+            if (typeof probability === 'number' && (probability < 0.05 || probability > 1))
+                add('warning', `Access probability for level ${level} must be between 0.05 and 1.00.`, `access-probability:${level}`);
+        }
+    }
 
     if (!attackers.length) add('warning', 'No attacker assumptions (required to ground the likelihood assessment).', 'no-attacker');
+    if (selectedSlc) {
+        const expectedId = `ATK-SLC-${selectedSlc}`;
+        if (attackers.length !== 1 || attackers[0]?.id !== expectedId || attackers[0]?.capability !== SLC_CAPABILITY[selectedSlc])
+            add('warning', `SL-C ${selectedSlc} requires the managed attacker profile '${expectedId}' (capability ${SLC_CAPABILITY[selectedSlc]}).`, 'slc-attacker-profile');
+    }
     const tbIds = new Set(arr(system.trustBoundaries).map((b) => b.id));
     const allIds = [
         ...components.map((c) => ({ id: c.id, kind: 'component' })),
@@ -69,6 +98,8 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
         for (const c of arr(t.components)) if (!compIds.has(c)) add('error', `${t.id}: references unknown component '${c}'.`);
         for (const a of arr(t.assets)) if (!assetIds.has(a)) add('error', `${t.id}: references unknown asset '${a}'.`);
         if (t.attackerRef && !attackerById.has(t.attackerRef)) add('error', `${t.id}: references unknown attacker profile '${t.attackerRef}'.`);
+        if (selectedSlc && t.attackerRef !== `ATK-SLC-${selectedSlc}`)
+            add('warning', `${t.id}: must use the selected SL-C attacker profile 'ATK-SLC-${selectedSlc}'.`, `slc-attacker:${t.id}`);
         for (const iface of arr(t.interfaceRefs)) if (!ifaceIds.has(iface)) add('error', `${t.id}: references unknown interface '${iface}'.`);
         if (t.interfaceRef && !ifaceIds.has(t.interfaceRef)) add('error', `${t.id}: references unknown interface '${t.interfaceRef}'.`);
         for (const aid of arr(t.assumptionRefs)) {
@@ -82,6 +113,22 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
             add('warning', `${t.id}: attacker ${atk.id} (${atk.access}) is not proximate enough to reach an exposure-${exposure} surface.`);
         if (atk && typeof atk.capability === 'number' && typeof exploit === 'number' && atk.capability + exploit < 6)
             add('warning', `${t.id}: exploit difficulty (${6 - exploit}) exceeds attacker ${atk.id}'s capability (${atk.capability}) — likelihood may be over-stated.`);
+        if (costBased) {
+            if (typeof t.requiredSkill !== 'number' || typeof t.requiredAccess !== 'number' || !t.costFactors)
+                add('warning', `${t.id}: cost-based scoring requires requiredSkill, requiredAccess, and all seven cost factors.`);
+            const missingCostFactor = ['time', 'exploitability', 'window', 'detection', 'notoriety', 'prep', 'abort']
+                .some((key) => typeof t.costFactors?.[key] !== 'number');
+            if (t.costFactors && missingCostFactor)
+                add('warning', `${t.id}: cost-based scoring has one or more unassessed difficulty dimensions.`);
+            const missingRationale = ['time', 'exploitability', 'window', 'detection', 'notoriety', 'prep', 'abort']
+                .some((key) => !hasText(t.costRationales?.[key]));
+            if (missingRationale)
+                add('warning', `${t.id}: cost-based scoring requires a rationale for each difficulty dimension.`);
+            if (typeof t.costLikelihoodProposal === 'number' && t.likelihood !== t.costLikelihoodProposal)
+                add('notice', `${t.id}: manually selected likelihood (${t.likelihood}) differs from the calculated cost-based proposal (${t.costLikelihoodProposal}).`, `cost-likelihood-override:${t.id}:${t.costLikelihoodProposal}`);
+            if (selectedSlc && typeof t.requiredSkill === 'number' && t.requiredSkill > SLC_CAPABILITY[selectedSlc] && t.status !== 'unfeasible')
+                add('warning', `${t.id}: required skill exceeds the SL-C ${selectedSlc} attacker capability and should be marked unfeasible.`);
+        }
         if (t.status === 'accepted' && (!t.acceptedBy || !t.acceptanceRationale || !t.reviewDate))
             add('warning', `${t.id}: accepted residual risk requires a sign-off owner (acceptedBy), a rationale (acceptanceRationale) and a next-review date (reviewDate).`);
         if (arr(t.stride).some((s) => s === 'S' || s === 'T' || s === 'I') && !t.classification)

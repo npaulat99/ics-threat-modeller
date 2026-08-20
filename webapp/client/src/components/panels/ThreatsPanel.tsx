@@ -26,13 +26,13 @@ export default function ThreatsPanel() {
     const requirementOpts = requirements.map((r) => ({ value: r.id, label: r.id, title: r.text }));
     const compOpts = (data.system.components || []).map((c) => ({ value: c.id, label: `${c.name}` }));
     const assetOpts = (data.system.assets || []).map((a) => ({ value: a.id, label: a.name }));
-    const attackers = data.assumptions.attacker || [];
+    const attacker = data.assumptions.attacker?.[0];
     const assumptionRows = [
         ...(data.assumptions.device || []).map((x) => ({ id: x.id, text: x.text || '', source: 'Device' })),
         ...(data.assumptions.system || []).map((x) => ({ id: x.id, text: x.text || '', source: 'System' })),
         ...(data.assumptions.environment || []).map((x) => ({ id: x.id, text: x.text || '', source: 'Environment' })),
         ...(data.assumptions.operational || []).map((x) => ({ id: x.id, text: x.text || '', source: 'Operational' })),
-        ...(attackers || []).map((x) => ({ id: x.id, text: x.text || x.name || '', source: 'Attacker' })),
+        ...(attacker ? [{ id: attacker.id, text: attacker.text || attacker.name || '', source: 'Attacker' }] : []),
     ];
     const assumptionOpts = assumptionRows.map((x) => ({ value: x.id, label: `${x.id} · ${x.source}`, title: x.text || undefined }));
 
@@ -127,14 +127,17 @@ export default function ThreatsPanel() {
                     <div className="grid3">
                         <Field label="Likelihood">
                             <ScaleSelect value={t.likelihood} onChange={(n) => upd({ likelihood: n })} levels={LIKELIHOOD_LEVELS} />
+                            {data.project.riskScoringMethod === 'cost-based' && typeof t.costLikelihoodProposal === 'number' && t.likelihood !== t.costLikelihoodProposal && (
+                                <p className="hint warnmark" style={{ margin: '5px 0 0' }}>Manual value differs from calculated proposal L{t.costLikelihoodProposal}. Review and accept this override in Review &amp; report if intentional.</p>
+                            )}
                         </Field>
                         <Field label="Impact">
                             <ScaleSelect value={t.impact} onChange={(n) => upd({ impact: n })} levels={IMPACT_LEVELS} />
                         </Field>
                         <Field label="Status">
                             <select value={t.status || 'open'} onChange={(e) => upd({ status: e.target.value })}>
-                                {['open', 'mitigated', 'accepted', 'transferred'].map((o) => (
-                                    <option key={o}>{o}</option>
+                                {['open', 'mitigated', 'accepted', 'transferred', 'unfeasible'].map((o) => (
+                                    <option key={o} disabled={o === 'unfeasible'}>{o}</option>
                                 ))}
                             </select>
                         </Field>
@@ -150,7 +153,7 @@ export default function ThreatsPanel() {
                             Classification
                         </button>
                         <button type="button" className={cx('tab', editTab === 'details' && 'active')} onClick={() => setEditTab('details')}>
-                            Assets, attacker &amp; interface
+                            Assets &amp; interfaces
                         </button>
                         <button type="button" className={cx('tab', editTab === 'risk' && 'active')} onClick={() => setEditTab('risk')}>
                             Risk rating
@@ -192,19 +195,9 @@ export default function ThreatsPanel() {
                     )}
                     {editTab === 'details' && (
                         <div className="calc">
-                            <div className="grid3">
+                            <div className="grid2">
                                 <Field label="Affected assets">
                                     <TagSelect options={assetOpts} value={t.assets || []} onChange={(v) => upd({ assets: v })} empty="No assets yet." />
-                                </Field>
-                                <Field label="Attacker profile" hint="Grounds the likelihood rating.">
-                                    <select value={t.attackerRef || ''} onChange={(e) => upd({ attackerRef: e.target.value })}>
-                                        <option value="">— none —</option>
-                                        {attackers.map((a) => (
-                                            <option key={a.id} value={a.id}>
-                                                {a.name} (cap {a.capability}, {a.access})
-                                            </option>
-                                        ))}
-                                    </select>
                                 </Field>
                                 <Field label="Affected interfaces / vectors" hint="Split by interface if the risk differs.">
                                     <TagSelect options={ifaceOpts} value={interfaceRefs} onChange={setInterfaces} empty="No interfaces defined in step 03 yet." />
@@ -287,6 +280,14 @@ export default function ThreatsPanel() {
             <p className="lead">
                 Enumerate STRIDE threats and link each one to the affected components and assets.
             </p>
+            <div className="assessment-basis" role="note">
+                <span className="assessment-basis-label">Assessment basis</span>
+                {attacker ? (
+                    <span>{attacker.name} <span className="muted">· capability {attacker.capability} · selected from the project SL-C target</span></span>
+                ) : (
+                    <span className="warnmark">Select a target SL-C level in Project settings to establish the assessment attacker.</span>
+                )}
+            </div>
 
             {editing ? (
                 <>

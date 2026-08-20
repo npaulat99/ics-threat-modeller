@@ -50,6 +50,7 @@ export function band(score: number, scheme: RiskScheme | null): RiskBand {
 
 /** Residual [likelihood, impact] for a threat across all selected countermeasure links. */
 export function residual(threat: Threat, cms: Countermeasure[]): [number, number] {
+    if (threat.status === 'unfeasible') return [0, 0];
     const links = cms.filter((c) => c.selected !== false).flatMap((c) => (c.addresses || []).filter((a) => a.threat === threat.id));
     if (!links.length) return [threat.likelihood, threat.impact];
     // All applied controls are in effect simultaneously, so an attacker must overcome the strongest
@@ -74,7 +75,7 @@ export interface ThreatRisk {
 }
 
 export function riskOf(threat: Threat, cms: Countermeasure[], scheme: RiskScheme | null): ThreatRisk {
-    const initial = (threat.likelihood || 0) * (threat.impact || 0);
+    const initial = threat.status === 'unfeasible' ? 0 : (threat.likelihood || 0) * (threat.impact || 0);
     const [rl, ri] = residual(threat, cms);
     const res = (rl || 0) * (ri || 0);
     return {

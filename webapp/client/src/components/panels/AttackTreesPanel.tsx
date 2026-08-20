@@ -5,11 +5,9 @@
 import { useState } from 'react';
 import { useStore, uid } from '../../state/store';
 import { TagSelect, Field, HelpButton, confirmDelete, IdInput } from '../common';
-import { evaluate, COST_FACTORS, updateNode, addChild, removeNode, moveChild, adId, KIND_LABEL, likelihoodFromProb, newNode, GATES, ADD_KINDS, ACCESS_OPTS, SKILL_OPTS, accessLabel, skillLabel } from '../../lib/attackTree';
+import { evaluate, COST_FACTORS, updateNode, addChild, removeNode, moveChild, adId, KIND_LABEL, likelihoodFromProb, newNode, GATES, ADD_KINDS, ACCESS_OPTS, SKILL_OPTS, accessLabel, skillLabel, accessProbability } from '../../lib/attackTree';
 import AttackTreeDiagram from './AttackTreeDiagram';
 import type { AdGate, AdKind, AdNode, AttackTree } from '../../types';
-
-const ACCESS_NUM: Record<string, number> = { remote: 2, adjacent: 3, local: 4, physical: 5 };
 
 interface Ops {
     upd: (id: string, patch: Partial<AdNode>) => void;
@@ -25,11 +23,12 @@ function treeThreatRefs(tree: AttackTree) {
 
 function NodeRow({ node, depth, ops }: { node: AdNode; depth: number; ops: Ops }) {
     const cms = useStore((s) => s.data!.countermeasures.countermeasures || []);
+    const weights = useStore((s) => s.data!.project.costFactorWeights);
     const cmById = new Map(cms.map((c) => [c.id, c]));
     const isStep = node.kind === 'step' || node.kind === 'substep';
     const isStructural = !['countermeasure', 'vulnerability'].includes(node.kind);
     const hasStructuralKids = (node.children || []).some((c) => c.kind !== 'countermeasure' && c.kind !== 'vulnerability');
-    const m = evaluate(node, cmById);
+    const m = evaluate(node, cmById, weights);
     return (
         <div className={'adnode kind-' + node.kind} style={{ marginLeft: depth * 18 }}>
             <div className="adrow">
@@ -154,14 +153,21 @@ function TreeCard({ tree, view }: { tree: AttackTree; view: 'list' | 'diagram' }
         move: (id, dir) => setRoot(moveChild(tree.root, id, dir)),
     };
 
-    const m = evaluate(tree.root, new Map((data.countermeasures.countermeasures || []).map((c) => [c.id, c])));
+    const m = evaluate(tree.root, new Map((data.countermeasures.countermeasures || []).map((c) => [c.id, c])), data.project.costFactorWeights);
+    const vectorProbability = m.prob * accessProbability(m.accessReq, data.project.accessProbabilities);
     const hasSteps = (tree.root.children || []).some((c) => c.kind !== 'countermeasure' && c.kind !== 'vulnerability');
     const setThreatLinks = (next: string[]) => updTree({ threatRefs: next, threatRef: next[0] || undefined });
 
     const applyToThreat = () => {
         if (!linkedThreatIds.length) return;
-        const L = likelihoodFromProb(m.prob);
-        save('threats', { threats: threats.map((t) => (linkedThreatIds.includes(t.id) ? { ...t, likelihood: L } : t)) });
+        const selectedAttacker = attackers[0];
+        const unfeasible = !!selectedAttacker && m.skillReq > selectedAttacker.capability;
+        const L = likelihoodFromProb(unfeasible ? 0 : vectorProbability);
+        save('threats', {
+            threats: threats.map((t) => linkedThreatIds.includes(t.id)
+                ? { ...t, requiredSkill: m.skillReq, requiredAccess: m.accessReq, costLikelihood: unfeasible ? 0 : vectorProbability, costLikelihoodProposal: L, likelihood: L, status: unfeasible ? 'unfeasible' : t.status === 'unfeasible' ? 'open' : t.status }
+                : t),
+        });
     };
     return (
         <div className="card">
@@ -188,7 +194,8 @@ function TreeCard({ tree, view }: { tree: AttackTree; view: 'list' | 'diagram' }
                     <>
                         <span className="tag">required skill {m.skillReq || '–'}</span>
                         <span className="tag">required access {m.accessReq || '–'}</span>
-                        <span className="tag">success ≈ {Math.round(m.prob * 100)}%</span>
+                        <span className="tag">goal cost likelihood ≈ {Math.round(m.prob * 100)}%</span>
+                        <span className="tag">attack-vector likelihood ≈ {Math.round(vectorProbability * 100)}%</span>
                         <span className="tag">defences {m.defenses}</span>
                         {m.vulns ? <span className="tag">vulnerabilities {m.vulns}</span> : null}
                         {linkedThreatIds.length > 0 && (
@@ -199,7 +206,7 @@ function TreeCard({ tree, view }: { tree: AttackTree; view: 'list' | 'diagram' }
                         <span className="muted" style={{ marginLeft: 8 }}>
                             feasible for:{' '}
                             {attackers
-                                .filter((a) => m.skillReq <= (a.capability || 0) && m.accessReq <= (ACCESS_NUM[a.access] || 0))
+                                .filter((a) => m.skillReq <= (a.capability || 0))
                                 .map((a) => a.name)
                                 .join(', ') || 'none of the defined attackers'}
                         </span>

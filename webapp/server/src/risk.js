@@ -16,6 +16,7 @@ export function band(s, r) {
 
 /** Residual [likelihood, impact] for a threat given all selected countermeasures. */
 export function residual(threat, cms) {
+    if (threat.status === 'unfeasible') return [0, 0];
     const links = cms.filter((c) => c.selected !== false).flatMap((c) => (c.addresses || []).filter((a) => a.threat === threat.id));
     if (!links.length) return [threat.likelihood, threat.impact];
     // All applied controls are in effect simultaneously, so an attacker must overcome the strongest
