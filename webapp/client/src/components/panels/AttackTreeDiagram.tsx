@@ -209,7 +209,8 @@ function NodeAssessmentOverlay({
     const isStructural = !['countermeasure', 'vulnerability'].includes(node.kind);
     const hasAttackChildren = (node.children || []).some((child) => child.kind === 'step' || child.kind === 'substep');
     const weights = useStore((s) => s.data!.project.costFactorWeights);
-    const metrics = hasAttackChildren ? evaluate(node, new Map(cms.map((countermeasure) => [countermeasure.id, countermeasure])), weights) : null;
+    const metrics = evaluate(node, new Map(cms.map((countermeasure) => [countermeasure.id, countermeasure])), weights);
+    const addKinds = node.kind === 'substep' ? ADD_KINDS.filter((kind) => !['step', 'substep', 'category'].includes(kind)) : ADD_KINDS;
     const setImpact = (key: 'confidentiality' | 'integrity' | 'availability' | 'safety', value: number) => ops.upd(node.id, { impactDimensions: { ...(node.impactDimensions || {}), [key]: value } });
     return (
         <div className="modal adt-page-modal" role="dialog" aria-modal="true" aria-label={`Assess ${node.label}`} onClick={(event) => event.stopPropagation()}>
@@ -236,6 +237,11 @@ function NodeAssessmentOverlay({
                     )}
                     {!isRoot && <button className="btn sm danger" type="button" onClick={() => { ops.del(node.id); onClose(); }}>Delete node</button>}
                 </div>
+                <div className="adderived">
+                    <span className="dtag">calculated probability <b>{Math.round(metrics.prob * 100)}%</b></span>
+                    <span className="dtag">calculated access <b>{metrics.accessReq || '–'} · {accessLabel(metrics.accessReq)}</b></span>
+                    <span className="dtag">calculated skill <b>{metrics.skillReq || '–'} · {skillLabel(metrics.skillReq)}</b></span>
+                </div>
 
                 {((isStep && !hasAttackChildren) || isVulnerability) && (
                     <div className="adattrs">
@@ -252,7 +258,6 @@ function NodeAssessmentOverlay({
                     </div>
                 )}
                 {isStep && !hasAttackChildren && <CostAssessment title="Step difficulty assessment" cost={node.cost} rationales={node.costRationales} onChange={(cost, costRationales) => ops.upd(node.id, { cost, costRationales })} />}
-                {isStep && hasAttackChildren && metrics && <div className="adderived"><span className="dtag">derived access <b>{metrics.accessReq || '–'} · {accessLabel(metrics.accessReq)}</b></span><span className="dtag">derived skill <b>{metrics.skillReq || '–'} · {skillLabel(metrics.skillReq)}</b></span><span className="dtag">derived probability <b>{Math.round(metrics.prob * 100)}%</b></span></div>}
                 {isCountermeasure && <CostAssessment title="Residual difficulty after this defence" cost={node.residualCost} rationales={node.residualCostRationales} onChange={(residualCost, residualCostRationales) => ops.upd(node.id, { residualCost, residualCostRationales })} />}
                 {isVulnerability && <CostAssessment title="Residual difficulty after exploiting this vulnerability" cost={node.residualCost} rationales={node.residualCostRationales} onChange={(residualCost, residualCostRationales) => ops.upd(node.id, { residualCost, residualCostRationales })} />}
                 {isGoal && (
@@ -266,7 +271,7 @@ function NodeAssessmentOverlay({
                 )}
                 <div className="adadd">
                     <span className="hint" style={{ marginRight: 4 }}>Add child:</span>
-                    {ADD_KINDS.map((kind) => <button key={kind} className="btn sm ghost" type="button" onClick={() => ops.add(node.id, kind)}>+ {KIND_LABEL[kind]}</button>)}
+                    {addKinds.map((kind) => <button key={kind} className="btn sm ghost" type="button" onClick={() => ops.add(node.id, kind)}>+ {KIND_LABEL[kind]}</button>)}
                 </div>
             </div>
         </div>

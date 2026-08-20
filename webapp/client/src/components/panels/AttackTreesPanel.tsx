@@ -118,7 +118,7 @@ function NodeRow({ node, depth, ops }: { node: AdNode; depth: number; ops: Ops }
             )}
 
             <div className="adadd">
-                {ADD_KINDS.map((k) => (
+                {(node.kind === 'substep' ? ADD_KINDS.filter((kind) => !['step', 'substep', 'category'].includes(kind)) : ADD_KINDS).map((k) => (
                     <button key={k} className="btn sm ghost" onClick={() => ops.add(node.id, k)}>
                         + {KIND_LABEL[k]}
                     </button>

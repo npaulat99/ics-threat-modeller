@@ -75,17 +75,20 @@ export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>
     const ownVuln = vulnChildren.length;
     // A non-leaf attack step is structural: its cost, required skill, and required access are
     // derived from the attack-step descendants rather than assessed independently.
-    const assessedNode = (node.kind === 'step' || node.kind === 'substep') && !kids.length;
-    let selfProb = assessedNode ? assessedStepProb(node.cost, weights) : 1;
+    const leafAttackStep = (node.kind === 'step' || node.kind === 'substep') && !kids.length;
+    const residualEntity = node.kind === 'countermeasure' || node.kind === 'vulnerability';
+    const assessedNode = leafAttackStep || residualEntity;
+    const assessmentCost = residualEntity ? node.residualCost : node.cost;
+    let selfProb = assessedNode ? assessedStepProb(assessmentCost, weights) : 1;
     let selfSkill = assessedNode ? level(node.skill) : 0;
     let selfAccess = assessedNode ? level(node.access) : 0;
 
     // Residual assessments modify only a leaf attack step. Structural AND/OR/SAND nodes aggregate
     // their child paths first; applying a low-probability vulnerability to an OR container would
     // incorrectly suppress a more likely sibling path.
-    const defenceResiduals = assessedNode ? defChildren.filter((child) => hasCostAssessment(child.residualCost)) : [];
+    const defenceResiduals = leafAttackStep ? defChildren.filter((child) => hasCostAssessment(child.residualCost)) : [];
     if (defenceResiduals.length) selfProb = Math.min(...defenceResiduals.map((child) => assessedStepProb(child.residualCost, weights)));
-    const vulnerabilityResiduals = assessedNode ? vulnChildren.filter((child) => hasCostAssessment(child.residualCost)) : [];
+    const vulnerabilityResiduals = leafAttackStep ? vulnChildren.filter((child) => hasCostAssessment(child.residualCost)) : [];
     if (vulnerabilityResiduals.length) {
         const selected = vulnerabilityResiduals.reduce((best, child) => assessedStepProb(child.residualCost, weights) > assessedStepProb(best.residualCost, weights) ? child : best);
         selfProb = assessedStepProb(selected.residualCost, weights);
@@ -108,7 +111,10 @@ export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>
         defenses += childM.reduce((s, c) => s + c.defenses, 0);
         vulns += childM.reduce((s, c) => s + c.vulns, 0);
         if (node.kind === 'category' || node.gate === 'OR') {
-            const best = childM.reduce((a, b) => (b.prob > a.prob ? b : a));
+            // A vulnerability attached to an OR container is an alternative attack vector. It must
+            // compete with the other paths rather than act as a modifier on the whole container.
+            const alternatives = [...childM, ...vulnChildren.map((child) => evaluate(child, cmById, weights))];
+            const best = alternatives.reduce((a, b) => (b.prob > a.prob ? b : a));
             skillReq = Math.max(best.skillReq, selfSkill);
             accessReq = Math.max(best.accessReq, selfAccess);
             prob = best.prob * selfProb;
@@ -118,8 +124,8 @@ export function evaluate(node: AdNode, cmById?: Map<string, { status?: string }>
             prob = childM.reduce((p, c) => p * c.prob, 1) * selfProb;
         }
     }
-    const legacyDefChildren = assessedNode ? defChildren.filter((child) => !hasCostAssessment(child.residualCost)) : [];
-    const legacyVulns = assessedNode ? vulnChildren.filter((child) => !hasCostAssessment(child.residualCost)).length : 0;
+    const legacyDefChildren = leafAttackStep ? defChildren.filter((child) => !hasCostAssessment(child.residualCost)) : [];
+    const legacyVulns = leafAttackStep ? vulnChildren.filter((child) => !hasCostAssessment(child.residualCost)).length : 0;
     const defMult = legacyDefChildren.reduce((m, c) => m * (DEF_FACTOR[(c.countermeasureRef ? cmById?.get(c.countermeasureRef)?.status : '') ?? ''] ?? 0.6), 1);
     prob = clamp01(prob * defMult * Math.pow(1.6, legacyVulns));
     return { skillReq, accessReq, prob, defenses, vulns };
@@ -144,7 +150,7 @@ export function updateNode(root: AdNode, id: string, patch: Partial<AdNode>): Ad
 
 export function addChild(root: AdNode, parentId: string, child: AdNode): AdNode {
     const rec = (n: AdNode): AdNode =>
-        n.id === parentId
+        n.id === parentId && !(n.kind === 'substep' && ['step', 'substep', 'category'].includes(child.kind))
             ? { ...n, children: [...(n.children || []), child] }
             : { ...n, children: (n.children || []).map(rec) };
     return rec(root);

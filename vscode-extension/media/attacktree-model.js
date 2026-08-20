@@ -37,6 +37,7 @@
   }
   function addChild(root, parentId, kind) {
     var p = find(root, parentId); if (!p) return null;
+    if (p.kind === "substep" && ["step", "substep", "category"].indexOf(kind) >= 0) return null;
     if (!p.children) p.children = [];
     var n = newNode(kind || "step", root); p.children.push(n); return n;
   }
@@ -78,11 +79,14 @@
     var defChildren = (node.children || []).filter(function (c) { return c.kind === "countermeasure"; });
     var vulnChildren = (node.children || []).filter(function (c) { return c.kind === "vulnerability"; });
     var ownVuln = vulnChildren.length;
-    var assessed = (node.kind === "step" || node.kind === "substep") && !kids.length;
-    var selfProb = assessed ? stepProb(node.cost) : 1, selfSkill = assessed ? level(node.skill) : 0, selfAccess = assessed ? level(node.access) : 0;
-    var defenceResiduals = assessed ? defChildren.filter(function (c) { return hasCost(c.residualCost); }) : [];
+    var leafAttackStep = (node.kind === "step" || node.kind === "substep") && !kids.length;
+    var residualEntity = node.kind === "countermeasure" || node.kind === "vulnerability";
+    var assessed = leafAttackStep || residualEntity;
+    var assessmentCost = residualEntity ? node.residualCost : node.cost;
+    var selfProb = assessed ? stepProb(assessmentCost) : 1, selfSkill = assessed ? level(node.skill) : 0, selfAccess = assessed ? level(node.access) : 0;
+    var defenceResiduals = leafAttackStep ? defChildren.filter(function (c) { return hasCost(c.residualCost); }) : [];
     if (defenceResiduals.length) selfProb = Math.min.apply(null, defenceResiduals.map(function (c) { return stepProb(c.residualCost); }));
-    var vulnerabilityResiduals = assessed ? vulnChildren.filter(function (c) { return hasCost(c.residualCost); }) : [];
+    var vulnerabilityResiduals = leafAttackStep ? vulnChildren.filter(function (c) { return hasCost(c.residualCost); }) : [];
     if (vulnerabilityResiduals.length) {
       var selected = vulnerabilityResiduals.reduce(function (best, c) { return stepProb(c.residualCost) > stepProb(best.residualCost) ? c : best; });
       selfProb = stepProb(selected.residualCost); selfSkill = level(selected.skill); selfAccess = level(selected.access);
@@ -94,7 +98,8 @@
       defenses += cm.reduce(function (s, c) { return s + c.defenses; }, 0);
       vulns += cm.reduce(function (s, c) { return s + c.vulns; }, 0);
       if (node.kind === "category" || node.gate === "OR") {
-        var best = cm.reduce(function (a, b) { return b.prob > a.prob ? b : a; });
+        var alternatives = cm.concat(vulnChildren.map(function (c) { return evaluate(c, cmById); }));
+        var best = alternatives.reduce(function (a, b) { return b.prob > a.prob ? b : a; });
         skillReq = Math.max(best.skillReq, selfSkill); accessReq = Math.max(best.accessReq, selfAccess); prob = best.prob * selfProb;
       } else {
         skillReq = Math.max.apply(null, [selfSkill].concat(cm.map(function (c) { return c.skillReq; })));
@@ -102,8 +107,8 @@
         prob = cm.reduce(function (p, c) { return p * c.prob; }, 1) * selfProb;
       }
     }
-    var legacyDefChildren = assessed ? defChildren.filter(function (c) { return !hasCost(c.residualCost); }) : [];
-    var legacyVulns = assessed ? vulnChildren.filter(function (c) { return !hasCost(c.residualCost); }).length : 0;
+    var legacyDefChildren = leafAttackStep ? defChildren.filter(function (c) { return !hasCost(c.residualCost); }) : [];
+    var legacyVulns = leafAttackStep ? vulnChildren.filter(function (c) { return !hasCost(c.residualCost); }).length : 0;
     var defMult = legacyDefChildren.reduce(function (m, c) { var st = c.countermeasureRef && cmById ? (cmById[c.countermeasureRef] || {}).status : ""; return m * (DEF_FACTOR[st] || 0.6); }, 1);
     prob = clamp01(prob * defMult * Math.pow(1.6, legacyVulns));
     return { skillReq: skillReq, accessReq: accessReq, prob: prob, defenses: defenses, vulns: vulns };
