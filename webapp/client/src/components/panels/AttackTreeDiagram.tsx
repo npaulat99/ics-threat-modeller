@@ -18,7 +18,7 @@ import {
     accessLabel,
     skillLabel,
 } from '../../lib/attackTree';
-import BugBarTable from '../BugBarTable';
+import BugBarImpactSelector from '../BugBarImpactSelector';
 import type { AdGate, AdKind, AdNode, AttackTree } from '../../types';
 
 const NW = 182; // node width
@@ -212,7 +212,12 @@ function NodeAssessmentOverlay({
     const addKinds = node.kind === 'substep' ? ADD_KINDS.filter((kind) => !['step', 'substep', 'category'].includes(kind)) : ADD_KINDS;
     const directAssessment = (isStep && !hasAttackChildren) || isVulnerability || isCountermeasure;
     const metricsLabel = isGoal || (isStep && hasAttackChildren) ? 'calculated' : 'assessed';
-    const setImpact = (key: 'confidentiality' | 'integrity' | 'availability' | 'safety', value: number) => ops.upd(node.id, { impactDimensions: { ...(node.impactDimensions || {}), [key]: value } });
+    const setImpact = (key: 'confidentiality' | 'integrity' | 'availability' | 'safety', value: number | undefined) => {
+        const d: any = { ...(node.impactDimensions || {}) };
+        if (value == null) delete d[key];
+        else d[key] = value;
+        ops.upd(node.id, { impactDimensions: d });
+    };
     return (
         <div className="modal adt-page-modal" role="dialog" aria-modal="true" aria-label={`Assess ${node.label}`} onClick={(event) => event.stopPropagation()}>
             <div className="modalhead">
@@ -264,10 +269,7 @@ function NodeAssessmentOverlay({
                 {isGoal && (
                     <section className="adt-assessment-section">
                         <h4>Bug Bar impact</h4>
-                        <div className="grid4">
-                            {(['confidentiality', 'integrity', 'availability', 'safety'] as const).map((key) => <label key={key} className="minifield"><span>{key}</span><select className="inp" value={node.impactDimensions?.[key] ?? ''} onChange={(e) => setImpact(key, Number(e.target.value))}><option value="">-</option>{[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>)}
-                        </div>
-                        <details><summary className="hint">Bug Bar reference</summary><BugBarTable /></details>
+                        <BugBarImpactSelector dims={node.impactDimensions} onSelect={(key, value) => setImpact(key as any, value)} />
                     </section>
                 )}
                 <div className="adadd">
