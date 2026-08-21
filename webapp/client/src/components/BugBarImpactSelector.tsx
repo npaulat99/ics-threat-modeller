@@ -7,7 +7,7 @@ import type { Objectives } from '../types';
 const LEVELS_DESC = [5, 4, 3, 2, 1];
 const DIM_KEYS = ['confidentiality', 'integrity', 'availability', 'safety'] as const;
 
-export default function BugBarImpactSelector({ dims, onSelect }: { dims?: Objectives; onSelect: (key: string, score: number) => void }) {
+export default function BugBarImpactSelector({ dims, onSelect }: { dims?: Objectives; onSelect: (key: string, score: number | undefined) => void }) {
     const bugBar = useStore((s) => s.bugBar);
     const dimensions = bugBar?.dimensions || [];
     if (!dimensions.length) return <p className="hint">Bug bar reference not available.</p>;
@@ -45,14 +45,17 @@ export default function BugBarImpactSelector({ dims, onSelect }: { dims?: Object
                             </td>
                             {dimensions.map((d: any) => {
                                 const level = d.levels.find((l: any) => l.score === score);
-                                const selected = (dims as any)?.[d.key] === score;
+                                const selectedVal = (dims as any)?.[d.key];
+                                const exact = selectedVal === score;
+                                // Fill every bar below the selected level too, so the column reads like a bar chart.
+                                const filled = typeof selectedVal === 'number' && score <= selectedVal;
                                 return (
                                     <td key={d.key}>
                                         <button
                                             type="button"
-                                            className={'bbcell' + (selected ? ' selected' : '')}
-                                            aria-pressed={selected}
-                                            onClick={() => onSelect(d.key, score)}
+                                            className={'bbcell' + (filled ? ' filled' : '') + (exact ? ' selected' : '')}
+                                            aria-pressed={exact}
+                                            onClick={() => onSelect(d.key, exact ? undefined : score)}
                                         >
                                             {level?.scenario}
                                         </button>

@@ -134,9 +134,11 @@ export default function RiskCalculator({
     const iface = interfaces.find((i) => i.id === primaryInterface);
     const today = new Date().toISOString().slice(0, 10);
 
-    const setDim = (k: string, v: number) => {
-        const d = { ...dims, [k]: v };
-        upd({ impactDimensions: d, [impactField]: deriveImpact(d) ?? impact, ratedAt: today });
+    const setDim = (k: string, v: number | undefined) => {
+        const d: any = { ...dims };
+        if (v == null) delete d[k];
+        else d[k] = v;
+        upd({ impactDimensions: d, [impactField]: deriveImpact(d) ?? 0, ratedAt: today });
     };
     const setFac = (k: string, v: number) => {
         const f = { ...fac, [k]: v };

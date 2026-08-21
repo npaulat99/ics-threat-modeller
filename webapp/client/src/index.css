@@ -1611,13 +1611,25 @@ button.linkbtn {
     background: var(--surface-2);
 }
 
+.bbcell.filled:hover {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.bbcell.selected:hover {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
 .bbcell:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
 }
 
+.bbcell.filled {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
 .bbcell.selected {
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
     box-shadow: inset 0 0 0 1.5px var(--accent);
     color: var(--accent);
     font-weight: 600;

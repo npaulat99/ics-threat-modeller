@@ -212,7 +212,12 @@ function NodeAssessmentOverlay({
     const addKinds = node.kind === 'substep' ? ADD_KINDS.filter((kind) => !['step', 'substep', 'category'].includes(kind)) : ADD_KINDS;
     const directAssessment = (isStep && !hasAttackChildren) || isVulnerability || isCountermeasure;
     const metricsLabel = isGoal || (isStep && hasAttackChildren) ? 'calculated' : 'assessed';
-    const setImpact = (key: 'confidentiality' | 'integrity' | 'availability' | 'safety', value: number) => ops.upd(node.id, { impactDimensions: { ...(node.impactDimensions || {}), [key]: value } });
+    const setImpact = (key: 'confidentiality' | 'integrity' | 'availability' | 'safety', value: number | undefined) => {
+        const d: any = { ...(node.impactDimensions || {}) };
+        if (value == null) delete d[key];
+        else d[key] = value;
+        ops.upd(node.id, { impactDimensions: d });
+    };
     return (
         <div className="modal adt-page-modal" role="dialog" aria-modal="true" aria-label={`Assess ${node.label}`} onClick={(event) => event.stopPropagation()}>
             <div className="modalhead">
