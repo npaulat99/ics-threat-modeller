@@ -40,6 +40,11 @@ function CostRiskCalculator({ t, upd }: { t: GuidedRiskModel; upd: (patch: any) 
         const nextProposal = likelihoodFromProb(nextProbability, likelihoodThresholds);
         upd({ ...patch, status, costLikelihood: nextProbability, costLikelihoodProposal: nextProposal, likelihood: nextProposal });
     };
+    useEffect(() => {
+        const proposal = likelihoodFromProb(probability, likelihoodThresholds);
+        if (t.likelihood === proposal && Math.abs((t.costLikelihood ?? -1) - probability) < 0.000001 && t.costLikelihoodProposal === proposal) return;
+        upd({ costLikelihood: probability, costLikelihoodProposal: proposal, likelihood: proposal });
+    }, [probability, likelihoodThresholds, t.likelihood, t.costLikelihood, t.costLikelihoodProposal, upd]);
     return (
         <div className="calc">
             <div className="calchead">Cost-based likelihood <span className="muted">weighted attack difficulty and required access</span></div>
@@ -285,7 +290,7 @@ export default function RiskCalculator({
                     {capGate && (
                         <>
                             {' '}
-                            <span className="warnmark">this exploit's difficulty ({5 - (fac.exploitability ?? 3) + 1}) exceeds the linked attacker's capability ({attacker!.capability}).</span>
+                            <span className="warnmark">likelihood may be over-stated based on the linked attacker's capability.</span>
                         </>
                     )}
                 </p>

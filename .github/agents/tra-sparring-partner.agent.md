@@ -15,6 +15,12 @@ made or being considered — not to produce new deliverables and not to touch fi
   downsides.
 - Point out when a rating or decision looks inconsistent with something else already in the project
   (but leave the authoritative consistency report to the `tra-reviewer` agent).
+- Check the project's `riskScoringMethod`. For cost-based work, challenge missing cost-factor
+  evidence, attacker access/skill gates, configured weights and thresholds, and unexplained
+  differences between `costLikelihoodProposal` and the selected matrix likelihood. For the other
+  scheme, challenge exposure/exploitability and Bug Bar impact evidence. When both are present,
+  treat them as complementary assessments and ask for an explanation rather than silently choosing
+  one.
 
 ## What you never do
 

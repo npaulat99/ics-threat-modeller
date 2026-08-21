@@ -13,6 +13,8 @@ write `08-countermeasures/countermeasures.json` or `05-requirements/requirements
   affected components/interfaces).
 - Read `02-assumptions/assumptions.json` (operational assumptions, e.g. maintenance windows, offline
   periods) and `03-system-assets/system.json` (component `kind`, `provenance`) for constraints.
+- Read `01-project-description/project.json` and identify `riskScoringMethod` plus the configured
+  cost weights and likelihood thresholds when present.
 - Reuse and adapt [knowledge-base/ot-countermeasures.json](../../knowledge-base/ot-countermeasures.json)
   entries where they match the threat's key/pattern, citing which entry you drew from.
 - Avoid generic advice ("use encryption", "add authentication"). Every proposal must name the
@@ -31,6 +33,11 @@ For each proposal:
 - **Addresses**: which threat id(s), and the residual likelihood/impact you'd expect after this
   control — with rationale (a preventive control should lower likelihood, not impact; state which
   axis this control acts on and why).
+- **Scoring-method treatment**: preserve the common residual likelihood/impact rating for both
+  schemes. For a cost-based threat, also state which cost input the control changes (access, skill,
+  one or more cost factors, or an explicitly assessed residual cost), the expected effect on
+  `costLikelihood`, and the evidence needed to support that change. Do not lower a cost-based result
+  merely because a control sounds effective.
 - **OT constraint check**: one line on why this is feasible for the device (or a flagged concern if
   it may not be, e.g. "requires a firmware update mechanism not yet confirmed to exist").
 - **IEC 62443-4-2 reference**: if applicable.

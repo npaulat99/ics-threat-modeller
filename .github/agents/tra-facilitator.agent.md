@@ -18,8 +18,10 @@ A TRA project is a folder with one JSON artifact per step (see [docs/HOW-TO-TRA.
 `01-project-description/project.json` -> `02-assumptions/assumptions.json` -> `03-system-assets/system.json`
 -> `04-dfd/dfd.json` -> `05-requirements/requirements.json` -> `06-threats/threats.json` ->
 `07-attack-trees/attack-trees.json` -> `08-countermeasures/countermeasures.json` -> `09-defects/defects.json`.
-The traceability chain is **asset -> threat -> risk rating (Likelihood x Impact, CIA + Safety) ->
-requirement -> countermeasure -> residual risk**. Never restructure this schema; only populate it.
+The traceability chain is **asset -> threat -> risk rating (common Likelihood x Impact matrix,
+with CIA + Safety impact) -> requirement -> countermeasure -> residual risk**. Projects may use
+either `exposure-exploitability-impact` or `cost-based` scoring. Never restructure this schema;
+populate the common matrix fields and, for cost-based projects, the additional cost assessment.
 
 Alongside the official artifacts, each project has an AI-only sidecar file, `.tra-knowledge.json`, at
 the project root. It is not read by the webapp or the VS Code extension. Read and update it freely
@@ -83,6 +85,13 @@ Track your current state and announce transitions briefly. Do not skip states.
    Log the change (what/why/approved-by/when) in `.tra-knowledge.json.decisionLog`.
 8. **Final review** — when the user says the project (or a step) is complete, delegate to
    `tra-reviewer` for a structured consistency/plausibility report before closing the session.
+
+For every project, first identify the selected `riskScoringMethod` and preserve both the common
+matrix rating and its evidence. In cost-based mode, collect `requiredSkill`, `requiredAccess`, all
+seven cost factors with rationales, and the calculated/proposed cost likelihood before treating a
+threat rating as complete. A manual matrix override is allowed only when it is explicitly recorded
+and justified. Attack-tree cost evaluations are supporting evidence and must not be confused with
+the threat-level cost-based assessment.
 
 By default, write each change immediately after presenting its summary — do not wait for a separate
 confirmation message. This default exists because the intended workspace pairs VS Code with git and

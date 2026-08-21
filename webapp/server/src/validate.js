@@ -115,8 +115,8 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
         const exploit = t.likelihoodFactors?.exploitability;
         if (atk && typeof exposure === 'number' && (PROX[atk.access] ?? 4) < reqProx(exposure))
             add('warning', `${t.id}: attacker ${atk.id} (${atk.access}) is not proximate enough to reach an exposure-${exposure} surface.`);
-        if (atk && typeof atk.capability === 'number' && typeof exploit === 'number' && atk.capability + exploit < 6)
-            add('warning', `${t.id}: exploit difficulty (${6 - exploit}) exceeds attacker ${atk.id}'s capability (${atk.capability}) — likelihood may be over-stated.`);
+        if (t.likelihood >= 3 && atk && typeof atk.capability === 'number' && typeof exploit === 'number' && atk.capability + exploit < 6)
+            add('notice', `${t.id}: likelihood may be over-stated based on attacker ${atk.id}'s capability. Accept if this is intentional.`, `capability-gate:${t.id}`);
         if (costBased) {
             if (typeof t.requiredSkill !== 'number' || typeof t.requiredAccess !== 'number' || !t.costFactors)
                 add('warning', `${t.id}: cost-based scoring requires requiredSkill, requiredAccess, and all seven cost factors.`);
@@ -253,5 +253,6 @@ export function validate({ project = {}, assumptions = {}, system = {}, threats 
             if (!tIds.has(ref)) add('error', `Attack tree '${tr.id}' references unknown threat '${ref}'.`);
     }
 
-    return issues;
+    const accepted = new Set(Array.isArray(project.acceptedNotices) ? project.acceptedNotices : []);
+    return issues.filter((issue) => issue.severity !== 'notice' || !accepted.has(issue.key));
 }

@@ -10,7 +10,11 @@ Prepare (do not start) a TRA interview for the project provided:
 2. Delegate to `tra-context-extractor` for a facts/gaps report on the current step files.
 3. Turn the gap list into a prioritized queue: correctness-blocking gaps first (e.g. no attacker
    profile at all, no interfaces documented), then completeness gaps (e.g. a component with no
-   description), then nice-to-have detail.
+   description), then nice-to-have detail. Also read `project.riskScoringMethod`: for
+   `cost-based`, add correctness-blocking questions for missing attacker access/skill evidence,
+   cost weights or thresholds, cost factors, and factor rationales; for
+   `exposure-exploitability-impact`, add questions for missing exposure/exploitability or Bug Bar
+   impact evidence when rigorous mode is enabled.
 4. Write the queue into `.tra-knowledge.json` under `interview.openQuestions` (creating the file if
    needed — no approval required, it's the AI sidecar file, not a TRA artifact).
 

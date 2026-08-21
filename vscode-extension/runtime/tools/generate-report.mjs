@@ -127,7 +127,7 @@ const atkRows = (ass.attacker || []).map((a) => {
   return `<li id="${esc(assumptionAnchor(a.id))}"><b>${esc(a.id)}</b> · <b>${esc(a.name)}</b> cap ${a.capability}, ${esc(a.access)}: ${esc(a.text || '')}${cited ? `<br><span style="font-size:11px;color:#555">cited by: ${cited}</span>` : ''}</li>`;
 }).join('');
 
-// SBOM (CycloneDX 1.5) from component list
+// SBOM (CycloneDX) from component list
 const sbomMode = project.sbom?.mode || 'in-tool';
 const sbomFormat = project.sbom?.format || 'cyclonedx';
 const sbomComps = (sys.components || []).filter(c => c.kind !== 'external-entity');
@@ -174,7 +174,7 @@ if (sbomMode !== 'in-tool') {
     ? `<h2>Software bill of materials (SBOM)</h2><p>Provided externally: <a href="${esc(project.sbom.url)}">${esc(project.sbom.url)}</a></p>`
     : `<h2>Software bill of materials (SBOM)</h2><p>Declared as externally provided; no URL recorded.</p>`;
 } else {
-  const fmt = sbomFormat === 'spdx' ? 'SPDX 2.3' : 'CycloneDX 1.5';
+  const fmt = sbomFormat === 'spdx' ? 'SPDX 2.3' : 'CycloneDX';
   const file = sbomFormat === 'spdx' ? 'report/sbom.spdx.json' : 'report/sbom.cdx.json';
   sbomSection = sbomTableRows
     ? `<h2>Software bill of materials (SBOM)</h2><p>${fmt} — <code>${file}</code></p><table><tr><th>Component</th><th>Version</th><th>Supplier</th><th>License</th><th>CPE / purl</th><th>Provenance</th></tr>${sbomTableRows}</table>`

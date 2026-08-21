@@ -116,7 +116,7 @@ export default function TopBar() {
                     aria-expanded={helpOpen}
                     onClick={() => setHelpOpen((v) => !v)}
                 >
-                    ?
+                    <span aria-hidden="true">?</span>
                 </button>
                 {helpOpen && (
                     <div className="helpmenu-pop" role="menu">

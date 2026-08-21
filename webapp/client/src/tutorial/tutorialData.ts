@@ -39,16 +39,16 @@ export type NavKey =
     | 'assumptions'
     | 'system'
     | 'dfd'
+    | 'useCases'
     | 'requirements'
     | 'threats'
     | 'attackTrees'
     | 'countermeasures'
-    | 'review';
+    | 'review'
+    | 'versions';
 
 export interface TutorialStep {
     key: string;
-    /** Original tool/step number shown in the interface, even when the tutorial order differs. */
-    toolNum: string;
     /** Which methodology item is highlighted in the mock navigation. */
     navKey?: NavKey;
     screen: ScreenKey;
@@ -74,7 +74,7 @@ export const tutorialProject = {
     title: 'FlowGuard FC-300 Smart Flow Controller',
     device: 'FC-300 controller',
     domain: 'Drinking-water pump station',
-    slTarget: 'SL 2',
+    slTarget: 'SL-C 2',
     status: 'In development',
 };
 
@@ -82,7 +82,6 @@ export const tutorialAssumptions = [
     { id: 'A-01', tag: 'Deployment', text: 'Installed in a locked cabinet inside a fenced pump station.' },
     { id: 'A-02', tag: 'Network', text: 'Plant network is segmented; Modbus TCP is not internet-exposed.' },
     { id: 'A-03', tag: 'Trust', text: 'Vendor cloud link uses mutual TLS with per-device certificates.' },
-    { id: 'A-04', tag: 'Attacker', text: 'Adversary can reach the HART service port during a maintenance visit.' },
 ];
 
 export const tutorialImpacts = [
@@ -131,26 +130,28 @@ export const tutorialCountermeasures = [
 ];
 
 // The methodology navigation shown inside the mock window (mirrors the real StepNav numbering).
-export const tutorialNav: { key: NavKey; num: string; label: string }[] = [
-    { key: 'project', num: '01', label: 'Project' },
-    { key: 'assumptions', num: '02', label: 'Assumptions' },
-    { key: 'system', num: '03', label: 'System & Assets' },
-    { key: 'dfd', num: '04', label: 'Data Flow Diagram' },
-    { key: 'requirements', num: '05', label: 'Requirements' },
-    { key: 'threats', num: '06', label: 'Threats' },
-    { key: 'attackTrees', num: '07', label: 'Attack trees' },
-    { key: 'countermeasures', num: '08', label: 'Countermeasures' },
-    { key: 'review', num: '09', label: 'Review & Report' },
+export const tutorialNav: { key: NavKey; label: string }[] = [
+    { key: 'project', label: 'Project' },
+    { key: 'assumptions', label: 'Assumptions' },
+    { key: 'system', label: 'System & Assets' },
+    { key: 'dfd', label: 'Data Flow Diagram' },
+    { key: 'useCases', label: '(Mis-)use cases' },
+    { key: 'requirements', label: 'Requirements' },
+    { key: 'threats', label: 'Threats' },
+    { key: 'attackTrees', label: 'Attack trees' },
+    { key: 'countermeasures', label: 'Countermeasures' },
+    { key: 'review', label: 'Review & Report' },
+    { key: 'versions', label: 'TRA Versions' },
 ];
 
 // Typical workshop sequence — shown as an example, explicitly not a mandatory process.
 export const tutorialWorkshops = [
     { phase: 'Kickoff', focus: 'Scope and initial assumptions', who: 'Project lead · architect · facilitator' },
     { phase: 'Impact workshop', focus: 'Worst-case scenarios · attack-tree roots', who: 'Product owner · business · facilitator' },
-    { phase: 'Technical modeling', focus: 'System, assets, DFD', who: 'Architects · developers · testers' },
+    { phase: 'Technical modeling', focus: 'System, assets, DFD · optional use cases', who: 'Architects · developers · testers' },
     { phase: 'Threat analysis', focus: 'Threats · attack-tree refinement', who: 'Technical team · facilitator' },
-    { phase: 'Mitigations → requirements', focus: 'Evaluate controls, then derive requirements', who: 'Technical team · product owner' },
-    { phase: 'Review', focus: 'Validate risk, assumptions, decisions', who: 'Project stakeholders' },
+    { phase: 'Requirements → mitigations', focus: 'Capture requirements, then evaluate controls', who: 'Technical team · product owner' },
+    { phase: 'Review and lifecycle', focus: 'Resolve findings · report · tag versions', who: 'Project stakeholders' },
 ];
 
 // Cursor waypoints are in percent of the animation stage. Content is revealed on the click
@@ -162,14 +163,13 @@ const ADD_Y = 14;
 export const tutorialSteps: TutorialStep[] = [
     {
         key: 'intro',
-        toolNum: '',
         screen: 'intro',
         title: 'A realistic threat & risk analysis',
         phase: 'How to read this tutorial',
         participants: ['Project lead', 'Architects & developers', 'Business stakeholders', 'Security facilitator'],
         iteration: 'Iterative, not a one-way checklist',
-        what: 'Watch an experienced team run an iterative TRA on a real connected field device.',
-        why: 'A TRA is revisited across several workshops — assumptions, attack trees and requirements keep evolving.',
+        what: 'Watch an experienced team run an iterative TRA on a real connected field device. Use the live app from left to right, saving each step as you build the evidence.',
+        why: 'A TRA is revisited across several workshops — assumptions, attack trees, requirements and risk decisions keep evolving.',
         duration: 3200,
         path: [
             { t: 0, x: 50, y: 20, reveal: 0 },
@@ -179,7 +179,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'project',
-        toolNum: '01',
         navKey: 'project',
         screen: 'project',
         title: 'Kickoff — define the device boundary',
@@ -200,28 +199,26 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'assumptions',
-        toolNum: '02',
         navKey: 'assumptions',
         screen: 'assumptions',
         title: 'Assumptions — a living artifact',
         phase: 'Kickoff → maintained throughout',
         participants: ['System architect', 'Security facilitator'],
         iteration: 'First pass · updated throughout the TRA',
-        what: 'Deployment, network, trust and attacker **assumptions** are captured — and revisited as the analysis grows.',
-        why: 'Assumptions make risk reasoning **auditable** and are refined whenever the picture changes.',
+        what: 'Deployment, network and trust **assumptions** are captured — and revisited as the analysis grows. The attacker profile is supplied automatically by the selected **SL-C** level.',
+        why: 'Assumptions make risk reasoning **auditable**, while the built-in SL-C attacker profile keeps likelihood ratings consistent.',
         duration: 4800,
         path: [
             { t: 0, x: 58, y: 14, reveal: 0 },
             { t: 0.22, x: ADD_X, y: ADD_Y, click: true, reveal: 1 },
             { t: 0.45, x: ADD_X, y: ADD_Y, click: true, reveal: 2 },
             { t: 0.68, x: ADD_X, y: ADD_Y, click: true, reveal: 3 },
-            { t: 0.9, x: ADD_X, y: ADD_Y, click: true, reveal: 4 },
-            { t: 1, x: 60, y: 40, reveal: 4 },
+            { t: 0.9, x: 60, y: 40, reveal: 3 },
+            { t: 1, x: 60, y: 40, reveal: 3 },
         ],
     },
     {
         key: 'impact',
-        toolNum: '07',
         navKey: 'attackTrees',
         screen: 'impact',
         title: 'Impact workshop — worst-case first',
@@ -243,7 +240,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'system',
-        toolNum: '03',
         navKey: 'system',
         screen: 'system',
         title: 'Technical modeling — components',
@@ -264,7 +260,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'assets',
-        toolNum: '03',
         navKey: 'system',
         screen: 'assets',
         title: 'Assets — connect impact to CIA + Safety',
@@ -285,7 +280,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'dfd',
-        toolNum: '04',
         navKey: 'dfd',
         screen: 'dfd',
         title: 'Data flow diagram — where paths emerge',
@@ -305,15 +299,14 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'threats',
-        toolNum: '06',
         navKey: 'threats',
         screen: 'threats',
         title: 'Threat analysis — rate & link to impact',
         phase: 'Threat analysis',
         participants: ['Technical team', 'Security facilitator'],
         iteration: 'Connected back to impact scenarios',
-        what: 'STRIDE threats are rated by **likelihood × impact** and linked to the attack-tree **roots**.',
-        why: 'Linking threats to impact keeps priorities **comparable** and defensible.',
+        what: 'STRIDE threats are rated and linked to affected components, interfaces, assets, requirements and attack-tree **roots**.',
+        why: 'Use the configured scoring method — **Exposure × Exploitability × Impact** or **cost-based** — so priorities remain comparable and defensible.',
         duration: 5000,
         path: [
             { t: 0, x: 58, y: 14, reveal: 0 },
@@ -325,7 +318,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'attacktree',
-        toolNum: '07',
         navKey: 'attackTrees',
         screen: 'attacktree',
         title: 'Attack trees — refined later',
@@ -345,15 +337,14 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'countermeasures',
-        toolNum: '08',
         navKey: 'countermeasures',
         screen: 'countermeasures',
         title: 'Mitigations — evaluate before implementing',
         phase: 'Mitigations → requirements',
         participants: ['Technical team', 'Security facilitator'],
         iteration: 'Implement a control only if it reduces real risk',
-        what: 'Each control is evaluated by its **risk reduction**. Only controls that lower at least one threat are implemented — CM-4 adds no value, so it is **skipped**.',
-        why: 'Spending only on controls that **reduce risk** keeps the treatment proportionate and defensible.',
+        what: 'Each control is evaluated by its **residual risk** against the linked threats. Select controls that reduce real risk, record their status and link the requirements they satisfy — CM-4 adds no value, so it is **skipped**.',
+        why: 'Choosing controls based on residual risk keeps treatment proportionate, traceable and defensible.',
         duration: 5200,
         path: [
             { t: 0, x: 55, y: 16, reveal: 0 },
@@ -366,15 +357,14 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'requirements',
-        toolNum: '05',
         navKey: 'requirements',
         screen: 'requirements',
         title: 'Requirements — derived from decisions',
-        phase: 'Mitigations → requirements',
+        phase: 'Requirements → mitigations',
         participants: ['Technical team', 'Product owner'],
         iteration: 'Two origins: project management or a chosen control',
-        what: 'Requirements have two sources: some come from **project management / compliance**, others **implement a chosen countermeasure** (CM-1…CM-3).',
-        why: 'Recording each requirement’s origin keeps the chain **traceable** through later reassessment.',
+        what: 'Capture testable security requirements from **project management / compliance**, threats and the security context. Choosing a countermeasure can also create an **is CM** requirement automatically.',
+        why: 'Linking requirements to threats and controls keeps the chain **traceable** through implementation and later reassessment.',
         duration: 5000,
         path: [
             { t: 0, x: 58, y: 14, reveal: 0 },
@@ -387,15 +377,14 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'review',
-        toolNum: '09',
         navKey: 'review',
         screen: 'review',
         title: 'Review — validate and revisit',
         phase: 'Review',
         participants: ['Project stakeholders'],
         iteration: 'Repeated after significant changes',
-        what: 'Stakeholders validate risks, assumptions and decisions, then mark the TRA **reviewed**.',
-        why: 'The review confirms the chain **asset → threat → countermeasure → requirement → residual risk**.',
+        what: 'Resolve plausibility findings, review classifications and residual risks, then generate the report and export traceability data.',
+        why: 'The review confirms the chain **asset → threat → requirement → countermeasure → residual risk** and makes exceptions explicit.',
         duration: 4600,
         path: [
             { t: 0, x: 55, y: 16, reveal: 1 },
@@ -406,14 +395,13 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'outro',
-        toolNum: '',
         screen: 'outro',
         title: 'A TRA is never truly finished',
         phase: 'Keep it alive',
         participants: ['Whole team', 'Revisited over the product lifecycle'],
         iteration: 'Revisit after significant changes',
-        what: 'Assumptions evolve, attack trees are refined and requirements change as the product matures.',
-        why: 'Revisit the TRA after **architecture changes, new interfaces, vulnerabilities or operational changes**.',
+        what: 'Assumptions evolve, attack trees are refined, requirements change and defects are tracked as the product matures. Tag a baseline in **TRA versions** when a review is complete.',
+        why: 'Revisit the TRA after **architecture changes, new interfaces, vulnerabilities or operational changes**, then compare versions to preserve the audit trail.',
         duration: 3400,
         path: [
             { t: 0, x: 50, y: 22, reveal: 0 },

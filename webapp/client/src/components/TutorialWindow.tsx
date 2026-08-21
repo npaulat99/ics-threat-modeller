@@ -44,7 +44,6 @@ export default function TutorialWindow({ step, cursor, onReplay }: Props) {
                             <div className="tw-navhead">Methodology</div>
                             {tutorialNav.map((n) => (
                                 <div key={n.key} className={'tw-navitem' + (step.navKey === n.key ? ' active' : '')}>
-                                    <span className="tw-navnum">{n.num}</span>
                                     <span className="tw-navlabel">{n.label}</span>
                                 </div>
                             ))}
@@ -293,7 +292,7 @@ function ThreatsScreen({ reveal }: { reveal: number }) {
             <PanelHead num="06" title="Threats · STRIDE + risk" action="+ Add threat" />
             <table className="tw-table">
                 <thead>
-                    <tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>Root</th><th>L×I</th><th>Risk</th></tr>
+                    <tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>Root</th><th>Score</th><th>Risk</th></tr>
                 </thead>
                 <tbody>
                     {tutorialThreats.map((t, i) => (
@@ -341,7 +340,7 @@ function RequirementsScreen({ reveal }: { reveal: number }) {
     return (
         <div>
             <PanelHead num="05" title="Security requirements" action="+ Add requirement" />
-            <div className="tw-note">Two origins: project management / compliance, or implementing a chosen countermeasure</div>
+            <div className="tw-note">Link requirements to threats and controls; chosen countermeasures can create an “is CM” requirement</div>
             <div className="tw-list">
                 {tutorialRequirements.map((r, i) => (
                     <div key={r.id} className={'tw-reqrow' + show(reveal, i + 1)}>
@@ -391,8 +390,8 @@ function ReviewScreen({ reveal }: { reveal: number }) {
     return (
         <div>
             <div className="tw-panelhead">
-                <div><span className="tw-badge">09</span> <b>Review & report</b></div>
-                <span className={'tw-status' + (reveal >= 3 ? ' reviewed' : '')}>{reveal >= 3 ? '✓ Reviewed' : 'In review'}</span>
+                <div><span className="tw-badge">09</span> <b>Review &amp; report</b></div>
+                <span className={'tw-status' + (reveal >= 3 ? ' reviewed' : '')}>{reveal >= 3 ? '✓ Report ready' : 'In review'}</span>
             </div>
             <div className="tw-trace">asset → threat → countermeasure → requirement → residual risk</div>
             <div className="tw-list">
