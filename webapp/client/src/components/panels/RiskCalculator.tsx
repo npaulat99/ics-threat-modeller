@@ -285,7 +285,7 @@ export default function RiskCalculator({
                     {capGate && (
                         <>
                             {' '}
-                            <span className="warnmark">this exploit's difficulty ({5 - (fac.exploitability ?? 3) + 1}) exceeds the linked attacker's capability ({attacker!.capability}).</span>
+                            <span className="warnmark">likelihood may be over-stated based on the linked attacker's capability.</span>
                         </>
                     )}
                 </p>
