@@ -5,22 +5,22 @@ import type { ViewKey } from '../types';
 
 interface StepDef {
     key: ViewKey | 'dfd';
-    num: string;
+    icon: string;
     label: string;
     sub: string;
 }
 const STEPS: StepDef[] = [
-    { key: 'project', num: '01', label: 'Project', sub: 'Scope, device, SL-C' },
-    { key: 'assumptions', num: '02', label: 'Assumptions', sub: 'Incl. attacker profiles' },
-    { key: 'system', num: '03', label: 'System & Assets', sub: 'Components, C/I/A/S' },
-    { key: 'dfd', num: '04', label: 'Data Flow Diagram', sub: 'Layered DeMarco model' },
-    { key: 'useCases', num: '04b', label: '(Mis-)use cases', sub: 'Actors, actions · optional' },
-    { key: 'requirements', num: '05', label: 'Requirements', sub: 'Security requirements (SR)' },
-    { key: 'threats', num: '06', label: 'Threats', sub: 'STRIDE + risk rating' },
-    { key: 'attackTrees', num: '07', label: 'Attack trees', sub: 'Optional · AND/OR/SAND' },
-    { key: 'countermeasures', num: '08', label: 'Countermeasures', sub: 'Residual risk' },
-    { key: 'review', num: '09', label: 'Review & Report', sub: 'Plausibility check' },
-    { key: 'versions', num: '10', label: 'TRA Versions', sub: 'Tagging history + diffs' },
+    { key: 'project', icon: '📋', label: 'Project', sub: 'Scope, device, SL-C' },
+    { key: 'assumptions', icon: '🧠', label: 'Assumptions', sub: 'Incl. attacker profiles' },
+    { key: 'system', icon: '🧱', label: 'System & Assets', sub: 'Components, C/I/A/S' },
+    { key: 'dfd', icon: '🔀', label: 'Data Flow Diagram', sub: 'Layered DeMarco model' },
+    { key: 'useCases', icon: '🎭', label: '(Mis-)use cases', sub: 'Actors, actions · optional' },
+    { key: 'requirements', icon: '📝', label: 'Requirements', sub: 'Security requirements (SR)' },
+    { key: 'threats', icon: '⚠️', label: 'Threats', sub: 'STRIDE + risk rating' },
+    { key: 'attackTrees', icon: '🌳', label: 'Attack trees', sub: 'Optional · AND/OR/SAND' },
+    { key: 'countermeasures', icon: '🛠️', label: 'Countermeasures', sub: 'Residual risk' },
+    { key: 'review', icon: '🔎', label: 'Review & Report', sub: 'Plausibility check' },
+    { key: 'versions', icon: '🕘', label: 'TRA Versions', sub: 'Tagging history + diffs' },
 ];
 
 export default function StepNav() {
@@ -59,7 +59,7 @@ export default function StepNav() {
         <nav className="stepnav" aria-label="TRA steps">
             <div className="grouplabel">Methodology</div>
             {STEPS.map((s) => (
-                <NavItem key={s.key} vkey={s.key} view={view} setView={setView} num={s.num} label={s.label} sub={s.sub}>
+                <NavItem key={s.key} vkey={s.key} view={view} setView={setView} icon={s.icon} label={s.label} sub={s.sub}>
                     {s.key === 'review' && issues.length > 0 ? (
                         <span className="count warnmark" title={`${issues.length} issue(s)`}>
                             {issues.length} ⚠
@@ -73,11 +73,11 @@ export default function StepNav() {
             ))}
 
             <div className="grouplabel">Views</div>
-            <NavItem vkey="dashboard" view={view} setView={setView} num="▦" label="Dashboard" sub="IEC 62443-4-1 overview" />
-            <NavItem vkey="defects" view={view} setView={setView} num="🐞" label="Defect register" sub="Lifecycle DM / SUM">
+            <NavItem vkey="dashboard" view={view} setView={setView} icon="▦" label="Dashboard" sub="IEC 62443-4-1 overview" />
+            <NavItem vkey="defects" view={view} setView={setView} icon="🐞" label="Defect register" sub="Lifecycle DM / SUM">
                 {(counts.defects ?? 0) > 0 ? <span className="count">{counts.defects}</span> : null}
             </NavItem>
-            <NavItem vkey="kb" view={view} setView={setView} num="📚" label="Knowledge base" sub="Bug Bar · library" />
+            <NavItem vkey="kb" view={view} setView={setView} icon="📚" label="Knowledge base" sub="Bug Bar · library" />
 
             {stepIdx >= 0 && (
                 <div className="stepnav-foot">
@@ -98,7 +98,7 @@ function NavItem({
     vkey,
     view,
     setView,
-    num,
+    icon,
     label,
     sub,
     children,
@@ -106,7 +106,7 @@ function NavItem({
     vkey: any;
     view: string;
     setView: (v: any) => void;
-    num: string;
+    icon: string;
     label: string;
     sub: string;
     children?: ReactNode;
@@ -125,7 +125,7 @@ function NavItem({
                 }
             }}
         >
-            <span className="num">{num}</span>
+            <span className="icon" aria-hidden="true">{icon}</span>
             <span className="lbl">
                 {label}
                 <small>{sub}</small>
