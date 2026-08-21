@@ -40,6 +40,11 @@ function CostRiskCalculator({ t, upd }: { t: GuidedRiskModel; upd: (patch: any) 
         const nextProposal = likelihoodFromProb(nextProbability, likelihoodThresholds);
         upd({ ...patch, status, costLikelihood: nextProbability, costLikelihoodProposal: nextProposal, likelihood: nextProposal });
     };
+    useEffect(() => {
+        const proposal = likelihoodFromProb(probability, likelihoodThresholds);
+        if (t.likelihood === proposal && Math.abs((t.costLikelihood ?? -1) - probability) < 0.000001 && t.costLikelihoodProposal === proposal) return;
+        upd({ costLikelihood: probability, costLikelihoodProposal: proposal, likelihood: proposal });
+    }, [probability, likelihoodThresholds, t.likelihood, t.costLikelihood, t.costLikelihoodProposal, upd]);
     return (
         <div className="calc">
             <div className="calchead">Cost-based likelihood <span className="muted">weighted attack difficulty and required access</span></div>
