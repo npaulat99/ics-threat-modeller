@@ -105,7 +105,6 @@ export default function TutorialOnboarding() {
                         <div className="tutorial-topline">
                             <div className="tut-headline">
                                 <strong>{step.title}</strong>
-                                {step.toolNum && <span className="tut-toolnum">Tool {step.toolNum}</span>}
                             </div>
                             <div className="tut-headright">
                                 <span className="muted">Step {index + 1} of {total}</span>

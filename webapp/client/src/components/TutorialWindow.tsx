@@ -44,7 +44,6 @@ export default function TutorialWindow({ step, cursor, onReplay }: Props) {
                             <div className="tw-navhead">Methodology</div>
                             {tutorialNav.map((n) => (
                                 <div key={n.key} className={'tw-navitem' + (step.navKey === n.key ? ' active' : '')}>
-                                    <span className="tw-navnum">{n.num}</span>
                                     <span className="tw-navlabel">{n.label}</span>
                                 </div>
                             ))}

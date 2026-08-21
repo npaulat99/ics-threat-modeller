@@ -49,8 +49,6 @@ export type NavKey =
 
 export interface TutorialStep {
     key: string;
-    /** Original tool/step number shown in the interface, even when the tutorial order differs. */
-    toolNum: string;
     /** Which methodology item is highlighted in the mock navigation. */
     navKey?: NavKey;
     screen: ScreenKey;
@@ -76,7 +74,7 @@ export const tutorialProject = {
     title: 'FlowGuard FC-300 Smart Flow Controller',
     device: 'FC-300 controller',
     domain: 'Drinking-water pump station',
-    slTarget: 'SL 2',
+    slTarget: 'SL-C 2',
     status: 'In development',
 };
 
@@ -84,7 +82,6 @@ export const tutorialAssumptions = [
     { id: 'A-01', tag: 'Deployment', text: 'Installed in a locked cabinet inside a fenced pump station.' },
     { id: 'A-02', tag: 'Network', text: 'Plant network is segmented; Modbus TCP is not internet-exposed.' },
     { id: 'A-03', tag: 'Trust', text: 'Vendor cloud link uses mutual TLS with per-device certificates.' },
-    { id: 'A-04', tag: 'Attacker', text: 'Adversary can reach the HART service port during a maintenance visit.' },
 ];
 
 export const tutorialImpacts = [
@@ -133,18 +130,18 @@ export const tutorialCountermeasures = [
 ];
 
 // The methodology navigation shown inside the mock window (mirrors the real StepNav numbering).
-export const tutorialNav: { key: NavKey; num: string; label: string }[] = [
-    { key: 'project', num: '01', label: 'Project' },
-    { key: 'assumptions', num: '02', label: 'Assumptions' },
-    { key: 'system', num: '03', label: 'System & Assets' },
-    { key: 'dfd', num: '04', label: 'Data Flow Diagram' },
-    { key: 'useCases', num: '04b', label: '(Mis-)use cases · optional' },
-    { key: 'requirements', num: '05', label: 'Requirements' },
-    { key: 'threats', num: '06', label: 'Threats' },
-    { key: 'attackTrees', num: '07', label: 'Attack trees' },
-    { key: 'countermeasures', num: '08', label: 'Countermeasures' },
-    { key: 'review', num: '09', label: 'Review & Report' },
-    { key: 'versions', num: '', label: 'TRA Versions' },
+export const tutorialNav: { key: NavKey; label: string }[] = [
+    { key: 'project', label: 'Project' },
+    { key: 'assumptions', label: 'Assumptions' },
+    { key: 'system', label: 'System & Assets' },
+    { key: 'dfd', label: 'Data Flow Diagram' },
+    { key: 'useCases', label: '(Mis-)use cases' },
+    { key: 'requirements', label: 'Requirements' },
+    { key: 'threats', label: 'Threats' },
+    { key: 'attackTrees', label: 'Attack trees' },
+    { key: 'countermeasures', label: 'Countermeasures' },
+    { key: 'review', label: 'Review & Report' },
+    { key: 'versions', label: 'TRA Versions' },
 ];
 
 // Typical workshop sequence — shown as an example, explicitly not a mandatory process.
@@ -166,7 +163,6 @@ const ADD_Y = 14;
 export const tutorialSteps: TutorialStep[] = [
     {
         key: 'intro',
-        toolNum: '',
         screen: 'intro',
         title: 'A realistic threat & risk analysis',
         phase: 'How to read this tutorial',
@@ -183,7 +179,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'project',
-        toolNum: '01',
         navKey: 'project',
         screen: 'project',
         title: 'Kickoff — define the device boundary',
@@ -204,28 +199,26 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'assumptions',
-        toolNum: '02',
         navKey: 'assumptions',
         screen: 'assumptions',
         title: 'Assumptions — a living artifact',
         phase: 'Kickoff → maintained throughout',
         participants: ['System architect', 'Security facilitator'],
         iteration: 'First pass · updated throughout the TRA',
-        what: 'Deployment, network, trust and attacker **assumptions** are captured — and revisited as the analysis grows.',
-        why: 'Assumptions make risk reasoning **auditable** and are refined whenever the picture changes.',
+        what: 'Deployment, network and trust **assumptions** are captured — and revisited as the analysis grows. The attacker profile is supplied automatically by the selected **SL-C** level.',
+        why: 'Assumptions make risk reasoning **auditable**, while the built-in SL-C attacker profile keeps likelihood ratings consistent.',
         duration: 4800,
         path: [
             { t: 0, x: 58, y: 14, reveal: 0 },
             { t: 0.22, x: ADD_X, y: ADD_Y, click: true, reveal: 1 },
             { t: 0.45, x: ADD_X, y: ADD_Y, click: true, reveal: 2 },
             { t: 0.68, x: ADD_X, y: ADD_Y, click: true, reveal: 3 },
-            { t: 0.9, x: ADD_X, y: ADD_Y, click: true, reveal: 4 },
-            { t: 1, x: 60, y: 40, reveal: 4 },
+            { t: 0.9, x: 60, y: 40, reveal: 3 },
+            { t: 1, x: 60, y: 40, reveal: 3 },
         ],
     },
     {
         key: 'impact',
-        toolNum: '07',
         navKey: 'attackTrees',
         screen: 'impact',
         title: 'Impact workshop — worst-case first',
@@ -247,7 +240,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'system',
-        toolNum: '03',
         navKey: 'system',
         screen: 'system',
         title: 'Technical modeling — components',
@@ -268,7 +260,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'assets',
-        toolNum: '03',
         navKey: 'system',
         screen: 'assets',
         title: 'Assets — connect impact to CIA + Safety',
@@ -289,7 +280,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'dfd',
-        toolNum: '04',
         navKey: 'dfd',
         screen: 'dfd',
         title: 'Data flow diagram — where paths emerge',
@@ -309,7 +299,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'threats',
-        toolNum: '06',
         navKey: 'threats',
         screen: 'threats',
         title: 'Threat analysis — rate & link to impact',
@@ -329,7 +318,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'attacktree',
-        toolNum: '07',
         navKey: 'attackTrees',
         screen: 'attacktree',
         title: 'Attack trees — refined later',
@@ -349,7 +337,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'countermeasures',
-        toolNum: '08',
         navKey: 'countermeasures',
         screen: 'countermeasures',
         title: 'Mitigations — evaluate before implementing',
@@ -370,7 +357,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'requirements',
-        toolNum: '05',
         navKey: 'requirements',
         screen: 'requirements',
         title: 'Requirements — derived from decisions',
@@ -391,7 +377,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'review',
-        toolNum: '09',
         navKey: 'review',
         screen: 'review',
         title: 'Review — validate and revisit',
@@ -410,7 +395,6 @@ export const tutorialSteps: TutorialStep[] = [
     },
     {
         key: 'outro',
-        toolNum: '',
         screen: 'outro',
         title: 'A TRA is never truly finished',
         phase: 'Keep it alive',
