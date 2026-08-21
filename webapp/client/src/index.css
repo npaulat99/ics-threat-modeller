@@ -171,6 +171,7 @@ textarea {
     line-height: 1;
     padding: 0 9px;
     min-width: 34px;
+    justify-content: center;
 }
 
 .conn {
@@ -2055,8 +2056,12 @@ button.linkbtn {
     color: var(--text-dim);
     cursor: pointer;
     font-weight: 700;
-    line-height: 1;
     font-size: 12px;
+    line-height: 1;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .helpbtn:hover {

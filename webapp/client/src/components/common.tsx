@@ -433,7 +433,7 @@ export function HelpButton({ title, children }: { title?: string; children: Reac
     return (
         <span className="helpwrap" onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
             <button type="button" className="helpbtn" title="Show guidance" aria-expanded={open} aria-label="Show guidance" onClick={() => setOpen((o) => !o)}>
-                ?
+                <span aria-hidden="true">?</span>
             </button>
             {open && (
                 <div className="helppop" role="dialog" aria-label={title || 'Guidance'}>
