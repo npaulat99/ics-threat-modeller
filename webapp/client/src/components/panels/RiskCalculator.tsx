@@ -2,12 +2,12 @@
 // decomposed into Exposure × Exploitability, with CVSS as an optional exploitability hint and
 // one-click seeding from the linked attacker profile / interface. Risk then reads
 // Exposure × Exploitability × Impact, kept on the familiar 5×5 matrix.
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useStore } from '../../state/store';
 import { deriveImpact, deriveLikelihood, exposureFromInterface } from '../../lib/risk';
 import { cvssBaseScore } from '../../lib/cvss';
 import { accessProbability, ACCESS_OPTS, COST_FACTOR_LEVELS, COST_FACTORS, likelihoodFromProb, SKILL_OPTS, stepProb } from '../../lib/attackTree';
-import BugBarTable from '../BugBarTable';
+import BugBarImpactSelector from '../BugBarImpactSelector';
 import type { Threat } from '../../types';
 
 type GuidedRiskModel = Pick<Threat, 'attackerRef' | 'interfaceRef' | 'interfaceRefs' | 'impactDimensions' | 'likelihoodFactors' | 'cvss' | 'ratedBy' | 'ratedAt' | 'requiredSkill' | 'requiredAccess' | 'costFactors' | 'costRationales' | 'costLikelihood' | 'costLikelihoodProposal' | 'status'> & {
@@ -67,12 +67,6 @@ function CostRiskCalculator({ t, upd }: { t: GuidedRiskModel; upd: (patch: any) 
     );
 }
 
-const IMPACT_DIMS: { k: 'confidentiality' | 'integrity' | 'availability' | 'safety'; label: string }[] = [
-    { k: 'confidentiality', label: 'Confidentiality' },
-    { k: 'integrity', label: 'Integrity' },
-    { k: 'availability', label: 'Availability' },
-    { k: 'safety', label: 'Safety' },
-];
 const LFACTORS: { k: 'exposure' | 'exploitability'; label: string; hint: string; opts: [number, string][] }[] = [
     { k: 'exposure', label: 'Exposure', hint: 'how reachable the attack surface is', opts: [[1, 'Physical (open enclosure)'], [2, 'Local (on site)'], [3, 'Adjacent / fieldbus'], [4, 'Remote (authenticated)'], [5, 'Remote (unauthenticated)']] },
     { k: 'exploitability', label: 'Exploitability', hint: 'how easy to exploit once reached', opts: [[1, 'Very hard (nation-state)'], [2, 'Hard (specialist)'], [3, 'Moderate'], [4, 'Easy'], [5, 'Trivial / automated']] },
@@ -132,13 +126,6 @@ export default function RiskCalculator({
     const dims = t.impactDimensions || {};
     const fac = t.likelihoodFactors || {};
     const cvss = t.cvss || {};
-    const [bbOpen, setBbOpen] = useState(false);
-    useEffect(() => {
-        if (!bbOpen) return;
-        const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setBbOpen(false);
-        document.addEventListener('keydown', onKey);
-        return () => document.removeEventListener('keydown', onKey);
-    }, [bbOpen]);
     const attackers = useStore((s) => s.data?.assumptions.attacker || []);
     const interfaces = useStore((s) => s.data?.system.interfaces || []);
     const attacker = attackers.find((a) => a.id === t.attackerRef);
@@ -182,137 +169,118 @@ export default function RiskCalculator({
     const overridden = (derivedL != null && derivedL !== likelihood) || (derivedI != null && derivedI !== impact);
     const capGate = attacker && typeof attacker.capability === 'number' && typeof fac.exploitability === 'number' && attacker.capability + fac.exploitability < 6;
 
-    if (scoringMethod === 'cost-based') return <CostRiskCalculator t={t} upd={upd} />;
+    const ratedByRow = (
+        <div className="inline" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            <label className="minifield" style={{ width: 160 }}>
+                <span>Rated by</span>
+                <input className="inp" value={t.ratedBy || ''} placeholder="name / initials" onChange={(e) => upd({ ratedBy: e.target.value, ratedAt: today })} />
+            </label>
+            {t.ratedAt && <span className="hint">last rated {t.ratedAt}</span>}
+        </div>
+    );
 
     return (
         <>
             <div className="calc">
-                <div className="calcgrid">
-                    <div>
-                        <div className="calchead">
-                            Bug Bar impact <span className="muted">— impact = worst dimension</span>
-                            <button type="button" className="btn sm ghost" style={{ marginLeft: 6 }} onClick={() => setBbOpen(true)}>
-                                ? reference
-                            </button>
+                <div className="calchead">
+                    Bug Bar impact <span className="muted">— impact = worst dimension; click the scenario that applies in each column</span>
+                </div>
+                <BugBarImpactSelector dims={dims} onSelect={setDim} />
+            </div>
+
+            {scoringMethod === 'cost-based' ? (
+                <>
+                    <CostRiskCalculator t={t} upd={upd} />
+                    <div className="calc">{ratedByRow}</div>
+                </>
+            ) : (
+                <div className="calc">
+                    <div className="calcgrid2">
+                        <div>
+                            <div className="calchead">
+                                Likelihood <span className="muted">— Exposure × Exploitability</span>
+                                {iface && (
+                                    <button type="button" className="btn sm ghost" style={{ marginLeft: 6 }} onClick={seed} title="Seed exposure from the linked interface's exposure class">
+                                        seed exposure from interface
+                                    </button>
+                                )}
+                            </div>
+                            <div className="grid2">
+                                {LFACTORS.map((f) => (
+                                    <label key={f.k} className="minifield">
+                                        <span title={f.hint}>{f.label}</span>
+                                        <select className="inp" value={(fac as any)[f.k] ?? ''} onChange={(e) => setFac(f.k, Number(e.target.value))}>
+                                            <option value="">–</option>
+                                            {f.opts.map(([v, lab]) => (
+                                                <option key={v} value={v}>{v} · {lab}</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
-                        <div className="grid4">
-                            {IMPACT_DIMS.map((d) => (
-                                <label key={d.k} className="minifield">
-                                    <span>{d.label}</span>
-                                    <select className="inp" value={(dims as any)[d.k] ?? ''} onChange={(e) => setDim(d.k, Number(e.target.value))}>
-                                        <option value="">–</option>
-                                        {[1, 2, 3, 4, 5].map((n) => (
-                                            <option key={n} value={n}>{n}</option>
-                                        ))}
+
+                        <div>
+                            <div className="calchead">CVSS <span className="muted">— optional, informs exploitability (v3.1 &amp; v4.0)</span></div>
+                            <div className="grid3">
+                                <label className="minifield">
+                                    <span>Version</span>
+                                    <select className="inp" value={cvssVer} onChange={(e) => upd({ cvss: { ...cvss, version: e.target.value } })}>
+                                        <option value="3.1">3.1</option>
+                                        <option value="4.0">4.0</option>
                                     </select>
                                 </label>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div>
-                        <div className="calchead">
-                            Likelihood <span className="muted">— Exposure × Exploitability</span>
-                            {iface && (
-                                <button type="button" className="btn sm ghost" style={{ marginLeft: 6 }} onClick={seed} title="Seed exposure from the linked interface's exposure class">
-                                    seed exposure from interface
-                                </button>
+                                <label className="minifield">
+                                    <span>Base score (0–10){hasVector ? ' — calculated' : ''}</span>
+                                    <input
+                                        className="inp"
+                                        type="number"
+                                        min={0}
+                                        max={10}
+                                        step={0.1}
+                                        value={hasVector ? (computedBase ?? '') : (cvss.baseScore ?? '')}
+                                        readOnly={hasVector}
+                                        title={hasVector ? 'Calculated from the vector — clear the vector box to enter a score manually.' : 'Enter a base score, or paste a vector to calculate it automatically.'}
+                                        style={hasVector ? { background: 'var(--surface-2)', cursor: 'not-allowed' } : undefined}
+                                        onChange={(e) => {
+                                            if (hasVector) return;
+                                            upd({ cvss: { ...cvss, baseScore: e.target.value === '' ? undefined : Number(e.target.value) } });
+                                        }}
+                                    />
+                                </label>
+                                <label className="minifield">
+                                    <span>Vector</span>
+                                    <input className={'inp' + (vecBad ? ' invalid' : '')} value={cvss.vector || ''} placeholder={cvssVer === '4.0' ? 'CVSS:4.0/AV:N/AC:L/AT:N/…' : 'CVSS:3.1/AV:N/AC:L/…'} onChange={(e) => upd({ cvss: { ...cvss, vector: e.target.value } })} />
+                                </label>
+                            </div>
+                            {vecBad && <p className="hint warnmark">Unrecognised vector — expected a CVSS:3.1 or CVSS:4.0 prefix.</p>}
+                            {vecMismatch && <p className="hint warnmark">Vector is {vecVer} but version is set to {cvssVer}.</p>}
+                            {hasVector && !vecBad && computedBase == null && <p className="hint warnmark">Vector is incomplete — add the base metrics to calculate the score.</p>}
+                            {suggestExp && (
+                                <p className="hint">
+                                    Suggested exploitability ≈ <b>{suggestExp}</b>{' '}
+                                    <button className="btn sm" style={{ padding: '0 7px' }} onClick={() => setFac('exploitability', suggestExp)}>
+                                        apply
+                                    </button>
+                                </p>
                             )}
                         </div>
-                        <div className="grid2">
-                            {LFACTORS.map((f) => (
-                                <label key={f.k} className="minifield">
-                                    <span title={f.hint}>{f.label}</span>
-                                    <select className="inp" value={(fac as any)[f.k] ?? ''} onChange={(e) => setFac(f.k, Number(e.target.value))}>
-                                        <option value="">–</option>
-                                        {f.opts.map(([v, lab]) => (
-                                            <option key={v} value={v}>{v} · {lab}</option>
-                                        ))}
-                                    </select>
-                                </label>
-                            ))}
-                        </div>
                     </div>
-
-                    <div>
-                        <div className="calchead">CVSS <span className="muted">— optional, informs exploitability (v3.1 &amp; v4.0)</span></div>
-                        <div className="grid3">
-                            <label className="minifield">
-                                <span>Version</span>
-                                <select className="inp" value={cvssVer} onChange={(e) => upd({ cvss: { ...cvss, version: e.target.value } })}>
-                                    <option value="3.1">3.1</option>
-                                    <option value="4.0">4.0</option>
-                                </select>
-                            </label>
-                            <label className="minifield">
-                                <span>Base score (0–10){hasVector ? ' — calculated' : ''}</span>
-                                <input
-                                    className="inp"
-                                    type="number"
-                                    min={0}
-                                    max={10}
-                                    step={0.1}
-                                    value={hasVector ? (computedBase ?? '') : (cvss.baseScore ?? '')}
-                                    readOnly={hasVector}
-                                    title={hasVector ? 'Calculated from the vector — clear the vector box to enter a score manually.' : 'Enter a base score, or paste a vector to calculate it automatically.'}
-                                    style={hasVector ? { background: 'var(--surface-2)', cursor: 'not-allowed' } : undefined}
-                                    onChange={(e) => {
-                                        if (hasVector) return;
-                                        upd({ cvss: { ...cvss, baseScore: e.target.value === '' ? undefined : Number(e.target.value) } });
-                                    }}
-                                />
-                            </label>
-                            <label className="minifield">
-                                <span>Vector</span>
-                                <input className={'inp' + (vecBad ? ' invalid' : '')} value={cvss.vector || ''} placeholder={cvssVer === '4.0' ? 'CVSS:4.0/AV:N/AC:L/AT:N/…' : 'CVSS:3.1/AV:N/AC:L/…'} onChange={(e) => upd({ cvss: { ...cvss, vector: e.target.value } })} />
-                            </label>
-                        </div>
-                        {vecBad && <p className="hint warnmark">Unrecognised vector — expected a CVSS:3.1 or CVSS:4.0 prefix.</p>}
-                        {vecMismatch && <p className="hint warnmark">Vector is {vecVer} but version is set to {cvssVer}.</p>}
-                        {hasVector && !vecBad && computedBase == null && <p className="hint warnmark">Vector is incomplete — add the base metrics to calculate the score.</p>}
-                        {suggestExp && (
-                            <p className="hint">
-                                Suggested exploitability ≈ <b>{suggestExp}</b>{' '}
-                                <button className="btn sm" style={{ padding: '0 7px' }} onClick={() => setFac('exploitability', suggestExp)}>
-                                    apply
-                                </button>
-                            </p>
+                    <p className="hint">
+                        Derived → likelihood <b>{derivedL ?? likelihood}</b>, impact <b>{derivedI ?? impact}</b>.{' '}
+                        {overridden ? (
+                            <span className="warnmark">stored risk uses likelihood {likelihood} × impact {impact}.</span>
+                        ) : (
+                            'These drive the risk above; you can still override the numbers directly.'
                         )}
-                    </div>
-                </div>
-                <p className="hint">
-                    Derived → likelihood <b>{derivedL ?? likelihood}</b>, impact <b>{derivedI ?? impact}</b>.{' '}
-                    {overridden ? (
-                        <span className="warnmark">stored risk uses likelihood {likelihood} × impact {impact}.</span>
-                    ) : (
-                        'These drive the risk above; you can still override the numbers directly.'
-                    )}
-                    {capGate && (
-                        <>
-                            {' '}
-                            <span className="warnmark">likelihood may be over-stated based on the linked attacker's capability.</span>
-                        </>
-                    )}
-                </p>
-                <div className="inline" style={{ gap: 8, flexWrap: 'wrap' }}>
-                    <label className="minifield" style={{ width: 160 }}>
-                        <span>Rated by</span>
-                        <input className="inp" value={t.ratedBy || ''} placeholder="name / initials" onChange={(e) => upd({ ratedBy: e.target.value, ratedAt: today })} />
-                    </label>
-                    {t.ratedAt && <span className="hint">last rated {t.ratedAt}</span>}
-                </div>
-            </div>
-            {bbOpen && (
-                <div className="modal-overlay" onClick={() => setBbOpen(false)}>
-                    <div className="modal" role="dialog" aria-modal="true" aria-label="Bug Bar impact rating reference" onClick={(e) => e.stopPropagation()}>
-                        <div className="modalhead">
-                            <h3 style={{ margin: 0 }}>Bug Bar — impact rating reference</h3>
-                            <button className="btn sm" aria-label="Close" onClick={() => setBbOpen(false)}>
-                                ✕ Close
-                            </button>
-                        </div>
-                        <BugBarTable />
-                    </div>
+                        {capGate && (
+                            <>
+                                {' '}
+                                <span className="warnmark">likelihood may be over-stated based on the linked attacker's capability.</span>
+                            </>
+                        )}
+                    </p>
+                    {ratedByRow}
                 </div>
             )}
         </>

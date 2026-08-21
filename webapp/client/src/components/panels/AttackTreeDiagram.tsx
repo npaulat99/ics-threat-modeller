@@ -18,7 +18,7 @@ import {
     accessLabel,
     skillLabel,
 } from '../../lib/attackTree';
-import BugBarTable from '../BugBarTable';
+import BugBarImpactSelector from '../BugBarImpactSelector';
 import type { AdGate, AdKind, AdNode, AttackTree } from '../../types';
 
 const NW = 182; // node width
@@ -264,10 +264,7 @@ function NodeAssessmentOverlay({
                 {isGoal && (
                     <section className="adt-assessment-section">
                         <h4>Bug Bar impact</h4>
-                        <div className="grid4">
-                            {(['confidentiality', 'integrity', 'availability', 'safety'] as const).map((key) => <label key={key} className="minifield"><span>{key}</span><select className="inp" value={node.impactDimensions?.[key] ?? ''} onChange={(e) => setImpact(key, Number(e.target.value))}><option value="">-</option>{[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>)}
-                        </div>
-                        <details><summary className="hint">Bug Bar reference</summary><BugBarTable /></details>
+                        <BugBarImpactSelector dims={node.impactDimensions} onSelect={(key, value) => setImpact(key as any, value)} />
                     </section>
                 )}
                 <div className="adadd">

@@ -1542,6 +1542,13 @@ button.linkbtn {
     margin-top: 8px;
 }
 
+.calcgrid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 8px;
+}
+
 .calchead {
     font-size: 12px;
     font-weight: 600;
@@ -1565,6 +1572,78 @@ button.linkbtn {
         grid-template-columns: 1fr;
     }
 }
+
+@media (max-width: 900px) {
+    .calcgrid2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ---- Bug Bar interactive impact selector --------------------------------- */
+.bbselect-table th {
+    white-space: nowrap;
+}
+
+.bbselect-table .bblevel {
+    font-size: 12px;
+    white-space: nowrap;
+    color: var(--text-dim);
+}
+
+.bbselect-table td {
+    padding: 2px;
+}
+
+.bbcell {
+    all: unset;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.bbcell:hover {
+    background: var(--surface-2);
+}
+
+.bbcell:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.bbcell.selected {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.bbsel-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    margin-left: 5px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.bbsel-badge.unset {
+    background: var(--surface-2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+}
+
 
 /* ---- Attack-defense tree ------------------------------------------------- */
 .admetrics {
