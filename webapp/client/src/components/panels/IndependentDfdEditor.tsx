@@ -27,10 +27,35 @@ function curvedPath(from: { x: number; y: number }, to: { x: number; y: number }
     const route = routeAround(from.x, from.y, to.x, to.y, obstacles, 16);
     const directDistance = Math.hypot(to.x - from.x, to.y - from.y) || 1;
     const routeDistance = route.slice(1).reduce((total, point, index) => total + Math.hypot(point[0] - route[index][0], point[1] - route[index][1]), 0);
-    if (route.length > 2 && routeDistance <= 2.4 * directDistance) return roundedPath(route, 14);
+    if (route.length > 2 && routeDistance <= 2.4 * directDistance) return { path: roundedPath(route, 14), label: pointOnRoute(route, 0.5) };
     const controlX = (from.x + to.x) / 2 + (-(to.y - from.y) / directDistance) * offset;
     const controlY = (from.y + to.y) / 2 + ((to.x - from.x) / directDistance) * offset;
-    return `M ${from.x},${from.y} Q ${controlX},${controlY} ${to.x},${to.y}`;
+    const t = 0.5;
+    const x = (1 - t) ** 2 * from.x + 2 * (1 - t) * t * controlX + t ** 2 * to.x;
+    const y = (1 - t) ** 2 * from.y + 2 * (1 - t) * t * controlY + t ** 2 * to.y;
+    const tangentX = 2 * (1 - t) * (controlX - from.x) + 2 * t * (to.x - controlX);
+    const tangentY = 2 * (1 - t) * (controlY - from.y) + 2 * t * (to.y - controlY);
+    const tangentLength = Math.hypot(tangentX, tangentY) || 1;
+    return { path: `M ${from.x},${from.y} Q ${controlX},${controlY} ${to.x},${to.y}`, label: { x, y, nx: -tangentY / tangentLength, ny: tangentX / tangentLength } };
+}
+
+function pointOnRoute(route: number[][], fraction: number) {
+    const lengths = route.slice(1).map((point, index) => Math.hypot(point[0] - route[index][0], point[1] - route[index][1]));
+    let remaining = lengths.reduce((total, length) => total + length, 0) * fraction;
+    for (let index = 0; index < lengths.length; index++) {
+        if (remaining <= lengths[index]) {
+            const ratio = lengths[index] ? remaining / lengths[index] : 0;
+            const from = route[index];
+            const to = route[index + 1];
+            const length = lengths[index] || 1;
+            return { x: from[0] + (to[0] - from[0]) * ratio, y: from[1] + (to[1] - from[1]) * ratio, nx: -(to[1] - from[1]) / length, ny: (to[0] - from[0]) / length };
+        }
+        remaining -= lengths[index];
+    }
+    const from = route[route.length - 2];
+    const to = route[route.length - 1];
+    const length = Math.hypot(to[0] - from[0], to[1] - from[1]) || 1;
+    return { x: to[0], y: to[1], nx: -(to[1] - from[1]) / length, ny: (to[0] - from[0]) / length };
 }
 
 function outlinePoint(position: { x?: number; y?: number }, type: Exclude<DfdNodeType, 'trust-boundary'>, toward: { x: number; y: number }) {
@@ -171,8 +196,13 @@ export default function IndependentDfdEditor({ diagram, updateDiagram }: { diagr
                             const size = NODE_DIMS[displayTypeFor(node)];
                             return { x: position.x || 0, y: position.y || 0, w: size.w, h: size.h };
                         });
-                        const path = curvedPath(start, end, obstacles, 28);
-                        return <g key={flow.id} className={selectedFlowId === flow.id ? 'scenario-flow selected' : 'scenario-flow'} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setSelectedFlowId(flow.id); setSelectedNodeId(null); }}><path d={path} markerEnd="url(#scenario-arrow)" /><text x={(start.x + end.x) / 2} y={(start.y + end.y) / 2 - 8} textAnchor="middle">{flow.label}</text></g>;
+                        const sameDirection = flows.filter((candidate) => candidate.from === flow.from && candidate.to === flow.to);
+                        const sameDirectionIndex = sameDirection.findIndex((candidate) => candidate.id === flow.id);
+                        const bidirectional = flows.some((candidate) => candidate.from === flow.to && candidate.to === flow.from);
+                        const geometry = curvedPath(start, end, obstacles, 28);
+                        const labelOffset = (bidirectional ? 16 : 10) + (sameDirectionIndex - (sameDirection.length - 1) / 2) * 16;
+                        const label = { x: geometry.label.x + geometry.label.nx * labelOffset, y: geometry.label.y + geometry.label.ny * labelOffset };
+                        return <g key={flow.id} className={selectedFlowId === flow.id ? 'scenario-flow selected' : 'scenario-flow'} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setSelectedFlowId(flow.id); setSelectedNodeId(null); }}><path d={geometry.path} markerEnd="url(#scenario-arrow)" />{flow.label && <text x={label.x} y={label.y} textAnchor="middle">{flow.label}</text>}</g>;
                     })}
                     {nodes.filter((node) => node.type !== 'trust-boundary').map((node) => {
                         const position = drag?.id === node.id ? drag : node;
