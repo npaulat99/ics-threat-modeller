@@ -16,6 +16,13 @@ function nodeTypeLabel(type: DfdNodeType) {
     return type === 'external-entity' ? 'External entity' : type === 'multiprocess' ? 'Multi-process' : type[0].toUpperCase() + type.slice(1);
 }
 
+function nodeTypeForComponent(component: { kind?: string } | undefined, fallback: DfdNodeType): Exclude<DfdNodeType, 'trust-boundary'> {
+    if (component?.kind === 'store') return 'store';
+    if (component?.kind === 'external-entity') return 'external-entity';
+    if (component?.kind === 'multiprocess') return 'multiprocess';
+    return fallback === 'trust-boundary' ? 'process' : fallback;
+}
+
 function curvedPath(from: { x: number; y: number }, to: { x: number; y: number }, obstacles: { x: number; y: number; w: number; h: number }[], offset: number) {
     const route = routeAround(from.x, from.y, to.x, to.y, obstacles, 16);
     const directDistance = Math.hypot(to.x - from.x, to.y - from.y) || 1;
@@ -38,10 +45,11 @@ export default function IndependentDfdEditor({ diagram, updateDiagram }: { diagr
     const nodes = dfd.nodes || [];
     const flows = dfd.flows || [];
     const componentById = new Map((data.system.components || []).map((component) => [component.id, component]));
+    const displayTypeFor = (node: DfdNode) => nodeTypeForComponent(node.componentRef ? componentById.get(node.componentRef) : undefined, node.type === 'trust-boundary' ? 'process' : node.type);
     const availableComponents = (data.dfd.nodes || [])
         .filter((node) => node.type !== 'trust-boundary' && node.componentRef)
         .filter((node, index, all) => all.findIndex((candidate) => candidate.componentRef === node.componentRef) === index)
-        .map((node) => ({ node, component: componentById.get(node.componentRef!) }))
+        .map((node) => ({ node, component: componentById.get(node.componentRef!), type: nodeTypeForComponent(componentById.get(node.componentRef!), node.type) }))
         .sort((left, right) => (left.component?.name || left.node.label).localeCompare(right.component?.name || right.node.label));
 
     const updateDfd = (patch: Partial<Dfd>) => updateDiagram({ dfd: { ...dfd, ...patch } });
@@ -70,7 +78,7 @@ export default function IndependentDfdEditor({ diagram, updateDiagram }: { diagr
         const source = availableComponents.find(({ node }) => node.id === sourceNodeId)?.node;
         if (!source || source.type === 'trust-boundary') return;
         const component = source.componentRef ? componentById.get(source.componentRef) : undefined;
-        addNode(source.type, component?.name || source.label, source.componentRef);
+        addNode(nodeTypeForComponent(component, source.type), component?.name || source.label, source.componentRef);
     };
 
     const autoLayout = () => updateDfd({ nodes: nodes.map((node, index) => ({ ...node, x: 48 + (index % 4) * 210, y: 48 + Math.floor(index / 4) * 150 })) });
@@ -103,8 +111,8 @@ export default function IndependentDfdEditor({ diagram, updateDiagram }: { diagr
     const selectedNode = nodes.find((node) => node.id === selectedNodeId);
     const selectedFlow = flows.find((flow) => flow.id === selectedFlowId);
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
-    const maxX = Math.max(760, ...nodes.map((node) => (node.x || 0) + NODE_DIMS[node.type === 'trust-boundary' ? 'process' : node.type].w + 60));
-    const maxY = Math.max(460, ...nodes.map((node) => (node.y || 0) + NODE_DIMS[node.type === 'trust-boundary' ? 'process' : node.type].h + 60));
+    const maxX = Math.max(760, ...nodes.map((node) => (node.x || 0) + NODE_DIMS[displayTypeFor(node)].w + 60));
+    const maxY = Math.max(460, ...nodes.map((node) => (node.y || 0) + NODE_DIMS[displayTypeFor(node)].h + 60));
 
     return (
         <>
@@ -112,7 +120,7 @@ export default function IndependentDfdEditor({ diagram, updateDiagram }: { diagr
                 <label className="hint" htmlFor="scenario-component">Add a Step 04 component</label>
                 <select id="scenario-component" className="inp navsel" defaultValue="" onChange={(event) => { if (event.target.value) addComponent(event.target.value); event.currentTarget.value = ''; }}>
                     <option value="">Select component...</option>
-                    {availableComponents.map(({ node, component }) => <option key={node.id} value={node.id}>{component?.name || node.label} ({nodeTypeLabel(node.type)})</option>)}
+                    {availableComponents.map(({ node, component, type }) => <option key={node.id} value={node.id}>{component?.name || node.label} ({nodeTypeLabel(type)})</option>)}
                 </select>
                 <span className="hint">or add</span>
                 {NODE_TYPES.map((type) => <button key={type} className="btn sm" onClick={() => addNode(type)}>+ {nodeTypeLabel(type)}</button>)}
@@ -142,7 +150,7 @@ export default function IndependentDfdEditor({ diagram, updateDiagram }: { diagr
                         const end = { x: (toPosition.x || 0) + 75, y: (toPosition.y || 0) + 42 };
                         const obstacles = nodes.filter((node) => node.id !== from.id && node.id !== to.id).map((node) => {
                             const position = drag?.id === node.id ? drag : node;
-                            const size = NODE_DIMS[node.type === 'trust-boundary' ? 'process' : node.type];
+                            const size = NODE_DIMS[displayTypeFor(node)];
                             return { x: position.x || 0, y: position.y || 0, w: size.w, h: size.h };
                         });
                         const path = curvedPath(start, end, obstacles, 28);
@@ -150,12 +158,13 @@ export default function IndependentDfdEditor({ diagram, updateDiagram }: { diagr
                     })}
                     {nodes.filter((node) => node.type !== 'trust-boundary').map((node) => {
                         const position = drag?.id === node.id ? drag : node;
-                        const size = NODE_DIMS[node.type];
-                        return <g key={node.id} className={'scenario-node ' + node.type + (selectedNodeId === node.id ? ' selected' : '')} transform={`translate(${position.x || 0},${position.y || 0})`} onMouseDown={(event) => { event.preventDefault(); event.stopPropagation(); startDrag(event, node); }}><rect width={size.w} height={size.h} rx={node.type === 'process' || node.type === 'multiprocess' ? 45 : 3} /><text x={size.w / 2} y={size.h / 2 + 4} textAnchor="middle">{node.label}</text></g>;
+                        const displayType = displayTypeFor(node);
+                        const size = NODE_DIMS[displayType];
+                        return <g key={node.id} className={'scenario-node ' + displayType + (selectedNodeId === node.id ? ' selected' : '')} transform={`translate(${position.x || 0},${position.y || 0})`} onMouseDown={(event) => { event.preventDefault(); event.stopPropagation(); startDrag(event, node); }}>{displayType === 'store' ? <><line x1="0" y1="10" x2={size.w} y2="10" /><line x1="0" y1={size.h - 10} x2={size.w} y2={size.h - 10} /></> : <rect width={size.w} height={size.h} rx={displayType === 'process' || displayType === 'multiprocess' ? 45 : 3} />}<text x={size.w / 2} y={size.h / 2 + 4} textAnchor="middle">{node.label}</text></g>;
                     })}
                 </svg>
             </div>
-            {selectedNode && <div className="scenario-editor"><div className="field"><label>Node label</label><input className="inp" value={selectedNode.label} onChange={(event) => updateNode(selectedNode.id, { label: event.target.value })} /></div><div className="field"><label>DFD shape</label><select className="inp" value={selectedNode.type} onChange={(event) => updateNode(selectedNode.id, { type: event.target.value as DfdNodeType })}>{NODE_TYPES.map((type) => <option key={type} value={type}>{nodeTypeLabel(type)}</option>)}</select></div><div className="field"><label>System component</label><select className="inp" value={selectedNode.componentRef || ''} onChange={(event) => updateNode(selectedNode.id, { componentRef: event.target.value || undefined })}><option value="">Independent node</option>{availableComponents.map(({ node, component }) => <option key={node.id} value={node.componentRef}>{component?.name || node.label}</option>)}</select></div></div>}
+            {selectedNode && <div className="scenario-editor"><div className="field"><label>Node label</label><input className="inp" value={selectedNode.label} onChange={(event) => updateNode(selectedNode.id, { label: event.target.value })} /></div><div className="field"><label>DFD shape</label><select className="inp" value={displayTypeFor(selectedNode)} onChange={(event) => updateNode(selectedNode.id, { type: event.target.value as DfdNodeType })}>{NODE_TYPES.map((type) => <option key={type} value={type}>{nodeTypeLabel(type)}</option>)}</select></div><div className="field"><label>System component</label><select className="inp" value={selectedNode.componentRef || ''} onChange={(event) => { const componentRef = event.target.value || undefined; updateNode(selectedNode.id, { componentRef, type: nodeTypeForComponent(componentRef ? componentById.get(componentRef) : undefined, selectedNode.type) }); }}><option value="">Independent node</option>{availableComponents.map(({ node, component }) => <option key={node.id} value={node.componentRef}>{component?.name || node.label}</option>)}</select></div></div>}
             {selectedFlow && <div className="scenario-editor"><div className="field"><label>Flow label</label><input className="inp" value={selectedFlow.label || ''} onChange={(event) => updateFlow(selectedFlow.id, { label: event.target.value })} /></div><div className="field"><label>From</label><select className="inp" value={selectedFlow.from} onChange={(event) => updateFlow(selectedFlow.id, { from: event.target.value })}>{nodes.map((node) => <option key={node.id} value={node.id}>{node.label || node.id}</option>)}</select></div><div className="field"><label>To</label><select className="inp" value={selectedFlow.to} onChange={(event) => updateFlow(selectedFlow.id, { to: event.target.value })}>{nodes.map((node) => <option key={node.id} value={node.id}>{node.label || node.id}</option>)}</select></div></div>}
             <p className="hint">This diagram is independent from Step 04. Add modelled components or local nodes, drag them into place, then select a source and choose Connect.</p>
         </>
