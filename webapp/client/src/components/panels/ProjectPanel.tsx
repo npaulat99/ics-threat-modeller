@@ -367,21 +367,21 @@ export default function ProjectPanel() {
             </div>
 
             <div className="card">
-                <h3>(Mis-)use cases</h3>
+                <h3>Scenarios & diagrams</h3>
                 <p className="hint" style={{ marginTop: 0 }}>
-                    Model actors, actions and misuse-case variants for the device in a dedicated editor.
+                    Model use cases, misuse cases and scenario-specific data flows in a dedicated editor.
                 </p>
                 <button className="btn sm" onClick={() => setView('useCases')}>
-                    Open use-case editor
+                    Open scenario editor
                 </button>
-                <Field label="Report inclusion" style={{ marginTop: 10 }} hint="Off by default — use-case diagrams are supporting material, not part of the TRA chain.">
+                <Field label="Report inclusion" style={{ marginTop: 10 }} hint="Off by default — scenario diagrams are supporting material, not part of the TRA chain.">
                     <label className="check">
-                        <input type="checkbox" checked={includeUseCases} onChange={(e) => setIncludeUseCases(e.target.checked)} /> Include use-case diagrams in report
+                        <input type="checkbox" checked={includeUseCases} onChange={(e) => setIncludeUseCases(e.target.checked)} /> Include scenario diagrams in report
                     </label>
                 </Field>
                 {ucNoticePending && (
                     <div className="notice-box" style={{ marginTop: 8 }}>
-                        <b>Notice:</b> {ucDiagrams.length} use-case diagram{ucDiagrams.length === 1 ? '' : 's'} exist but {ucDiagrams.length === 1 ? 'is' : 'are'} excluded from the report.
+                        <b>Notice:</b> {ucDiagrams.length} scenario diagram{ucDiagrams.length === 1 ? '' : 's'} exist but {ucDiagrams.length === 1 ? 'is' : 'are'} excluded from the report.
                         <div style={{ marginTop: 6 }}>
                             <button className="btn sm" onClick={ackUseCaseNotice}>
                                 Acknowledge intentional exclusion

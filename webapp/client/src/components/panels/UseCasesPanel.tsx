@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useStore, uid } from '../../state/store';
 import { cx } from '../common';
 import type { UseCaseConnection, UseCaseDiagram, UseCaseEntity, UseCaseEntityKind } from '../../types';
+import IndependentDfdEditor from './IndependentDfdEditor';
 
 const ENTITY_LABEL: Record<UseCaseEntityKind, string> = {
     actor: 'Actor',
@@ -155,9 +156,17 @@ export default function UseCasesPanel() {
     const setDiagrams = (next: UseCaseDiagram[]) => save('useCases', { diagrams: next });
     const updateDiagram = (id: string, patch: Partial<UseCaseDiagram>) => setDiagrams(diagrams.map((d) => (d.id === id ? { ...d, ...patch } : d)));
 
-    const addDiagram = () => {
+    const addDiagram = (kind: 'use-case' | 'independent-dfd' = 'use-case') => {
         const id = uid('UC', diagrams.map((d) => d.id));
-        const next: UseCaseDiagram = { id, name: `Use cases ${diagrams.length + 1}`, entities: [], connections: [], groups: [] };
+        const next: UseCaseDiagram = {
+            id,
+            name: kind === 'independent-dfd' ? `Data flow ${diagrams.length + 1}` : `Use cases ${diagrams.length + 1}`,
+            kind,
+            entities: [],
+            connections: [],
+            groups: [],
+            ...(kind === 'independent-dfd' ? { dfd: { nodes: [], flows: [] } } : {}),
+        };
         setDiagrams([...diagrams, next]);
         setUcDiagram(id);
     };
@@ -172,7 +181,7 @@ export default function UseCasesPanel() {
         return (
             <div className="panel" ref={panelRef}>
                 <div className="panelhead">
-                    <h1>(Mis-)use cases</h1>
+                    <h1>Scenarios & diagrams</h1>
                 </div>
                 <p className="lead">Model actors, actions and misuse-case variants for the device. Optional and excluded from the report by default.</p>
                 <div className="notice-box" style={{ maxWidth: 680 }}>
@@ -180,8 +189,11 @@ export default function UseCasesPanel() {
                     If that happens, reload the page once and the use-case editor will work normally.
                 </div>
                 <div className="inline">
-                    <button className="btn primary" onClick={addDiagram}>
-                        + New diagram
+                    <button className="btn primary" onClick={() => addDiagram('use-case')}>
+                        + New use case
+                    </button>
+                    <button className="btn" onClick={() => addDiagram('independent-dfd')}>
+                        + New DFD
                     </button>
                     <button className="btn sm" onClick={() => setView('project')}>
                         ← Exit to project
@@ -308,12 +320,36 @@ export default function UseCasesPanel() {
         };
     });
 
+    if (activeDiagram.kind === 'independent-dfd') {
+        return (
+            <div className="panel" ref={panelRef}>
+                <div className="panelhead"><h1>Scenarios & diagrams</h1></div>
+                <p className="lead">Model a data flow for this scenario without changing the system DFD in Step 04.</p>
+                <div className="dfd-bar">
+                    <div className="crumbs">
+                        <select className="inp" value={activeDiagram.id} onChange={(e) => setUcDiagram(e.target.value)}>
+                            {diagrams.map((diagram) => <option key={diagram.id} value={diagram.id}>{diagram.name || diagram.id}</option>)}
+                        </select>
+                        <input className="inp" style={{ marginLeft: 8, width: 200 }} value={activeDiagram.name || ''} onChange={(e) => updateDiagram(activeDiagram.id, { name: e.target.value })} />
+                    </div>
+                    <div className="right palette">
+                        <button className="btn sm" onClick={() => addDiagram('use-case')}>+ Use case</button>
+                        <button className="btn sm" onClick={() => addDiagram('independent-dfd')}>+ DFD</button>
+                        <button className="btn sm danger" onClick={() => deleteDiagram(activeDiagram.id)}>Delete</button>
+                        <button className="btn sm" onClick={() => setView('project')}>← Exit</button>
+                    </div>
+                </div>
+                <IndependentDfdEditor diagram={activeDiagram} updateDiagram={(patch) => updateDiagram(activeDiagram.id, patch)} />
+            </div>
+        );
+    }
+
     return (
         <div className="panel" ref={panelRef}>
             <div className="panelhead">
-                <h1>(Mis-)use cases</h1>
+                <h1>Scenarios & diagrams</h1>
             </div>
-            <p className="lead">Optional supporting diagrams — actors, actions, misuse-case variants and grouping boxes. Excluded from the report by default (toggle in step 01).</p>
+            <p className="lead">Optional supporting diagrams — use cases, misuse cases and scenario-specific data flows. Excluded from the report by default (toggle in step 01).</p>
 
             <div className="dfd-bar">
                 <div className="crumbs">
@@ -385,8 +421,11 @@ export default function UseCasesPanel() {
                     >
                         {linking ? '✓ Connections' : '🔗 Connections'}
                     </button>
-                    <button className="btn sm" onClick={addDiagram} title="New diagram">
-                        + Diagram
+                    <button className="btn sm" onClick={() => addDiagram('use-case')} title="New use-case diagram">
+                        + Use case
+                    </button>
+                    <button className="btn sm" onClick={() => addDiagram('independent-dfd')} title="New independent data-flow diagram">
+                        + DFD
                     </button>
                     <button className="btn sm danger" onClick={() => deleteDiagram(activeDiagram.id)} title="Delete this diagram">
                         Delete

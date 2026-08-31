@@ -14,7 +14,7 @@ const STEPS: StepDef[] = [
     { key: 'assumptions', icon: '🧠', label: 'Assumptions', sub: 'Incl. attacker profiles' },
     { key: 'system', icon: '🧱', label: 'System & Assets', sub: 'Components, C/I/A/S' },
     { key: 'dfd', icon: '🔀', label: 'Data Flow Diagram', sub: 'Layered DeMarco model' },
-    { key: 'useCases', icon: '🎭', label: '(Mis-)use cases', sub: 'Actors, actions · optional' },
+    { key: 'useCases', icon: '🎭', label: 'Scenarios & diagrams', sub: 'Use cases, DFDs · optional' },
     { key: 'requirements', icon: '📝', label: 'Requirements', sub: 'Security requirements (SR)' },
     { key: 'threats', icon: '⚠️', label: 'Threats', sub: 'STRIDE + risk rating' },
     { key: 'attackTrees', icon: '🌳', label: 'Attack trees', sub: 'Optional · AND/OR/SAND' },

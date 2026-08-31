@@ -128,10 +128,12 @@ export interface UseCaseGroup {
 export interface UseCaseDiagram {
     id: string;
     name: string;
+    kind?: 'use-case' | 'independent-dfd';
     entities: UseCaseEntity[];
     connections: UseCaseConnection[];
     groups: UseCaseGroup[];
     drawioXml?: string;
+    dfd?: Dfd;
 }
 
 export interface UseCasesDoc {

@@ -135,7 +135,7 @@ export const tutorialNav: { key: NavKey; label: string }[] = [
     { key: 'assumptions', label: 'Assumptions' },
     { key: 'system', label: 'System & Assets' },
     { key: 'dfd', label: 'Data Flow Diagram' },
-    { key: 'useCases', label: '(Mis-)use cases' },
+    { key: 'useCases', label: 'Scenarios & diagrams' },
     { key: 'requirements', label: 'Requirements' },
     { key: 'threats', label: 'Threats' },
     { key: 'attackTrees', label: 'Attack trees' },
@@ -148,7 +148,7 @@ export const tutorialNav: { key: NavKey; label: string }[] = [
 export const tutorialWorkshops = [
     { phase: 'Kickoff', focus: 'Scope and initial assumptions', who: 'Project lead · architect · facilitator' },
     { phase: 'Impact workshop', focus: 'Worst-case scenarios · attack-tree roots', who: 'Product owner · business · facilitator' },
-    { phase: 'Technical modeling', focus: 'System, assets, DFD · optional use cases', who: 'Architects · developers · testers' },
+    { phase: 'Technical modeling', focus: 'System, assets, DFD · optional scenarios', who: 'Architects · developers · testers' },
     { phase: 'Threat analysis', focus: 'Threats · attack-tree refinement', who: 'Technical team · facilitator' },
     { phase: 'Requirements → mitigations', focus: 'Capture requirements, then evaluate controls', who: 'Technical team · product owner' },
     { phase: 'Review and lifecycle', focus: 'Resolve findings · report · tag versions', who: 'Project stakeholders' },

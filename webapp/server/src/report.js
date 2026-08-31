@@ -699,8 +699,8 @@ export async function buildReport(id) {
     const ucDiagrams = Array.isArray(useCases?.diagrams) ? useCases.diagrams : [];
     const useCaseSection = project.reportOptions?.includeUseCases
         ? ucDiagrams.length
-            ? `<h2>Use-case diagrams</h2>${ucDiagrams
-                .map((d) => `<h3>${esc(d.name || d.id)}</h3>${useCaseSvg(d)}`)
+            ? `<h2>Scenarios & diagrams</h2>${ucDiagrams
+                .map((d) => `<h3>${esc(d.name || d.id)}</h3>${d.kind === 'independent-dfd' ? (layerSvg(d.dfd || {}, null, {}) || '<p>No components in this diagram.</p>') : useCaseSvg(d)}`)
                 .join('')}`
             : ''
         : '';
