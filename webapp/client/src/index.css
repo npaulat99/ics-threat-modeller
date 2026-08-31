@@ -3165,6 +3165,45 @@ button.linkbtn {
     z-index: 6;
 }
 
+.scenario-choice {
+    flex-direction: column;
+    min-height: 70px;
+}
+
+.tw-scenario-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 18px;
+    font-size: 10px;
+    transition: opacity 400ms ease, transform 400ms ease;
+}
+
+.tw-scenario-node {
+    padding: 7px 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    border-radius: 4px;
+    text-align: center;
+}
+
+.tw-scenario-node.process {
+    border-radius: 999px;
+}
+
+.tw-scenario-node.store {
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+    background: var(--surface-2);
+}
+
+.tw-scenario-arrow {
+    color: var(--text-faint);
+    white-space: nowrap;
+}
+
 /* risk badges */
 .tw-risk {
     display: inline-block;

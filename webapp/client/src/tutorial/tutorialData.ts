@@ -27,6 +27,7 @@ export type ScreenKey =
     | 'system'
     | 'assets'
     | 'dfd'
+    | 'scenarios'
     | 'threats'
     | 'attacktree'
     | 'requirements'
@@ -295,6 +296,25 @@ export const tutorialSteps: TutorialStep[] = [
             { t: 0.6, x: 60, y: 50, click: true, reveal: 2 },
             { t: 0.86, x: 62, y: 40, click: true, reveal: 3 },
             { t: 1, x: 52, y: 50, reveal: 3 },
+        ],
+    },
+    {
+        key: 'scenarios',
+        navKey: 'useCases',
+        screen: 'scenarios',
+        title: 'Optional scenarios — use cases or focused DFDs',
+        phase: 'Technical modeling',
+        participants: ['Architects', 'Developers', 'Testers'],
+        iteration: 'Add only when a focused view helps',
+        what: 'Use **Scenarios & diagrams** to model a specific operating or misuse case. Choose a **use-case diagram** for actors and actions, or an independent **DFD** for the data flows in one scenario.',
+        why: 'Scenario DFDs reuse components from the main model but do not change the primary Step 04 architecture or its layered trust-boundary analysis.',
+        duration: 4600,
+        path: [
+            { t: 0, x: 22, y: 42, reveal: 0 },
+            { t: 0.28, x: 36, y: 30, click: true, reveal: 1 },
+            { t: 0.58, x: 66, y: 30, click: true, reveal: 2 },
+            { t: 0.82, x: 66, y: 62, click: true, reveal: 3 },
+            { t: 1, x: 52, y: 54, reveal: 3 },
         ],
     },
     {
