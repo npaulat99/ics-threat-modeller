@@ -87,6 +87,8 @@ function Screen({ step, reveal, typing }: { step: TutorialStep; reveal: number; 
             return <AssetsScreen reveal={reveal} />;
         case 'dfd':
             return <DfdScreen reveal={reveal} />;
+        case 'scenarios':
+            return <ScenariosScreen reveal={reveal} />;
         case 'threats':
             return <ThreatsScreen reveal={reveal} />;
         case 'attacktree':
@@ -280,6 +282,32 @@ function DfdScreen({ reveal }: { reveal: number }) {
                 <div className={'tw-flowlabel' + show(reveal, 3)} style={{ left: '68%', top: '63%' }}>
                     Signed firmware
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function ScenariosScreen({ reveal }: { reveal: number }) {
+    return (
+        <div>
+            <PanelHead num="04b" title="Scenarios & diagrams" action="+ Use case  + DFD" />
+            <p className={'tw-note' + show(reveal, 1)}>Optional focused models for one operating or misuse scenario.</p>
+            <div className="tw-two">
+                <div className={'tw-cardrow scenario-choice' + show(reveal, 1)}>
+                    <span className="tw-node">USE CASE</span>
+                    <span><b>Operator maintenance</b><br />Actor → authenticate → calibrate device</span>
+                </div>
+                <div className={'tw-cardrow scenario-choice' + show(reveal, 2)}>
+                    <span className="tw-node">SCENARIO DFD</span>
+                    <span><b>Remote firmware update</b><br />Reuse modelled components for one flow</span>
+                </div>
+            </div>
+            <div className={'tw-scenario-flow' + show(reveal, 3)}>
+                <span className="tw-scenario-node">Vendor cloud</span>
+                <span className="tw-scenario-arrow">Signed firmware →</span>
+                <span className="tw-scenario-node process">FC-300 controller</span>
+                <span className="tw-scenario-arrow">Verify →</span>
+                <span className="tw-scenario-node store">Firmware store</span>
             </div>
         </div>
     );

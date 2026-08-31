@@ -1108,6 +1108,57 @@ textarea {
     cursor: default;
 }
 
+.scenario-dfd-canvas {
+    min-height: 460px;
+}
+
+.scenario-node {
+    cursor: grab;
+}
+
+.scenario-node rect {
+    fill: var(--surface);
+    stroke: var(--node-border);
+    stroke-width: 1.8px;
+}
+
+.scenario-node.store line {
+    stroke: var(--node-border);
+    stroke-width: 2px;
+}
+
+.scenario-node.selected rect,
+.scenario-node.selected line {
+    stroke: var(--accent);
+    stroke-width: 3px;
+}
+
+.scenario-node text,
+.scenario-flow text {
+    fill: var(--text);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.scenario-flow {
+    color: var(--edge);
+    cursor: pointer;
+}
+
+.scenario-flow path {
+    stroke: currentColor;
+    stroke-width: 1.8px;
+    fill: none;
+}
+
+.scenario-flow.selected {
+    color: var(--accent);
+}
+
+.scenario-editor {
+    padding: 8px 14px;
+}
+
 .react-flow__edge-text {
     font-size: 10px;
     fill: var(--text-dim);
@@ -3112,6 +3163,45 @@ button.linkbtn {
     white-space: nowrap;
     transition: opacity 400ms ease;
     z-index: 6;
+}
+
+.scenario-choice {
+    flex-direction: column;
+    min-height: 70px;
+}
+
+.tw-scenario-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 18px;
+    font-size: 10px;
+    transition: opacity 400ms ease, transform 400ms ease;
+}
+
+.tw-scenario-node {
+    padding: 7px 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    border-radius: 4px;
+    text-align: center;
+}
+
+.tw-scenario-node.process {
+    border-radius: 999px;
+}
+
+.tw-scenario-node.store {
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+    background: var(--surface-2);
+}
+
+.tw-scenario-arrow {
+    color: var(--text-faint);
+    white-space: nowrap;
 }
 
 /* risk badges */
