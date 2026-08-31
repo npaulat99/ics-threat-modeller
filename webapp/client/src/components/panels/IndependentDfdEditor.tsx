@@ -33,6 +33,20 @@ function curvedPath(from: { x: number; y: number }, to: { x: number; y: number }
     return `M ${from.x},${from.y} Q ${controlX},${controlY} ${to.x},${to.y}`;
 }
 
+function outlinePoint(position: { x?: number; y?: number }, type: Exclude<DfdNodeType, 'trust-boundary'>, toward: { x: number; y: number }) {
+    const size = NODE_DIMS[type];
+    const center = { x: (position.x || 0) + size.w / 2, y: (position.y || 0) + size.h / 2 };
+    const dx = toward.x - center.x;
+    const dy = toward.y - center.y;
+    if (!dx && !dy) return center;
+    if (type === 'process' || type === 'multiprocess') {
+        const scale = 1 / Math.sqrt((dx * dx) / ((size.w / 2) ** 2) + (dy * dy) / ((size.h / 2) ** 2));
+        return { x: center.x + dx * scale, y: center.y + dy * scale };
+    }
+    const scale = 1 / Math.max(Math.abs(dx) / (size.w / 2), Math.abs(dy) / (size.h / 2));
+    return { x: center.x + dx * scale, y: center.y + dy * scale };
+}
+
 export default function IndependentDfdEditor({ diagram, updateDiagram }: { diagram: UseCaseDiagram; updateDiagram: (patch: Partial<UseCaseDiagram>) => void }) {
     const data = useStore((s) => s.data)!;
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -146,8 +160,12 @@ export default function IndependentDfdEditor({ diagram, updateDiagram }: { diagr
                         if (!from || !to) return null;
                         const fromPosition = drag?.id === from.id ? drag : from;
                         const toPosition = drag?.id === to.id ? drag : to;
-                        const start = { x: (fromPosition.x || 0) + 75, y: (fromPosition.y || 0) + 42 };
-                        const end = { x: (toPosition.x || 0) + 75, y: (toPosition.y || 0) + 42 };
+                        const fromType = displayTypeFor(from);
+                        const toType = displayTypeFor(to);
+                        const fromCenter = { x: (fromPosition.x || 0) + NODE_DIMS[fromType].w / 2, y: (fromPosition.y || 0) + NODE_DIMS[fromType].h / 2 };
+                        const toCenter = { x: (toPosition.x || 0) + NODE_DIMS[toType].w / 2, y: (toPosition.y || 0) + NODE_DIMS[toType].h / 2 };
+                        const start = outlinePoint(fromPosition, fromType, toCenter);
+                        const end = outlinePoint(toPosition, toType, fromCenter);
                         const obstacles = nodes.filter((node) => node.id !== from.id && node.id !== to.id).map((node) => {
                             const position = drag?.id === node.id ? drag : node;
                             const size = NODE_DIMS[displayTypeFor(node)];
