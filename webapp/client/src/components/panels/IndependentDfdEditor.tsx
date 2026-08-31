@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { uid, useStore } from '../../state/store';
 import type { Dfd, DfdNode, DfdNodeType, Flow, UseCaseDiagram } from '../../types';
+import { routeAround, roundedPath } from '@shared/dfdEngine.js';
 
 const NODE_DIMS: Record<Exclude<DfdNodeType, 'trust-boundary'>, { w: number; h: number }> = {
     process: { w: 150, h: 90 },
@@ -13,6 +14,16 @@ const NODE_TYPES: Exclude<DfdNodeType, 'trust-boundary'>[] = ['process', 'multip
 
 function nodeTypeLabel(type: DfdNodeType) {
     return type === 'external-entity' ? 'External entity' : type === 'multiprocess' ? 'Multi-process' : type[0].toUpperCase() + type.slice(1);
+}
+
+function curvedPath(from: { x: number; y: number }, to: { x: number; y: number }, obstacles: { x: number; y: number; w: number; h: number }[], offset: number) {
+    const route = routeAround(from.x, from.y, to.x, to.y, obstacles, 16);
+    const directDistance = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+    const routeDistance = route.slice(1).reduce((total, point, index) => total + Math.hypot(point[0] - route[index][0], point[1] - route[index][1]), 0);
+    if (route.length > 2 && routeDistance <= 2.4 * directDistance) return roundedPath(route, 14);
+    const controlX = (from.x + to.x) / 2 + (-(to.y - from.y) / directDistance) * offset;
+    const controlY = (from.y + to.y) / 2 + ((to.x - from.x) / directDistance) * offset;
+    return `M ${from.x},${from.y} Q ${controlX},${controlY} ${to.x},${to.y}`;
 }
 
 export default function IndependentDfdEditor({ diagram, updateDiagram }: { diagram: UseCaseDiagram; updateDiagram: (patch: Partial<UseCaseDiagram>) => void }) {
@@ -129,7 +140,13 @@ export default function IndependentDfdEditor({ diagram, updateDiagram }: { diagr
                         const toPosition = drag?.id === to.id ? drag : to;
                         const start = { x: (fromPosition.x || 0) + 75, y: (fromPosition.y || 0) + 42 };
                         const end = { x: (toPosition.x || 0) + 75, y: (toPosition.y || 0) + 42 };
-                        return <g key={flow.id} className={selectedFlowId === flow.id ? 'scenario-flow selected' : 'scenario-flow'} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setSelectedFlowId(flow.id); setSelectedNodeId(null); }}><line x1={start.x} y1={start.y} x2={end.x} y2={end.y} markerEnd="url(#scenario-arrow)" /><text x={(start.x + end.x) / 2} y={(start.y + end.y) / 2 - 8} textAnchor="middle">{flow.label}</text></g>;
+                        const obstacles = nodes.filter((node) => node.id !== from.id && node.id !== to.id).map((node) => {
+                            const position = drag?.id === node.id ? drag : node;
+                            const size = NODE_DIMS[node.type === 'trust-boundary' ? 'process' : node.type];
+                            return { x: position.x || 0, y: position.y || 0, w: size.w, h: size.h };
+                        });
+                        const path = curvedPath(start, end, obstacles, 28);
+                        return <g key={flow.id} className={selectedFlowId === flow.id ? 'scenario-flow selected' : 'scenario-flow'} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setSelectedFlowId(flow.id); setSelectedNodeId(null); }}><path d={path} markerEnd="url(#scenario-arrow)" /><text x={(start.x + end.x) / 2} y={(start.y + end.y) / 2 - 8} textAnchor="middle">{flow.label}</text></g>;
                     })}
                     {nodes.filter((node) => node.type !== 'trust-boundary').map((node) => {
                         const position = drag?.id === node.id ? drag : node;

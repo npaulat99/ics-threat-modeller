@@ -323,7 +323,15 @@ export default function UseCasesPanel() {
     if (activeDiagram.kind === 'independent-dfd') {
         return (
             <div className="panel" ref={panelRef}>
-                <div className="panelhead"><h1>Scenarios & diagrams</h1></div>
+                <div className="panelhead">
+                    <h1>Scenarios & diagrams</h1>
+                    <div className="right palette">
+                        <button className="btn sm" onClick={() => addDiagram('use-case')}>+ Use case</button>
+                        <button className="btn sm" onClick={() => addDiagram('independent-dfd')}>+ DFD</button>
+                        <button className="btn sm danger" onClick={() => deleteDiagram(activeDiagram.id)}>Delete</button>
+                        <button className="btn sm" onClick={() => setView('project')}>← Exit</button>
+                    </div>
+                </div>
                 <p className="lead">Model a data flow for this scenario without changing the system DFD in Step 04.</p>
                 <div className="dfd-bar">
                     <div className="crumbs">
@@ -331,12 +339,6 @@ export default function UseCasesPanel() {
                             {diagrams.map((diagram) => <option key={diagram.id} value={diagram.id}>{diagram.name || diagram.id}</option>)}
                         </select>
                         <input className="inp" style={{ marginLeft: 8, width: 200 }} value={activeDiagram.name || ''} onChange={(e) => updateDiagram(activeDiagram.id, { name: e.target.value })} />
-                    </div>
-                    <div className="right palette">
-                        <button className="btn sm" onClick={() => addDiagram('use-case')}>+ Use case</button>
-                        <button className="btn sm" onClick={() => addDiagram('independent-dfd')}>+ DFD</button>
-                        <button className="btn sm danger" onClick={() => deleteDiagram(activeDiagram.id)}>Delete</button>
-                        <button className="btn sm" onClick={() => setView('project')}>← Exit</button>
                     </div>
                 </div>
                 <IndependentDfdEditor diagram={activeDiagram} updateDiagram={(patch) => updateDiagram(activeDiagram.id, patch)} />
@@ -348,6 +350,12 @@ export default function UseCasesPanel() {
         <div className="panel" ref={panelRef}>
             <div className="panelhead">
                 <h1>Scenarios & diagrams</h1>
+                <div className="right palette">
+                    <button className="btn sm" onClick={() => addDiagram('use-case')} title="New use-case diagram">+ Use case</button>
+                    <button className="btn sm" onClick={() => addDiagram('independent-dfd')} title="New independent data-flow diagram">+ DFD</button>
+                    <button className="btn sm danger" onClick={() => deleteDiagram(activeDiagram.id)} title="Delete this diagram">Delete</button>
+                    <button className="btn sm" onClick={() => setView('project')}>← Exit</button>
+                </div>
             </div>
             <p className="lead">Optional supporting diagrams — use cases, misuse cases and scenario-specific data flows. Excluded from the report by default (toggle in step 01).</p>
 
@@ -420,18 +428,6 @@ export default function UseCasesPanel() {
                         title="Connections mode: click a source entity, then a target entity, to link them"
                     >
                         {linking ? '✓ Connections' : '🔗 Connections'}
-                    </button>
-                    <button className="btn sm" onClick={() => addDiagram('use-case')} title="New use-case diagram">
-                        + Use case
-                    </button>
-                    <button className="btn sm" onClick={() => addDiagram('independent-dfd')} title="New independent data-flow diagram">
-                        + DFD
-                    </button>
-                    <button className="btn sm danger" onClick={() => deleteDiagram(activeDiagram.id)} title="Delete this diagram">
-                        Delete
-                    </button>
-                    <button className="btn sm" onClick={() => setView('project')}>
-                        ← Exit
                     </button>
                 </div>
             </div>
